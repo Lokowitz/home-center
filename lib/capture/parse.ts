@@ -93,11 +93,32 @@ export function pickTotal(text: string): number | null {
   return all.length ? Math.max(...all) : null
 }
 
+// A reference number line: "Job #188200417", "Order Number: QX55120847", "PO# 5510".
+const ID_LINE =
+  /^(job|order|ref|reference|po|p\.o\.|purchase order|work order|repair order|ro|account|acct|ticket|transaction|trans|txn|confirmation|conf|customer|cust|member|tracking|store|register|reg|terminal|auth|approval|case|claim)\b\.?\s*(#|no\b\.?|num\b\.?|number|id)?\s*[:#]?\s*[a-z]{0,4}[-\s]?\d/i
+// What a date line is made of besides digits and punctuation.
+const DATE_WORDS =
+  /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sept?(ember)?|oct(ober)?|nov(ember)?|dec(ember)?|(mon|tues?|wed(nes)?|thu(rs?)?|fri|sat(ur)?|sun)(day)?|[ap]\.?m)\b\.?/gi
+const CONTACT = /https?:\/\/|\bwww\.|\S+@\S+\.\S+|^(tel|phone|ph|fax|call)\b/i
+// OCR noise and decoration at the ends of a line (">. BELLE", "** NAME --"). A
+// trailing period stays: "Allbright Plumbing Co.".
+const trimNoise = (l: string) => l.trim().replace(/^[^\p{L}\p{N}]+/u, "").replace(/[^\p{L}\p{N}.)'&]+$/u, "")
+
+function isVendorLine(l: string): boolean {
+  if (!/[a-z]{3}/i.test(l)) return false
+  if (/invoice|receipt|page \d|^date/i.test(l)) return false
+  if (ID_LINE.test(l) || CONTACT.test(l)) return false
+  const digits = (l.match(/\d/g) ?? []).length
+  const letters = (l.match(/\p{L}/gu) ?? []).length
+  if (digits >= letters) return false
+  // A date line: nothing left but digits and punctuation once month, weekday and am/pm words go.
+  if (/\d/.test(l) && !/[a-z]{3}/i.test(l.replace(DATE_WORDS, ""))) return false
+  return true
+}
+
+/** The first line that reads like a business name, with OCR noise at its ends trimmed. */
 export function pickVendor(text: string): string | null {
-  const line = text
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .find((l) => /[a-z]{3}/i.test(l) && !/invoice|receipt|page \d|^date/i.test(l))
+  const line = text.split(/\r?\n/).map(trimNoise).find(isVendorLine)
   return line ? line.slice(0, 60) : null
 }
 

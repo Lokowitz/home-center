@@ -62,6 +62,31 @@ describe("parseReceipt vendor", () => {
   })
   it("skips lines without three letters", () => expect(p("12345\n--\nAce Hardware").vendor).toBe("Ace Hardware"))
   it("truncates to 60 chars", () => expect(p("A".repeat(80)).vendor).toHaveLength(60))
+  it("skips job, order, ref, PO, account, ticket and transaction number lines", () => {
+    expect(p("Job #188200417\nCopperline Chimney Sweeps").vendor).toBe("Copperline Chimney Sweeps")
+    expect(p("Order Number: QX55120847\nWillowmere Home Goods").vendor).toBe("Willowmere Home Goods")
+    expect(p("Ref: AB-77120\nPO# 55102\nAccount No. 4471-2290\nTicket 00412\nTransaction ID: T9981\nFernlake Glass").vendor).toBe("Fernlake Glass")
+    expect(p("Work Order WO-3381\nAcct: 99812\nConfirmation # ZK41\nGreystone Movers").vendor).toBe("Greystone Movers")
+  })
+  it("skips date lines", () => {
+    expect(p("Jan 12, 2024\nHollowbrook Dental Group").vendor).toBe("Hollowbrook Dental Group")
+    expect(p("Monday, March 3, 2025 10:42 AM\n10/04/2026 3:47 PM\nAshgrove Bakery").vendor).toBe("Ashgrove Bakery")
+  })
+  it("skips phone numbers, URLs, emails and mostly-digit lines", () => {
+    const t = "(555) 201-7740\nTel: 555-201-7741\nwww.example-shop.test\nhttps://pay.example.test/inv\nbilling@example.test\n4471 2290 1183 AB\nPage 2 of 3\nQuarry Hill Electric"
+    expect(p(t).vendor).toBe("Quarry Hill Electric")
+  })
+  it("trims leading and trailing OCR punctuation instead of rejecting the line", () => {
+    expect(p(">. FAIRWEATHER TIRE\n12 Elm St").vendor).toBe("FAIRWEATHER TIRE")
+    expect(p("** Brambleton Feed & Seed --\n12 Elm St").vendor).toBe("Brambleton Feed & Seed")
+    expect(p("|  Allbright Plumbing Co.  |").vendor).toBe("Allbright Plumbing Co.")
+  })
+  it("still takes an address-led vendor and a name with a number", () => {
+    expect(p("7-Star Car Wash\n100 Main St").vendor).toBe("7-Star Car Wash")
+    // Names that start like a month or weekday are not date lines.
+    expect(p("Sunoco 4471\nPump 3").vendor).toBe("Sunoco 4471")
+    expect(p("Mayfair Cleaners #12").vendor).toBe("Mayfair Cleaners #12")
+  })
 })
 
 describe("parseReceipt edge inputs", () => {

@@ -570,4 +570,58 @@ Total              8.00`,
     knownMiss: true,
     why: "The date has no year, and the parser won't guess one.",
   },
+
+  // ── Junk above the vendor name ────────────────────────────────────────────
+  {
+    id: "job-number-above-vendor",
+    text: `Job #188200417
+Copperline Chimney Sweeps
+88 Furnace Ln, Millbrook, OH 44090
+Service Date: 09/14/2026
+Chimney inspection and sweep     189.00
+Total Due                        189.00`,
+    expected: { date: "2026-09-14", total: 189, vendor: "Copperline Chimney Sweeps" },
+  },
+  {
+    id: "order-number-above-vendor",
+    text: `Order Number: QX55120847
+Willowmere Home Goods
+Order Date: 2026-09-25
+Linen curtain panel x2      58.00
+Shipping                     6.95
+Order Total                 64.95`,
+    expected: { date: "2026-09-25", total: 64.95, vendor: "Willowmere Home Goods" },
+  },
+  {
+    id: "ocr-punctuation-before-vendor",
+    text: `>. FAIRWEATHER TIRE
+19 Quarry Rd
+DATE 09/30/2026
+Tire rotation          29.99
+Valve stems x4         12.00
+TOTAL                  41.99`,
+    expected: { date: "2026-09-30", total: 41.99, vendor: "FAIRWEATHER TIRE" },
+  },
+  {
+    id: "date-line-above-vendor",
+    text: `Sep 19, 2026
+Hollowbrook Dental Group
+(555) 310-4420
+Cleaning and exam        145.00
+Insurance adjustment     -95.00
+Patient Balance           50.00
+Amount Paid               50.00`,
+    expected: { date: "2026-09-19", total: 50, vendor: "Hollowbrook Dental Group" },
+  },
+  {
+    id: "contact-lines-above-vendor",
+    text: `Page 1 of 2
+(555) 482-0091
+www.quarryhill-electric.test
+Quarry Hill Electric
+Invoice Date: 10/01/2026
+Panel inspection          95.00
+Total                     95.00`,
+    expected: { date: "2026-10-01", total: 95, vendor: "Quarry Hill Electric" },
+  },
 ]

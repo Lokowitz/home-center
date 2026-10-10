@@ -7,8 +7,8 @@ import { FIXTURE_TODAY, RECEIPT_FIXTURES, type ReceiptExpectation } from "./fixt
 // asserted field by field; the overall date+total score may not drop below
 // MIN_DATE_AND_TOTAL. Raise the floor when the parser improves.
 
-/** Fixtures (of RECEIPT_FIXTURES) whose date and total must both be right. Measured 2026-10-10: 27 of 34. */
-const MIN_DATE_AND_TOTAL = 27
+/** Fixtures (of RECEIPT_FIXTURES) whose date and total must both be right. Measured 2026-10-10: 32 of 39. */
+const MIN_DATE_AND_TOTAL = 32
 
 const parse = (text: string) => parseReceipt(text, FIXTURE_TODAY)
 

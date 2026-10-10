@@ -9,6 +9,8 @@ export type CompletableSchedule = {
   intervalMiles: number | null
   nextDueDate: Date | null
   nextDueMileage: number | null
+  lastCompletedDate?: Date | null
+  lastCompletedMileage?: number | null
 }
 
 export type ScheduleCompletion = {
@@ -19,15 +21,28 @@ export type ScheduleCompletion = {
 }
 
 /// The next due date/mileage counts from the completion, not from the old due
-/// date. A side with no interval keeps whatever due value it had.
+/// date, but never moves earlier: filing an old receipt against a reminder
+/// already due later keeps the later due value. A side with no interval keeps
+/// whatever due value it had. Likewise an older completion never replaces a
+/// later recorded one as "last completed".
 export function completeSchedule(schedule: CompletableSchedule, completedDate: Date, completedMileage: number | null): ScheduleCompletion {
-  const nextDueDate = schedule.intervalDays
+  const computedDate = schedule.intervalDays
     ? new Date(new Date(completedDate).setDate(completedDate.getDate() + schedule.intervalDays))
+    : null
+  const nextDueDate = computedDate
+    ? schedule.nextDueDate && schedule.nextDueDate.getTime() >= computedDate.getTime() ? schedule.nextDueDate : computedDate
     : schedule.nextDueDate
-  const nextDueMileage = schedule.intervalMiles && completedMileage != null
-    ? completedMileage + schedule.intervalMiles
+  const computedMileage = schedule.intervalMiles && completedMileage != null ? completedMileage + schedule.intervalMiles : null
+  const nextDueMileage = computedMileage != null
+    ? Math.max(schedule.nextDueMileage ?? computedMileage, computedMileage)
     : schedule.nextDueMileage
-  return { lastCompletedDate: completedDate, lastCompletedMileage: completedMileage, nextDueDate, nextDueMileage }
+  const olderThanLast = schedule.lastCompletedDate != null && completedDate.getTime() < schedule.lastCompletedDate.getTime()
+  return {
+    lastCompletedDate: olderThanLast ? schedule.lastCompletedDate! : completedDate,
+    lastCompletedMileage: olderThanLast ? schedule.lastCompletedMileage ?? null : completedMileage,
+    nextDueDate,
+    nextDueMileage,
+  }
 }
 
 /// The service record category a completed reminder is logged under. People's
