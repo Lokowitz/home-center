@@ -8,6 +8,9 @@ export default auth((req) => {
   // Auth API and static assets pass through
   if (nextUrl.pathname.startsWith("/api/auth")) return NextResponse.next()
 
+  // Container healthcheck: no session, and it only answers ok/error.
+  if (nextUrl.pathname === "/api/health") return NextResponse.next()
+
   // Public routes
   const publicPaths = ["/login", "/setup"]
   if (publicPaths.includes(nextUrl.pathname)) {

@@ -44,9 +44,9 @@ export async function createEquipment(data: z.infer<typeof schema>) {
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.equipment.create({ data: clean(parsed.data) })
+  const row = await prisma.equipment.create({ data: clean(parsed.data) })
   revalidatePath("/assets/equipment")
-  return { success: true }
+  return { success: true, id: row.id }
 }
 
 export async function updateEquipment(id: string, data: z.infer<typeof schema>) {

@@ -10,6 +10,8 @@ import { z } from "zod"
 import { completionCategory } from "@/lib/maintenance-complete"
 import { dismissScheduleNotifications, scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
 import { snoozeEnd, type SnoozeFor } from "@/lib/maintenance-due"
+import { firstDue, templatesFor } from "@/lib/maintenance-templates"
+import { loadTemplateTarget } from "@/lib/maintenance-templates-server"
 
 const schema = z.object({
   assetId: z.string().min(1),
@@ -168,6 +170,57 @@ export async function setMaintenanceScheduleActive(id: string, isActive: boolean
   ])
   revalidateSchedule(schedule)
   return { success: true }
+}
+
+const templatePicksSchema = z
+  .array(
+    z.object({
+      key: z.string().min(1),
+      intervalDays: z.literal("").or(z.coerce.number().int().min(1)).optional(),
+      intervalMiles: z.literal("").or(z.coerce.number().int().min(1)).optional(),
+    })
+  )
+  .min(1)
+  .max(50)
+
+/**
+ * Creates the default reminders picked for a new asset. Keys are checked
+ * against the asset's own template list; titles always come from it, and only
+ * the intervals can be changed.
+ */
+export async function addTemplateSchedules(assetType: AssetType, assetId: string, picks: z.input<typeof templatePicksSchema>) {
+  const session = await auth()
+  if (!session) redirect("/login")
+  const parsed = templatePicksSchema.safeParse(picks)
+  if (!parsed.success) return { error: "Invalid input" }
+
+  const target = await loadTemplateTarget(assetType, assetId)
+  if (!target) return { error: "Not found" }
+  const byKey = new Map(templatesFor(target.asset).map((t) => [t.key, t]))
+
+  const today = new Date()
+  const rows = []
+  for (const pick of parsed.data) {
+    const t = byKey.get(pick.key)
+    if (!t) return { error: "Invalid input" }
+    const intervalDays = pick.intervalDays === undefined ? t.intervalDays ?? null : pick.intervalDays === "" ? null : pick.intervalDays
+    const intervalMiles = pick.intervalMiles === undefined ? t.intervalMiles ?? null : pick.intervalMiles === "" ? null : pick.intervalMiles
+    if (!intervalDays && !intervalMiles) return { error: `"${t.title}" needs an interval.` }
+    rows.push({
+      assetType,
+      assetId,
+      title: t.title,
+      description: t.description ?? null,
+      intervalDays,
+      intervalMiles,
+      ...firstDue({ intervalDays, intervalMiles }, today, target.currentReading),
+      ...(t.reminderMilesBefore ? { reminderMilesBefore: t.reminderMilesBefore } : {}),
+    })
+  }
+
+  await prisma.maintenanceSchedule.createMany({ data: rows })
+  revalidateSchedule({ assetType, assetId })
+  return { success: true, count: rows.length }
 }
 
 function revalidateSchedule(s: { assetType: AssetType; assetId: string }) {

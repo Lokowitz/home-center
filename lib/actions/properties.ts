@@ -38,9 +38,9 @@ export async function createProperty(data: z.infer<typeof schema>) {
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.property.create({ data: clean(parsed.data) })
+  const row = await prisma.property.create({ data: clean(parsed.data) })
   revalidatePath("/assets/properties")
-  return { success: true }
+  return { success: true, id: row.id }
 }
 
 export async function updateProperty(id: string, data: z.infer<typeof schema>) {

@@ -73,4 +73,7 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV UPLOAD_DIR=/data/uploads
 ENV MODELS_DIR=/data/models
+# Probes the database through /api/health (left public in proxy.ts).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
 ENTRYPOINT ["./docker-entrypoint.sh"]

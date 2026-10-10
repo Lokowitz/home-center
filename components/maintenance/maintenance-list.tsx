@@ -13,6 +13,7 @@ import { deleteMaintenanceSchedule, setMaintenanceScheduleActive } from "@/lib/a
 import { MaintenanceFormDialog } from "./maintenance-form-dialog"
 import { CompleteDialog } from "./complete-dialog"
 import { SnoozeMenu } from "./snooze-menu"
+import { remindersHref } from "./add-reminders-submit"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
 import { SortableTableHead } from "@/components/ui/sortable-table-head"
@@ -129,6 +130,14 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
       {schedules.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           No maintenance schedules yet.
+          {assetType !== "PERSON" && (
+            <>
+              {" "}
+              <Link href={remindersHref(assetType, assetId)} className="font-medium text-foreground underline-offset-4 hover:underline">
+                Add default reminders
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">
