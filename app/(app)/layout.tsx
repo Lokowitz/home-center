@@ -45,12 +45,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
             <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
-            <div className="flex min-w-0 flex-1 justify-center">
+            {/* On a phone search is an icon, so it sits with the other header buttons on the right. */}
+            <div className="flex min-w-0 flex-1 justify-end sm:justify-center">
               <Suspense fallback={null}>
                 <GlobalSearch className="max-w-xl" />
               </Suspense>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <ThemeNavigator />
               {showAssistant && <ChatToggle />}
               <NotificationBell notifications={notificationItems} />

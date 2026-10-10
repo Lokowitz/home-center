@@ -65,6 +65,14 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
   return { ...badge, label: due.dueSoon ? "Due soon" : badge.label, icon }
 }
 
+// When the columns don't fit (a narrow window, the detail page's side column),
+// the table scrolls inside its card; the actions stay pinned to the right edge
+// so Complete and Snooze are never the part that's scrolled out of sight. Its
+// background must be opaque (the row hover tint, mixed onto the card) or the
+// scrolled cells would show through.
+const stickyActions =
+  "sticky right-0 z-[1] bg-card shadow-[-10px_0_10px_-10px_rgb(0_0_0/0.25)] [tr:hover_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))] [tr:has([aria-expanded=true])_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]"
+
 export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, openId }: Props) {
   const router = useRouter()
   const [schedules, setSchedules] = useState(initialSchedules)
@@ -152,7 +160,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                 <TableHead>Interval</TableHead>
                 <SortableTableHead column="lastCompleted" label="Last Completed" sortState={table.sortState} onToggle={table.toggleSort} />
                 <TableHead>Files</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className={`text-right ${stickyActions}`}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,7 +222,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <AttachmentCount attachments={s.attachments} onClick={() => setExpandedId(expanded ? null : s.id)} />
                     </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className={`text-right ${stickyActions}`} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2"
                           onClick={() => setCompleting(s)}>

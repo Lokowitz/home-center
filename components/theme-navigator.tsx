@@ -14,13 +14,14 @@ import { THEMES, nextTheme, prevTheme, themeLabel } from "@/lib/themes"
 
 const noSubscribe = () => () => {}
 
+// Below sm only the palette shows: there's no room on a phone header for three controls.
 const arrowClass =
-  "inline-flex h-9 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
+  "hidden sm:inline-flex h-9 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground"
 
 /**
  * Header theme picker: arrows step through the themes (wrapping), the name in
- * the middle opens the full list. Below sm the name collapses to an icon so the
- * header still fits on a phone.
+ * the middle opens the full list. Below sm the arrows go and the name collapses
+ * to a palette button that opens the list, so the header still fits on a phone.
  */
 export function ThemeNavigator() {
   const { theme, setTheme } = useTheme()
@@ -28,7 +29,7 @@ export function ThemeNavigator() {
   const mounted = useSyncExternalStore(noSubscribe, () => true, () => false)
 
   if (!mounted) {
-    return <div className="h-9 w-[5.25rem] sm:w-[9.5rem]" aria-hidden="true" />
+    return <div className="h-10 w-10 sm:h-9 sm:w-[9.5rem]" aria-hidden="true" />
   }
 
   const current = theme ?? "system"
@@ -41,7 +42,7 @@ export function ThemeNavigator() {
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger
-          className="inline-flex h-9 w-7 items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground sm:w-24 sm:px-1"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground sm:h-9 sm:w-24 sm:px-1"
           aria-label={`Choose theme, current: ${label}`}
         >
           <Palette className="h-4 w-4 sm:hidden" />
