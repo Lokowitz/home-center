@@ -18,9 +18,6 @@ const SHORTCUT_TOOLS: RegisteredTool[] = [
 ]
 const GENERIC_TOOLS: RegisteredTool[] = [findRecordsTool, getRecordTool, aggregateTool]
 
-/** Shortcuts first: weaker models tend to pick from the top of the list. */
-export const TOOLS: RegisteredTool[] = [...SHORTCUT_TOOLS, ...GENERIC_TOOLS]
-
 const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, observationLogTool])
 
 /**
@@ -29,6 +26,7 @@ const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, observationLogTo
  * read-only inbox tool is always there; it shows items that look like a
  * person's only when health documents may go to the model (`healthDocuments`,
  * which doesn't depend on document indexing being on).
+ * Shortcuts first: weaker models tend to pick from the top of the list.
  */
 export function chatTools(access: DocumentAccess, health = true, healthDocuments = access.includeHealth): RegisteredTool[] {
   const shortcuts = health ? SHORTCUT_TOOLS : SHORTCUT_TOOLS.filter((t) => !HEALTH_TOOLS.has(t))
@@ -39,3 +37,10 @@ export function chatTools(access: DocumentAccess, health = true, healthDocuments
     ...GENERIC_TOOLS,
   ]
 }
+
+/**
+ * The tools the admin model test offers: the chat's own list with Health on and
+ * document indexing off (an opt-in feature whose tools need indexed files). Only
+ * names, descriptions and schemas are used — the test serves made-up results.
+ */
+export const MODEL_TEST_TOOLS: RegisteredTool[] = chatTools({ enabled: false, includeHealth: true })

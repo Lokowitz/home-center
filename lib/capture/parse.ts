@@ -45,19 +45,29 @@ function labelled(before: string): boolean {
   if (!last) return false
   // Only the label nearest the date counts, with a few words of lead-in — so an
   // earlier "Due Date: …" line no longer vetoes the "Invoice Date:" after it.
+  // The lead-in stays on the label's own line: "Amount Due: $64.20" just above
+  // "Statement Date:" must not veto it.
   const lead = before.slice(Math.max(0, last.index - 12), last.index + last[0].length)
-  return !NOT_DATE_LABEL.test(lead)
+  return !NOT_DATE_LABEL.test(lead.slice(lead.lastIndexOf("\n") + 1))
+}
+
+/** True when the same line, just before the date, says it's a due/print/expiry date ("REPRINT 10/09/2026"). */
+function excluded(text: string, index: number): boolean {
+  const lineStart = text.lastIndexOf("\n", index - 1) + 1
+  return NOT_DATE_LABEL.test(text.slice(Math.max(lineStart, index - 30), index))
 }
 
 export function pickDate(text: string, maxYear: number): string | null {
   const dates = findDates(text, maxYear)
   if (!dates.length) return null
-  // A date within 40 chars after a "... date" label wins; else the most common; ties go to the first.
+  // A date within 40 chars after a "... date" label wins; else the most common
+  // (skipping due/print dates unless that's all there is); ties go to the first.
   for (const d of dates) {
     if (labelled(text.slice(Math.max(0, d.index - 40), d.index))) return d.date
   }
+  const plain = dates.filter((d) => !excluded(text, d.index))
   const count = new Map<string, number>()
-  for (const d of dates) count.set(d.date, (count.get(d.date) ?? 0) + 1)
+  for (const d of plain.length ? plain : dates) count.set(d.date, (count.get(d.date) ?? 0) + 1)
   return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0]
 }
 
@@ -67,7 +77,7 @@ const amounts = (s: string) => [...s.matchAll(AMOUNT)].map((m) => Number(m[1].re
 const TOTAL_LABEL =
   /\b(grand\s*total|invoice\s*total|total\s*due|amount\s*due|balance\s*due|total\s*amount|amount\s*paid|total\s*paid|total\s*charges|total\s*sale|order\s*total|total)\b/i
 const NOT_TOTAL =
-  /sub\s*-?\s*total|total\s*(tax|discount|savings|parts|labor|labour|qty|quantity|items?)\b|tax\s*total/i
+  /sub\s*-?\s*total|total\s*(tax|discount|savings|parts|labor|labour|qty|quantity|items?)\b|tax\s*total|due\s*after|paid\s*after|\blate\b/i
 
 export function pickTotal(text: string): number | null {
   const lines = text.split(/\r?\n/)

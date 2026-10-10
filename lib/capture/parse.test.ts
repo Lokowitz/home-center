@@ -9,6 +9,15 @@ describe("parseReceipt date", () => {
     const t = "Acme Plumbing\nPrinted 10/09/2026\nDue Date: 11/05/2026\nInvoice Date: 10/05/2026\nTotal $120.00"
     expect(p(t).date).toBe("2026-10-05")
   })
+  it("a 'Due' on the line above doesn't veto a labelled statement date", () => {
+    const t = "Water Co\nDue Date: 11/02/2026\nAmount Due: $64.20\nStatement Date: 10/08/2026"
+    expect(p(t).date).toBe("2026-10-08")
+  })
+  it("without a label, skips a reprint or due date for the transaction date", () => {
+    expect(p("Garden Center\nREPRINT 10/09/2026 08:15\nTOTAL 58.30\n10/04/2026 3:47 PM").date).toBe("2026-10-04")
+    expect(p("Shop\nPayment due 11/01/2026\n10/04/2026").date).toBe("2026-10-04")
+    expect(p("Shop\nREPRINT 10/09/2026").date).toBe("2026-10-09")
+  })
   it("reads MM/DD/YYYY", () => expect(p("Shop\n03/14/2025 thanks").date).toBe("2025-03-14"))
   it("reads YYYY-MM-DD", () => expect(p("Shop\n2025-03-14").date).toBe("2025-03-14"))
   it("reads 'Oct 5, 2026'", () => expect(p("Shop\nOct 5, 2026").date).toBe("2026-10-05"))
@@ -30,6 +39,10 @@ describe("parseReceipt total", () => {
   it("Grand Total beats subtotal and tax", () => {
     const t = "Shop\nSubtotal 100.00\nTax 8.25\nGrand Total 108.25\nCash 120.00\nChange 11.75"
     expect(p(t).total).toBe(108.25)
+  })
+  it("ignores the late amount owed after the due date", () => {
+    expect(p("Water Co\nAmount Due: $64.20\nAmount Due After 11/02/2026: $70.62").total).toBe(64.2)
+    expect(p("Water Co\nTotal Due 64.20\nTotal with late fee 70.62").total).toBe(64.2)
   })
   it("reads an amount on the line after the label", () => {
     expect(p("Shop\nAmount Due\n\n$45.10\nSubtotal 40.00").total).toBe(45.1)
