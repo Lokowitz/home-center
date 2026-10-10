@@ -25,6 +25,8 @@ export type InboxListItem = {
   parsedTotal: number | null
   parsedVendor: string | null
   parseMethod: string | null
+  /** Why Local AI was chosen but not used (see ParseNote in lib/inbox); null otherwise. */
+  parseNote: string | null
   error: string | null
   /** Null when there's no suggestion, or the suggested asset is gone or hidden (a person with Health off). */
   suggestedAsset: { type: AssetType; id: string; name: string } | null
@@ -101,8 +103,26 @@ async function itemsWithMatchingRecord(rows: RecordProbe[]): Promise<Set<string>
   )
 }
 
+export type InboxList = {
+  items: InboxListItem[]
+  /**
+   * Names of the people in the household (accounts, plus people while Health
+   * is on), so the card can doubt a "shop" that is really the customer.
+   */
+  householdNames: string[]
+}
+
+/** Account names, plus people's names only while Health is on. */
+async function loadHouseholdNames(includePeople: boolean): Promise<string[]> {
+  const [users, people] = await Promise.all([
+    prisma.user.findMany({ select: { name: true } }),
+    includePeople ? prisma.person.findMany({ select: { name: true } }) : Promise.resolve([]),
+  ])
+  return [...new Set([...users, ...people].map((r) => r.name.trim()).filter(Boolean))]
+}
+
 /** Every item, newest first, with its files and suggested asset. Cleans up abandoned items first. */
-export async function listInboxItems(now: Date = new Date()): Promise<InboxListItem[]> {
+export async function listInboxItems(now: Date = new Date()): Promise<InboxList> {
   await removeAbandoned(now)
   const [rows, features] = await Promise.all([
     prisma.inboxItem.findMany({
@@ -118,8 +138,12 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxListI
     loadFeatures(),
   ])
   const refs = rows.flatMap((r) => (r.suggestedAssetType && r.suggestedAssetId ? [{ type: r.suggestedAssetType, id: r.suggestedAssetId }] : []))
-  const [names, matching] = await Promise.all([assetNames(refs, features.health), itemsWithMatchingRecord(rows)])
-  return rows.map((r) => {
+  const [names, matching, householdNames] = await Promise.all([
+    assetNames(refs, features.health),
+    itemsWithMatchingRecord(rows),
+    loadHouseholdNames(features.health),
+  ])
+  const items = rows.map((r): InboxListItem => {
     const name = r.suggestedAssetId ? names.get(r.suggestedAssetId) : undefined
     return {
       id: r.id,
@@ -130,6 +154,7 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxListI
       parsedTotal: r.parsedTotal,
       parsedVendor: r.parsedVendor,
       parseMethod: r.parseMethod,
+      parseNote: r.parseNote,
       error: r.error,
       suggestedAsset: r.suggestedAssetType && r.suggestedAssetId && name ? { type: r.suggestedAssetType, id: r.suggestedAssetId, name } : null,
       suggestedReason: name ? r.suggestedReason : null,
@@ -144,6 +169,7 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxListI
       })),
     }
   })
+  return { items, householdNames }
 }
 
 /** For the sidebar badge: items with at least one file. */

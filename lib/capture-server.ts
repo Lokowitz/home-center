@@ -5,12 +5,12 @@ import { createChatClient } from "@/lib/llm/client"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DOCUMENT_SETTINGS_ID, loadDocumentSettings } from "@/lib/documents/settings"
 import { parseReceipt, type ParsedReceipt } from "@/lib/capture/parse"
-import { askViaChat, llmParseReceipt } from "@/lib/capture/llm-parse"
+import { llmFailureDetail, readReceiptByLlm, receiptChatOptions, type LlmReceiptRead } from "@/lib/capture/llm-parse"
 import { buildIdentifiers, matchAsset, type AssetMatch, type CandidateAsset } from "@/lib/capture/match"
 import { RECORD_KINDS, semanticQueryText, suggestByMeaning, toAssetHits, type OwnerRef } from "@/lib/capture/semantic"
 import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
 import { embedderFor } from "@/lib/documents/embed/server"
-import { chooseParser, inboxText, parsedFields, type ParserChoice } from "@/lib/inbox"
+import { chooseParser, fallbackLogLine, inboxText, llmSkipNote, parsedFields, type ParseNote, type ParserChoice } from "@/lib/inbox"
 import type { CaptureParser } from "@/app/generated/prisma/client"
 
 // Reads a capture-inbox item once its files have been extracted: the receipt
@@ -88,33 +88,43 @@ async function suggestFromMeaning(text: string, candidates: CandidateAsset[], al
   }
 }
 
-async function readWithLlm(text: string): Promise<ParsedReceipt | null> {
+type ReceiptRead = { parsed: ParsedReceipt | null; method: "basic" | "llm" | null; note: ParseNote | null }
+
+async function readWithLlm(text: string): Promise<LlmReceiptRead | { note: "llm-not-ready"; detail: string }> {
   const config = await loadLlmConfig()
-  if (!isLlmReady(config) || !config.baseUrl || !config.model) return null
-  const chat = createChatClient({
-    baseUrl: config.baseUrl,
-    apiKey: config.apiKey,
-    model: config.model,
-    temperature: config.temperature,
-    maxTokens: config.maxTokens,
-    extraBody: parseExtraBody(config.extraBody),
-  })
-  return llmParseReceipt(text, askViaChat(chat, AbortSignal.timeout(LLM_TIMEOUT_MS)))
+  if (!isLlmReady(config) || !config.baseUrl || !config.model) return { note: "llm-not-ready", detail: "settings changed while reading" }
+  const { baseUrl, model } = config
+  const extraBody = parseExtraBody(config.extraBody)
+  return readReceiptByLlm(
+    text,
+    (opts) => createChatClient({ baseUrl, apiKey: config.apiKey, model, ...receiptChatOptions(extraBody, opts) }),
+    AbortSignal.timeout(LLM_TIMEOUT_MS),
+  )
 }
 
-/** The receipt fields, LLM first when chosen, the built-in parser whenever the LLM can't answer. */
-async function readReceipt(text: string, choice: ParserChoice): Promise<{ parsed: ParsedReceipt | null; method: "basic" | "llm" | null }> {
-  if (choice === "none" || !text.trim()) return { parsed: null, method: null }
+/**
+ * The receipt fields, LLM first when chosen, the built-in parser whenever the
+ * LLM isn't used or can't answer. Every such fallback is logged in one line
+ * and comes back as a note for the card. Never logs receipt text.
+ */
+async function readReceipt(text: string, choice: ParserChoice, skipped: ParseNote | null): Promise<ReceiptRead> {
+  if (choice === "none" || !text.trim()) return { parsed: null, method: null, note: null }
+  let note = skipped
+  let detail: string | undefined
   if (choice === "llm") {
     try {
-      const parsed = await readWithLlm(text)
-      if (parsed) return { parsed, method: "llm" }
+      const read = await readWithLlm(text)
+      if ("parsed" in read) return { parsed: read.parsed, method: "llm", note: null }
+      note = read.note
+      detail = read.detail
     } catch (error) {
-      // Never log the error text: some servers echo the prompt (the receipt) back.
-      console.error("[inbox] LLM read failed, using the built-in parser:", error instanceof Error ? error.name : typeof error)
+      // readReceiptByLlm never throws; this is the settings load or client setup.
+      note = "llm-failed"
+      detail = llmFailureDetail(error)
     }
   }
-  return { parsed: parseReceipt(text), method: "basic" }
+  if (note) console.error(fallbackLogLine(note, detail))
+  return { parsed: parseReceipt(text), method: "basic", note }
 }
 
 /**
@@ -151,20 +161,20 @@ export async function processInboxItem(itemId: string): Promise<void> {
     const candidates = await loadCaptureCandidates(features.health)
     match = matchAsset(read.text, candidates) ?? (await suggestFromMeaning(read.text, candidates, features.health))
   }
-  const choice = chooseParser({
+  const parserInput = {
     mode,
     llmReady: isLlmReady(llm),
     suggestedAssetType: match?.assetType ?? null,
     healthDocumentsEnabled: features.health && llm.healthDocumentsEnabled,
-  })
-  const { parsed, method } = await readReceipt(read.text, choice)
+  }
+  const { parsed, method, note } = await readReceipt(read.text, chooseParser(parserInput), llmSkipNote(parserInput))
 
   await prisma.inboxItem.updateMany({
     where: { id: itemId },
     data: {
       status: "READY",
       error: null,
-      ...parsedFields(parsed, method),
+      ...parsedFields(parsed, method, note),
       suggestedAssetType: match?.assetType ?? null,
       suggestedAssetId: match?.assetId ?? null,
       // The plain-words reason ("VIN on the receipt"), never the matched value.

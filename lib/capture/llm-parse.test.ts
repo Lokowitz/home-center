@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
-import type { ChatFn, ChatRequest } from "@/lib/llm/types"
-import { PROMPT, askViaChat, llmParseReceipt, parseLlmReply } from "./llm-parse"
+import type { ChatFn, ChatRequest, ChatResult } from "@/lib/llm/types"
+import { LlmError } from "@/lib/llm/errors"
+import { MAX_TEXT_CHARS, PROMPT, RECEIPT_MAX_TOKENS, llmFailureDetail, parseLlmReply, readReceiptByLlm, receiptChatOptions } from "./llm-parse"
 
 describe("parseLlmReply", () => {
   it("reads a plain JSON reply", () => {
@@ -40,54 +41,115 @@ describe("parseLlmReply", () => {
   })
 })
 
-describe("llmParseReceipt", () => {
-  it("sends the prompt and truncated text, then parses the reply", async () => {
-    const calls: [string, string][] = []
-    const r = await llmParseReceipt("a".repeat(20000), async (system, user) => {
-      calls.push([system, user])
-      return '{"date":"2026-10-05","total":10,"vendor":"Acme"}'
-    })
-    expect(calls).toHaveLength(1)
-    expect(calls[0][0]).toBe(PROMPT)
-    expect(calls[0][1]).toHaveLength(12000)
-    expect(r).toEqual({ date: "2026-10-05", total: 10, vendor: "Acme" })
+describe("receiptChatOptions", () => {
+  it("asks for a short, repeatable answer whatever the chat settings say", () => {
+    const o = receiptChatOptions(null, { thinkingOff: false })
+    expect(o).toEqual({ temperature: 0, maxTokens: RECEIPT_MAX_TOKENS, extraBody: null })
+    expect(RECEIPT_MAX_TOKENS).toBeGreaterThanOrEqual(300)
   })
-  it("propagates ask errors", async () => {
-    await expect(llmParseReceipt("x", async () => { throw new Error("down") })).rejects.toThrow("down")
+  it("turns thinking off for this call, keeping the user's other request fields", () => {
+    const o = receiptChatOptions({ top_k: 20, chat_template_kwargs: { enable_thinking: true, foo: 1 } }, { thinkingOff: true })
+    expect(o.extraBody).toEqual({ top_k: 20, chat_template_kwargs: { enable_thinking: false, foo: 1 } })
+    expect(receiptChatOptions(null, { thinkingOff: true }).extraBody).toEqual({ chat_template_kwargs: { enable_thinking: false } })
+  })
+  it("replaces a chat_template_kwargs that isn't an object", () => {
+    expect(receiptChatOptions({ chat_template_kwargs: "x" }, { thinkingOff: true }).extraBody).toEqual({ chat_template_kwargs: { enable_thinking: false } })
+  })
+  it("leaves the user's request fields alone without thinkingOff", () => {
+    const extra = { chat_template_kwargs: { enable_thinking: true } }
+    expect(receiptChatOptions(extra, { thinkingOff: false }).extraBody).toBe(extra)
   })
 })
 
-describe("askViaChat", () => {
-  it("builds a system+user request without tools and returns the content", async () => {
-    let seen: ChatRequest | undefined
-    const chat: ChatFn = async (req, onText) => {
-      seen = req
-      onText('{"a"')
-      onText(":1}")
-      return { content: '{"a":1}', toolCalls: [] }
-    }
-    const ask = askViaChat(chat)
-    expect(await ask("SYS", "USER")).toBe('{"a":1}')
-    expect(seen).toEqual({
-      messages: [{ role: "system", content: "SYS" }, { role: "user", content: "USER" }],
-    })
+describe("llmFailureDetail", () => {
+  it("names the kind of failure without the provider's text", () => {
+    expect(llmFailureDetail(new LlmError("The LLM provider returned 400: <echo of the receipt>", 400))).toBe("http 400")
+    expect(llmFailureDetail(new LlmError("Couldn't reach the LLM server at ai.local.")))
+      .toBe("unreachable")
+    expect(llmFailureDetail(new LlmError("Couldn't reach the LLM server at ai.local: secret text")))
+      .toBe("unreachable")
+    expect(llmFailureDetail(new LlmError("The LLM server stopped responding for 60 seconds — it may be busy. Try again."))).toBe("stalled")
+    expect(llmFailureDetail(new DOMException("timed out", "TimeoutError"))).toBe("timeout")
+    expect(llmFailureDetail(new DOMException("aborted", "AbortError"))).toBe("timeout")
+    expect(llmFailureDetail(new TypeError("receipt text here"))).toBe("TypeError")
+    expect(llmFailureDetail("str")).toBe("string")
   })
-  it("falls back to streamed text when content is empty", async () => {
-    const chat: ChatFn = async (_req, onText) => {
-      onText("he")
-      onText("llo")
+})
+
+/** A fake ChatFn that records its options and answers with `reply`. */
+function fakeChats(reply: (o: { thinkingOff: boolean }) => Promise<ChatResult> | ChatResult) {
+  const seen: { thinkingOff: boolean; req: ChatRequest }[] = []
+  const make = (o: { thinkingOff: boolean }): ChatFn => async (req) => {
+    seen.push({ ...o, req })
+    return reply(o)
+  }
+  return { make, seen }
+}
+const ok = (content: string, finishReason: string | null = "stop"): ChatResult => ({ content, toolCalls: [], finishReason })
+
+describe("readReceiptByLlm", () => {
+  it("sends the prompt and truncated text with thinking off, then parses the reply", async () => {
+    const { make, seen } = fakeChats(() => ok('{"date":"2026-10-05","total":10,"vendor":"Acme"}'))
+    const r = await readReceiptByLlm("a".repeat(20000), make)
+    expect(r).toEqual({ parsed: { date: "2026-10-05", total: 10, vendor: "Acme" } })
+    expect(seen).toHaveLength(1)
+    expect(seen[0].thinkingOff).toBe(true)
+    expect(seen[0].req.messages).toEqual([{ role: "system", content: PROMPT }, { role: "user", content: "a".repeat(MAX_TEXT_CHARS) }])
+    expect(seen[0].req.tools).toBeUndefined()
+  })
+  it("uses streamed text when the result's content is empty", async () => {
+    const make = (): ChatFn => async (_req, onText) => {
+      onText('{"total":')
+      onText("5}")
       return { content: "", toolCalls: [] }
     }
-    expect(await askViaChat(chat)("s", "u")).toBe("hello")
+    expect(await readReceiptByLlm("x", make)).toEqual({ parsed: { date: null, total: 5, vendor: null } })
+  })
+  it("says so when the reply has no usable JSON: cut off while thinking", async () => {
+    const { make } = fakeChats(() => ok("", "length"))
+    expect(await readReceiptByLlm("x", make)).toEqual({ note: "llm-no-answer", detail: "no JSON in reply (finish: length, 0 chars)" })
+  })
+  it("says so when the reply is prose, without repeating it", async () => {
+    const { make } = fakeChats(() => ok("I can't read this receipt from Acme.", null))
+    const r = await readReceiptByLlm("x", make)
+    expect(r).toEqual({ note: "llm-no-answer", detail: "no JSON in reply (finish: unknown, 36 chars)" })
+    expect(JSON.stringify(r)).not.toContain("Acme")
+  })
+  it("says so when the request fails", async () => {
+    const { make } = fakeChats(() => {
+      throw new LlmError("Couldn't reach the LLM server at ai.local.")
+    })
+    expect(await readReceiptByLlm("x", make)).toEqual({ note: "llm-failed", detail: "unreachable" })
+  })
+  it("retries once with the user's own request fields when the server rejects the thinking switch", async () => {
+    const { make, seen } = fakeChats(({ thinkingOff }) => {
+      if (thinkingOff) throw new LlmError("The LLM provider returned 400: unknown field", 400)
+      return ok('{"total":7}')
+    })
+    expect(await readReceiptByLlm("x", make)).toEqual({ parsed: { date: null, total: 7, vendor: null } })
+    expect(seen.map((s) => s.thinkingOff)).toEqual([true, false])
+  })
+  it("doesn't retry other failures", async () => {
+    const { make, seen } = fakeChats(() => {
+      throw new LlmError("The LLM provider had an error — try again.", 500)
+    })
+    expect(await readReceiptByLlm("x", make)).toEqual({ note: "llm-failed", detail: "http 500" })
+    expect(seen).toHaveLength(1)
+  })
+  it("reports the retry's failure", async () => {
+    const { make } = fakeChats(({ thinkingOff }) => {
+      throw new LlmError("bad", thinkingOff ? 400 : 404)
+    })
+    expect(await readReceiptByLlm("x", make)).toEqual({ note: "llm-failed", detail: "http 404" })
   })
   it("passes the signal through", async () => {
     const ctl = new AbortController()
     let got: AbortSignal | undefined
-    const chat: ChatFn = async (_req, _onText, signal) => {
+    const make = (): ChatFn => async (_req, _onText, signal) => {
       got = signal
-      return { content: "x", toolCalls: [] }
+      return ok("{}")
     }
-    await askViaChat(chat, ctl.signal)("s", "u")
+    await readReceiptByLlm("x", make, ctl.signal)
     expect(got).toBe(ctl.signal)
   })
 })

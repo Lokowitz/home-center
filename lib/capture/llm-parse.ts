@@ -1,6 +1,9 @@
-// Local-AI receipt reading: the prompt, reply validation, and an adapter from
-// the streaming ChatFn. Pure — the chat function is injected by the caller.
+// Local-AI receipt reading: the prompt, the request options, reply validation,
+// and the one-shot call with its fallbacks. Pure — the caller injects the chat
+// function (built from the user's LLM settings).
+import { LlmError } from "@/lib/llm/errors"
 import type { ChatFn } from "@/lib/llm/types"
+import type { ParseNote } from "@/lib/inbox"
 import type { ParsedReceipt } from "./parse"
 
 export const PROMPT = `You read one household document (receipt, invoice, estimate or similar).
@@ -12,7 +15,14 @@ vendor: the business that issued it.`
 export const MAX_TEXT_CHARS = 12000
 const MAX_VENDOR_CHARS = 80
 
-export type AskFn = (system: string, user: string) => Promise<string>
+/**
+ * The answer is about 50 tokens. The cap is the chat setting's business for
+ * chat, not here: a low one cuts the JSON short, and with thinking on a
+ * reasoning model can spend any cap before it answers (seen with Qwen 3.5:
+ * finish "length", empty content). Generous enough for a model that thinks
+ * anyway, small enough that a runaway reply ends.
+ */
+export const RECEIPT_MAX_TOKENS = 1024
 
 function validDate(v: unknown): string | null {
   if (typeof v !== "string") return null
@@ -55,22 +65,75 @@ export function parseLlmReply(reply: string): ParsedReceipt | null {
   return { date: validDate(o.date), total: validTotal(o.total), vendor: validVendor(o.vendor) }
 }
 
-/** Ask the model to read a receipt. Errors from `ask` propagate so the caller can fall back. */
-export async function llmParseReceipt(text: string, ask: AskFn): Promise<ParsedReceipt | null> {
-  return parseLlmReply(await ask(PROMPT, text.slice(0, MAX_TEXT_CHARS)))
+/**
+ * The chat client options for one receipt read, whatever the chat settings
+ * say: temperature 0 and RECEIPT_MAX_TOKENS. With `thinkingOff`, also asks
+ * chat-template servers (llama.cpp, vLLM) not to think, keeping the user's
+ * other extra request fields.
+ */
+export function receiptChatOptions(extraBody: Record<string, unknown> | null, opts: { thinkingOff: boolean }) {
+  let body = extraBody
+  if (opts.thinkingOff) {
+    const kwargs = extraBody?.chat_template_kwargs
+    const own = kwargs && typeof kwargs === "object" && !Array.isArray(kwargs) ? (kwargs as Record<string, unknown>) : {}
+    body = { ...extraBody, chat_template_kwargs: { ...own, enable_thinking: false } }
+  }
+  return { temperature: 0, maxTokens: RECEIPT_MAX_TOKENS, extraBody: body }
 }
 
-/** Adapt the streaming ChatFn to a one-shot AskFn (the model is fixed by the chat client's config). */
-export function askViaChat(chat: ChatFn, signal: AbortSignal = new AbortController().signal): AskFn {
-  return async (system, user) => {
-    let streamed = ""
-    const result = await chat(
-      { messages: [{ role: "system", content: system }, { role: "user", content: user }] },
-      (t) => {
-        streamed += t
-      },
-      signal,
-    )
-    return result.content || streamed
+/** A short, fixed description of a failed request for the log. Never the provider's text (it may echo the receipt). */
+export function llmFailureDetail(error: unknown): string {
+  if (error instanceof LlmError) {
+    if (error.status) return `http ${error.status}`
+    if (error.message.startsWith("Couldn't reach the LLM server")) return "unreachable"
+    if (error.message.startsWith("The LLM server stopped responding")) return "stalled"
+    if (error.message.startsWith("The LLM server took too long")) return "timeout"
+    return "LlmError"
   }
+  if (error instanceof Error || error instanceof DOMException) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") return "timeout"
+    return error.name
+  }
+  return typeof error
+}
+
+export type LlmReceiptRead = { parsed: ParsedReceipt } | { note: Extract<ParseNote, "llm-failed" | "llm-no-answer">; detail: string }
+
+async function ask(chat: ChatFn, text: string, signal: AbortSignal) {
+  let streamed = ""
+  const result = await chat(
+    { messages: [{ role: "system", content: PROMPT }, { role: "user", content: text.slice(0, MAX_TEXT_CHARS) }] },
+    (t) => {
+      streamed += t
+    },
+    signal,
+  )
+  return { reply: result.content || streamed, finishReason: result.finishReason ?? null }
+}
+
+/**
+ * Read a receipt with the LLM. `makeChat` builds the chat function for the
+ * request options (see receiptChatOptions); thinking is asked off first, and
+ * if the server rejects that (HTTP 400) the read is retried once without it.
+ * Never throws: a failure says why, in words safe to log and store.
+ */
+export async function readReceiptByLlm(
+  text: string,
+  makeChat: (opts: { thinkingOff: boolean }) => ChatFn,
+  signal: AbortSignal = new AbortController().signal,
+): Promise<LlmReceiptRead> {
+  let answer: { reply: string; finishReason: string | null }
+  try {
+    try {
+      answer = await ask(makeChat({ thinkingOff: true }), text, signal)
+    } catch (error) {
+      if (!(error instanceof LlmError && error.status === 400)) throw error
+      answer = await ask(makeChat({ thinkingOff: false }), text, signal)
+    }
+  } catch (error) {
+    return { note: "llm-failed", detail: llmFailureDetail(error) }
+  }
+  const parsed = parseLlmReply(answer.reply)
+  if (parsed) return { parsed }
+  return { note: "llm-no-answer", detail: `no JSON in reply (finish: ${answer.finishReason ?? "unknown"}, ${answer.reply.length} chars)` }
 }

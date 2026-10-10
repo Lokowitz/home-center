@@ -20,7 +20,12 @@ export type OpenAiTool = {
 
 export type ChatRequest = { messages: ChatMessage[]; tools?: OpenAiTool[]; toolChoice?: "auto" | "none" }
 
-export type ChatResult = { content: string; toolCalls: ToolCall[] }
+export type ChatResult = {
+  content: string
+  toolCalls: ToolCall[]
+  /** Why the reply ended ("stop", "length", ...) when the server said; "length" means it was cut off. */
+  finishReason?: string | null
+}
 
 /** One streamed completion. `onText` receives content deltas as they arrive. */
 export type ChatFn = (req: ChatRequest, onText: (text: string) => void, signal: AbortSignal) => Promise<ChatResult>

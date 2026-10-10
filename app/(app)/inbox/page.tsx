@@ -9,7 +9,7 @@ import type { InboxAssetOption, InboxReminderOption } from "@/components/inbox/a
 export default async function InboxPage() {
   const features = await loadFeatures()
   const byName = { select: { id: true, name: true }, orderBy: { name: "asc" } } as const
-  const [items, properties, vehicles, equipment, people, schedules] = await Promise.all([
+  const [{ items, householdNames }, properties, vehicles, equipment, people, schedules] = await Promise.all([
     listInboxItems(),
     prisma.property.findMany(byName),
     prisma.vehicle.findMany({ select: { id: true, name: true, meterUnit: true }, orderBy: { name: "asc" } }),
@@ -41,7 +41,7 @@ export default async function InboxPage() {
         </p>
       </div>
       <InboxDropZone />
-      <InboxList items={items} assets={assets} reminders={reminders} />
+      <InboxList items={items} householdNames={householdNames} assets={assets} reminders={reminders} />
     </div>
   )
 }

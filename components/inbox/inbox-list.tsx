@@ -13,10 +13,12 @@ const POLL_MS = 3000
 
 export function InboxList({
   items,
+  householdNames,
   assets,
   reminders,
 }: {
   items: InboxListItem[]
+  householdNames: string[]
   assets: InboxAssetOption[]
   reminders: InboxReminderOption[]
 }) {
@@ -46,7 +48,7 @@ export function InboxList({
     <ul className="space-y-3">
       {items.map((item) => (
         <li key={item.id}>
-          <InboxItemCard item={item} assets={assets} reminders={reminders} />
+          <InboxItemCard item={item} householdNames={householdNames} assets={assets} reminders={reminders} />
         </li>
       ))}
     </ul>

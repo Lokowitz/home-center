@@ -14,7 +14,7 @@ export const INBOX_LIMIT = 20
 
 export const INBOX_TOOL_DESCRIPTION =
   "List the files waiting in the Inbox: receipts and invoices someone added (on the Inbox page or by attaching them in this chat) that aren't filed yet. " +
-  "Each item has its file names, whether it has been read, the date, total and shop read from it, and the asset it seems to be for. " +
+  "Each item has its file names, whether it has been read, the date, total and shop read from it, and the asset it seems to be for (with why, when known). " +
   "Use it when asked what's in the Inbox, what was read from a file just added, or about a receipt that may not be filed yet. " +
   "You can't file, edit or discard items: the user does that on the Inbox page (href in the result)."
 
@@ -30,6 +30,8 @@ export type InboxToolRow = {
   suggestedAssetType: AssetType | null
   /** Null when there's no suggestion or the asset is gone or hidden. */
   suggestedAsset: { name: string; href: string } | null
+  /** Why it was suggested, in plain words ("VIN on the receipt"); never the matched value. */
+  suggestedReason: string | null
   files: string[]
 }
 
@@ -52,7 +54,10 @@ export function inboxToolResult(rows: InboxToolRow[], opts: { includeHealth: boo
       date: r.parsedDate ? toDay(r.parsedDate) : null,
       total: r.parsedTotal,
       vendor: r.parsedVendor,
-      suggestedAsset: r.suggestedAssetType && r.suggestedAsset ? { type: r.suggestedAssetType, ...r.suggestedAsset } : null,
+      suggestedAsset:
+        r.suggestedAssetType && r.suggestedAsset
+          ? { type: r.suggestedAssetType, ...r.suggestedAsset, ...(r.suggestedReason ? { why: r.suggestedReason } : {}) }
+          : null,
       error: r.status === "FAILED" ? r.error : null,
     })
   )

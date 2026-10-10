@@ -17,7 +17,7 @@ import { assetIcon, assetLabel } from "@/lib/assets"
 import { formatMoney } from "@/lib/costs"
 import { formatDay } from "@/lib/health"
 import {
-  assetKey, defaultDestination, fileFormDefaults, inboxHeadline, inboxReadiness, isPreviewableImage, localDay, readByLabel, readFields,
+  assetKey, defaultDestination, fileFormDefaults, inboxHeadline, inboxReadiness, isPreviewableImage, localDay, readByLabel, readerNote, readFields,
   type FieldRead, type FileFormValues, type InboxDestination, type InboxReadiness,
 } from "@/lib/inbox-form"
 import { cn } from "@/lib/utils"
@@ -97,10 +97,13 @@ const DESTINATIONS: { value: InboxDestination; label: string; hint: string }[] =
 
 export function InboxItemCard({
   item,
+  householdNames,
   assets,
   reminders,
 }: {
   item: InboxListItem
+  /** People in the household, so a "shop" that is really the customer reads as unsure. */
+  householdNames: string[]
   assets: InboxAssetOption[]
   reminders: InboxReminderOption[]
 }) {
@@ -115,9 +118,10 @@ export function InboxItemCard({
   const fileName = first ? (item.attachments.length > 1 ? `${first.originalName} +${item.attachments.length - 1}` : first.originalName) : "Uploading…"
   const thumb = item.attachments.find((a) => isPreviewableImage(a.mimeType))
   const uploading = item.attachments.length === 0
-  const readiness = inboxReadiness(item)
-  const fields = readFields(item)
+  const readiness = inboxReadiness(item, householdNames)
+  const fields = readFields(item, householdNames)
   const readBy = readByLabel(item.parseMethod)
+  const fallback = readerNote(item.parseMethod, item.parseNote)
   const SuggestedIcon = item.suggestedAsset ? assetIcon[item.suggestedAsset.type] : null
   const nothingRead = item.status === "READY" && !item.parsedDate && item.parsedTotal == null && !item.parsedVendor
   const parsed = { date: item.parsedDate ? new Date(item.parsedDate) : null, total: item.parsedTotal }
@@ -249,7 +253,7 @@ export function InboxItemCard({
       <div className="grid border-t md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)]">
         {/* What we read */}
         <section aria-label="What we read" className="min-w-0 p-4">
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
             <h4 className="text-[0.7rem] font-semibold tracking-wider text-muted-foreground uppercase">What we read</h4>
             {item.status === "READY" && (
               <Badge variant="outline" className="text-muted-foreground">
@@ -257,6 +261,7 @@ export function InboxItemCard({
                 {readBy ? readBy.charAt(0).toUpperCase() + readBy.slice(1) : "Reading off"}
               </Badge>
             )}
+            {item.status === "READY" && fallback && <span className="text-xs text-muted-foreground">{fallback}</span>}
           </div>
 
           {readiness === "reading" && (

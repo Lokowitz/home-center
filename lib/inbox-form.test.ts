@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   NO_CATEGORY, assetKey, fileFormDefaults, fileFormPayload, guessTitle, hasPendingItems, localDay, parseAssetKey,
-  readByLabel, uploadAccept, fieldErrorTarget, isPreviewableImage,
+  readByLabel, readerNote, looksLikeHouseholdName, uploadAccept, fieldErrorTarget, isPreviewableImage,
   vendorDoubt, dateDoubt, totalDoubt, readFields, inboxReadiness, inboxHeadline, defaultDestination,
 } from "./inbox-form"
 
@@ -110,6 +110,24 @@ describe("readByLabel", () => {
   })
 })
 
+describe("readerNote", () => {
+  it("says why the built-in reader was used when Local AI was chosen", () => {
+    expect(readerNote("basic", "llm-failed")).toBe("Local AI couldn't read this one — used the built-in reader")
+    expect(readerNote("basic", "llm-no-answer")).toBe("Local AI couldn't read this one — used the built-in reader")
+    expect(readerNote("basic", "llm-health")).toBe("Local AI skipped: health file")
+    expect(readerNote("basic", "llm-not-ready")).toBe("Local AI isn't set up")
+  })
+  it("says nothing otherwise", () => {
+    expect(readerNote("basic", null)).toBeNull()
+    expect(readerNote("llm", null)).toBeNull()
+    expect(readerNote(null, null)).toBeNull()
+    // A note only explains a built-in read.
+    expect(readerNote("llm", "llm-failed")).toBeNull()
+    expect(readerNote(null, "llm-failed")).toBeNull()
+    expect(readerNote("basic", "something-new")).toBeNull()
+  })
+})
+
 describe("uploadAccept", () => {
   it("lists every allowed extension", () => {
     const accept = uploadAccept()
@@ -159,6 +177,53 @@ describe("vendorDoubt", () => {
     for (const v of ["02/02/2026", "2026-02-02", "Feb 2, 2026", "February 2nd 2026", "2 Feb 2026", "12.31.25"]) {
       expect(vendorDoubt(v), v).toMatch(/date/i)
     }
+  })
+})
+
+describe("looksLikeHouseholdName", () => {
+  const names = ["Mike Dazzo", "Jessica Dazzo", "Grandma"]
+  it("matches a household member's full name, however it's written", () => {
+    for (const v of ["Mike Dazzo", "MIKE DAZZO", "Dazzo, Mike", "mike  dazzo.", "Mike J. Dazzo", "Mr Mike Dazzo"]) {
+      expect(looksLikeHouseholdName(v, names), v).toBe(true)
+    }
+  })
+  it("matches a shared last name with any household first name", () => {
+    expect(looksLikeHouseholdName("Mike & Jessi Dazzo", ["Mike Dazzo"])).toBe(true)
+    expect(looksLikeHouseholdName("Jessica and Mike Dazzo", ["Mike Dazzo"])).toBe(true)
+    expect(looksLikeHouseholdName("Jessica Dazzo", ["Mike Dazzo", "Jessica Smith"])).toBe(true)
+  })
+  it("ignores accents", () => {
+    expect(looksLikeHouseholdName("Zoe Muller", ["Zoë Müller"])).toBe(true)
+  })
+  it("doesn't flag a business that only shares a first name, or only a last name", () => {
+    for (const v of ["Mike's Plumbing", "Mike's Auto Body", "Big Mike Towing", "Dazzo's Pizza", "Dazzo Brothers Paving", "Jessi Hair Studio"]) {
+      expect(looksLikeHouseholdName(v, names), v).toBe(false)
+    }
+    expect(looksLikeHouseholdName("Mike's Plumbing", ["Mike Dazzo"])).toBe(false)
+  })
+  it("matches a single-word name only when the vendor is just that name", () => {
+    expect(looksLikeHouseholdName("Grandma", names)).toBe(true)
+    expect(looksLikeHouseholdName("grandma!", names)).toBe(true)
+    expect(looksLikeHouseholdName("Grandma's Kitchen", names)).toBe(false)
+    expect(looksLikeHouseholdName("Mike", ["Mike"])).toBe(true)
+    expect(looksLikeHouseholdName("Mike's Plumbing", ["Mike"])).toBe(false)
+  })
+  it("has nothing to match without names or a vendor", () => {
+    expect(looksLikeHouseholdName("Mike Dazzo", [])).toBe(false)
+    expect(looksLikeHouseholdName("Mike Dazzo", ["", "  ", "&"])).toBe(false)
+    expect(looksLikeHouseholdName("", names)).toBe(false)
+    expect(looksLikeHouseholdName("  ", names)).toBe(false)
+  })
+})
+
+describe("vendorDoubt with household names", () => {
+  it("doubts a vendor that looks like someone in the household", () => {
+    expect(vendorDoubt("Mike & Jessi Dazzo", ["Mike Dazzo"])).toBe("Looks like a household member's name, not a shop name.")
+  })
+  it("leaves shops alone", () => {
+    expect(vendorDoubt("Mike's Plumbing", ["Mike Dazzo"])).toBeNull()
+    expect(vendorDoubt("Haley Mechanical", ["Mike Dazzo"])).toBeNull()
+    expect(vendorDoubt("Mike Dazzo")).toBeNull()
   })
 })
 
@@ -228,6 +293,12 @@ describe("readFields", () => {
     expect(f.total).toMatchObject({ state: "unsure", reason: expect.stringMatching(/zero/i) })
     expect(f.date).toMatchObject({ state: "unsure", reason: expect.stringMatching(/after/i) })
   })
+  it("marks a vendor that is a household member's name unsure", () => {
+    expect(readFields({ ...ready, parsedVendor: "Mike Dazzo" }, ["Mike Dazzo"]).vendor).toEqual({
+      state: "unsure", reason: "Looks like a household member's name, not a shop name.",
+    })
+    expect(readFields({ ...ready, parsedVendor: "Mike Dazzo" }).vendor).toEqual({ state: "found" })
+  })
   it("reads dates sent over the wire as strings", () => {
     expect(readFields({ ...ready, createdAt: "2026-10-10T15:00:00.000Z" as unknown as Date, parsedDate: "2024-04-30T00:00:00.000Z" as unknown as Date }).date).toEqual({ state: "found" })
   })
@@ -252,6 +323,7 @@ describe("inboxReadiness", () => {
     expect(inboxReadiness({ ...ready, suggestedAsset: null })).toBe("check")
     expect(inboxReadiness({ ...ready, parsedVendor: ">. BELLE TIR" })).toBe("check")
     expect(inboxReadiness({ ...ready, parsedTotal: 0 })).toBe("check")
+    expect(inboxReadiness({ ...ready, parsedVendor: "Mike & Jessica Dazzo" }, ["Mike Dazzo"])).toBe("check")
   })
 })
 

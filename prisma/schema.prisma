@@ -554,6 +554,9 @@ model InboxItem {
   parsedVendor String?
   /// "basic" or "llm"; null when nothing was parsed (reading off, or no text).
   parseMethod  String?
+  /// Why Local AI was chosen but the built-in parser read it: "llm-not-ready", "llm-health",
+  /// "llm-failed" or "llm-no-answer". Null otherwise. A fixed code, never receipt text.
+  parseNote    String?
   suggestedAssetType AssetType?
   suggestedAssetId   String?
   /// Why that asset was suggested, in words for the card ("VIN on the receipt"). Never the matched value.

@@ -24,7 +24,7 @@ export function inboxTool(includeHealth: boolean): RegisteredTool {
           orderBy: { createdAt: "desc" },
           select: {
             createdAt: true, status: true, parsedDate: true, parsedTotal: true, parsedVendor: true, error: true,
-            suggestedAssetType: true, suggestedAssetId: true,
+            suggestedAssetType: true, suggestedAssetId: true, suggestedReason: true,
             attachments: { orderBy: { uploadedAt: "asc" }, select: { originalName: true } },
           },
         }),
@@ -45,6 +45,7 @@ export function inboxTool(includeHealth: boolean): RegisteredTool {
             suggestedAsset: name && r.suggestedAssetType && r.suggestedAssetId
               ? { name, href: assetHref(r.suggestedAssetType, r.suggestedAssetId) }
               : null,
+            suggestedReason: r.suggestedReason,
             files: r.attachments.map((a) => a.originalName),
           }
         }),

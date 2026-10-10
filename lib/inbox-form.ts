@@ -106,6 +106,19 @@ export function readByLabel(parseMethod: string | null): string | null {
   return null
 }
 
+const READER_NOTES: Record<string, string> = {
+  "llm-failed": "Local AI couldn't read this one — used the built-in reader",
+  "llm-no-answer": "Local AI couldn't read this one — used the built-in reader",
+  "llm-health": "Local AI skipped: health file",
+  "llm-not-ready": "Local AI isn't set up",
+}
+
+/** Why the built-in reader was used when Local AI was chosen (InboxItem.parseNote); null otherwise. */
+export function readerNote(parseMethod: string | null, parseNote: string | null): string | null {
+  if (parseMethod !== "basic" || !parseNote) return null
+  return READER_NOTES[parseNote] ?? null
+}
+
 /** The file input's `accept`, from the same table the upload route enforces. */
 export function uploadAccept(): string {
   return Object.keys(UPLOAD_TYPES).join(",")
@@ -134,12 +147,49 @@ const DATE_SHAPES = [
   new RegExp(String.raw`^\d{1,2}(?:st|nd|rd|th)?\s+${MONTH},?\s+\d{2,4}$`, "i"),
 ]
 
+/** Lower-case words without accents or punctuation; "Mike's" → ["mike"]. */
+function nameTokens(s: string): string[] {
+  return s
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/['’]s\b/g, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+}
+
+/**
+ * True when a read vendor is probably the customer (someone in the household)
+ * rather than the shop: it contains a household first name and a household
+ * last name ("Mike & Jessi Dazzo" for "Mike Dazzo"), or is exactly a one-word
+ * name. A shared first name alone ("Mike's Plumbing") or last name alone
+ * ("Dazzo's Pizza") isn't enough.
+ */
+export function looksLikeHouseholdName(vendor: string, householdNames: string[]): boolean {
+  const words = new Set(nameTokens(vendor))
+  if (!words.size) return false
+  const firsts = new Set<string>()
+  const lasts = new Set<string>()
+  for (const name of householdNames) {
+    const t = nameTokens(name)
+    if (t.length === 1) {
+      if (words.size === 1 && words.has(t[0])) return true
+    } else if (t.length > 1) {
+      firsts.add(t[0])
+      lasts.add(t[t.length - 1])
+    }
+  }
+  const has = (set: Set<string>) => [...set].some((w) => words.has(w))
+  return has(firsts) && has(lasts)
+}
+
 /**
  * Why a read vendor might not be a shop name: an order or job number, a date,
- * a line that starts with stray punctuation, or mostly digits. Null when it
- * looks fine or there is none. Conservative: "THE HOME DEPOT #1234" passes.
+ * a line that starts with stray punctuation, mostly digits, or a household
+ * member's name (the customer, not the shop). Null when it looks fine or there
+ * is none. Conservative: "THE HOME DEPOT #1234" passes.
  */
-export function vendorDoubt(vendor: string | null): string | null {
+export function vendorDoubt(vendor: string | null, householdNames: string[] = []): string | null {
   const v = vendor?.replace(/\s+/g, " ").trim()
   if (!v) return null
   if (NUMBER_PREFIX.test(v) && /\d/.test(v)) return "Looks like a job, order or invoice number, not a shop name."
@@ -148,6 +198,7 @@ export function vendorDoubt(vendor: string | null): string | null {
   const digits = (v.match(/\p{N}/gu) ?? []).length
   const letters = (v.match(/\p{L}/gu) ?? []).length
   if (digits > letters) return "Mostly numbers, so it may not be the shop name."
+  if (looksLikeHouseholdName(v, householdNames)) return "Looks like a household member's name, not a shop name."
   return null
 }
 
@@ -188,12 +239,12 @@ function fieldRead(present: boolean, doubt: string | null): FieldRead {
 }
 
 /** Each field the card shows: found, not found, or found but doubtful (with why). */
-export function readFields(item: Omit<CardSource, "status" | "attachments">) {
+export function readFields(item: Omit<CardSource, "status" | "attachments">, householdNames: string[] = []) {
   const date = item.parsedDate ? new Date(item.parsedDate) : null
   return {
     date: fieldRead(date != null, dateDoubt(date, new Date(item.createdAt))),
     total: fieldRead(item.parsedTotal != null, totalDoubt(item.parsedTotal)),
-    vendor: fieldRead(!!item.parsedVendor?.trim(), vendorDoubt(item.parsedVendor)),
+    vendor: fieldRead(!!item.parsedVendor?.trim(), vendorDoubt(item.parsedVendor, householdNames)),
     asset: fieldRead(item.suggestedAsset != null, null),
   }
 }
@@ -201,10 +252,10 @@ export function readFields(item: Omit<CardSource, "status" | "attachments">) {
 export type InboxReadiness = "reading" | "failed" | "ready" | "check"
 
 /** The card's status chip. "ready" needs a date, a total and an asset, and nothing read doubtful. */
-export function inboxReadiness(item: CardSource): InboxReadiness {
+export function inboxReadiness(item: CardSource, householdNames: string[] = []): InboxReadiness {
   if (!item.attachments.length || item.status === "PENDING") return "reading"
   if (item.status === "FAILED") return "failed"
-  const f = readFields(item)
+  const f = readFields(item, householdNames)
   const required = [f.date, f.total, f.asset].every((x) => x.state === "found")
   return required && f.vendor.state !== "unsure" ? "ready" : "check"
 }

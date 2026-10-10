@@ -10,6 +10,7 @@ const row = (over: Partial<InboxToolRow> = {}): InboxToolRow => ({
   error: null,
   suggestedAssetType: "VEHICLE",
   suggestedAsset: { name: "Civic", href: "/assets/vehicles/v1" },
+  suggestedReason: null,
   files: ["receipt.pdf"],
   ...over,
 })
@@ -41,6 +42,24 @@ describe("inboxToolResult", () => {
     expect(out.items[0]).toEqual({ files: ["receipt.pdf"], added: "2026-10-09", status: "still being read" })
     const failed = inboxToolResult([row({ status: "FAILED", error: "Couldn't read this file" })], { includeHealth: true })
     expect(failed.items[0]).toMatchObject({ status: "couldn't be read", error: "Couldn't read this file" })
+  })
+
+  it("says why the asset was suggested", () => {
+    const out = inboxToolResult([row({ suggestedReason: "VIN on the receipt" })], { includeHealth: true })
+    expect(out.items[0].suggestedAsset).toEqual({ type: "VEHICLE", name: "Civic", href: "/assets/vehicles/v1", why: "VIN on the receipt" })
+    // No reason stored (older items): no "why" key at all.
+    expect(inboxToolResult([row()], { includeHealth: true }).items[0].suggestedAsset).not.toHaveProperty("why")
+  })
+
+  it("drops the reason with a hidden suggestion", () => {
+    const out = inboxToolResult([row({ suggestedAsset: null, suggestedReason: "Name on the receipt" })], { includeHealth: true })
+    expect(JSON.stringify(out)).not.toContain("Name on the receipt")
+  })
+
+  it("keeps a person's reason out while health documents aren't allowed", () => {
+    const person = row({ suggestedAssetType: "PERSON", suggestedAsset: { name: "Ann", href: "/assets/people/p1" }, suggestedReason: "Name on the receipt" })
+    expect(JSON.stringify(inboxToolResult([person], { includeHealth: false }))).not.toContain("Name on the receipt")
+    expect(inboxToolResult([person], { includeHealth: true }).items[0].suggestedAsset).toMatchObject({ why: "Name on the receipt" })
   })
 
   it("keeps the suggestion's type even when its name is hidden", () => {

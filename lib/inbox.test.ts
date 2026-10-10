@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
-  EMPTY_ITEM_MAX_AGE_MS, bestAttachMatch, chooseParser, filedAttachmentData, inboxText, isStaleEmptyItem, moveWithRollback, parsedFields,
-  targetDir,
+  EMPTY_ITEM_MAX_AGE_MS, bestAttachMatch, chooseParser, fallbackLogLine, filedAttachmentData, inboxText, isStaleEmptyItem, llmSkipNote,
+  moveWithRollback, parsedFields, targetDir,
 } from "./inbox"
 
 describe("isStaleEmptyItem", () => {
@@ -57,14 +57,49 @@ describe("chooseParser", () => {
   })
 })
 
+describe("llmSkipNote", () => {
+  const base = { mode: "LLM" as const, llmReady: true, suggestedAssetType: null, healthDocumentsEnabled: false }
+  it("says why Local AI was chosen but not used", () => {
+    expect(llmSkipNote({ ...base, llmReady: false })).toBe("llm-not-ready")
+    expect(llmSkipNote({ ...base, suggestedAssetType: "PERSON" })).toBe("llm-health")
+  })
+  it("is null when Local AI is used, or wasn't chosen", () => {
+    expect(llmSkipNote(base)).toBeNull()
+    expect(llmSkipNote({ ...base, suggestedAssetType: "PERSON", healthDocumentsEnabled: true })).toBeNull()
+    expect(llmSkipNote({ ...base, mode: "BASIC", llmReady: false })).toBeNull()
+    expect(llmSkipNote({ ...base, mode: "OFF", suggestedAssetType: "PERSON" })).toBeNull()
+  })
+  it("agrees with chooseParser", () => {
+    for (const llmReady of [true, false])
+      for (const suggestedAssetType of [null, "PERSON", "VEHICLE"] as const)
+        for (const healthDocumentsEnabled of [true, false]) {
+          const c = { ...base, llmReady, suggestedAssetType, healthDocumentsEnabled }
+          expect(llmSkipNote(c) !== null).toBe(chooseParser(c) === "basic")
+        }
+  })
+})
+
+describe("fallbackLogLine", () => {
+  it("is one line naming the reason, with a detail when there is one", () => {
+    expect(fallbackLogLine("llm-failed", "unreachable")).toBe("[inbox] Local AI not used (llm-failed: unreachable); read with the built-in parser")
+    expect(fallbackLogLine("llm-health")).toBe("[inbox] Local AI not used (llm-health); read with the built-in parser")
+  })
+  it("never spans lines", () => {
+    expect(fallbackLogLine("llm-no-answer", "a\nb\r\nc")).not.toMatch(/[\r\n]/)
+  })
+})
+
 describe("parsedFields", () => {
   it("turns a parsed receipt into the item's columns", () => {
     expect(parsedFields({ date: "2026-10-05", total: 108.25, vendor: "Acme" }, "basic")).toEqual({
-      parsedDate: new Date("2026-10-05T00:00:00Z"), parsedTotal: 108.25, parsedVendor: "Acme", parseMethod: "basic",
+      parsedDate: new Date("2026-10-05T00:00:00Z"), parsedTotal: 108.25, parsedVendor: "Acme", parseMethod: "basic", parseNote: null,
     })
   })
+  it("records why Local AI wasn't used", () => {
+    expect(parsedFields({ date: null, total: 1, vendor: null }, "basic", "llm-no-answer").parseNote).toBe("llm-no-answer")
+  })
   it("clears everything when nothing was parsed", () => {
-    expect(parsedFields(null, null)).toEqual({ parsedDate: null, parsedTotal: null, parsedVendor: null, parseMethod: null })
+    expect(parsedFields(null, null)).toEqual({ parsedDate: null, parsedTotal: null, parsedVendor: null, parseMethod: null, parseNote: null })
   })
   it("drops a malformed date rather than storing Invalid Date", () => {
     expect(parsedFields({ date: "2026-13-40", total: null, vendor: null }, "llm").parsedDate).toBeNull()

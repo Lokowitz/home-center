@@ -52,9 +52,38 @@ export function chooseParser(c: {
   return "llm"
 }
 
+/**
+ * Why an item set to Local AI was read by the built-in parser instead. Stored
+ * in InboxItem.parseNote so the card can say so, and logged; never holds
+ * receipt text.
+ */
+export type ParseNote =
+  /** The assistant (LLM) is off or missing its URL or model. */
+  | "llm-not-ready"
+  /** It looks like a person's file and health documents may not go to the LLM. */
+  | "llm-health"
+  /** The request failed: unreachable, an HTTP error, a timeout. */
+  | "llm-failed"
+  /** The model answered, but with no usable JSON (e.g. cut off while thinking). */
+  | "llm-no-answer"
+
+/** chooseParser's reason for "basic" when Local AI was chosen; null when it wasn't chosen or is used. */
+export function llmSkipNote(c: Parameters<typeof chooseParser>[0]): ParseNote | null {
+  if (c.mode !== "LLM") return null
+  if (!c.llmReady) return "llm-not-ready"
+  if (c.suggestedAssetType === "PERSON" && !c.healthDocumentsEnabled) return "llm-health"
+  return null
+}
+
+/** The one server log line for every fallback from Local AI. `detail` must never carry receipt text. */
+export function fallbackLogLine(note: ParseNote, detail?: string): string {
+  const why = detail ? `${note}: ${detail.replace(/[\r\n]+/g, " ")}` : note
+  return `[inbox] Local AI not used (${why}); read with the built-in parser`
+}
+
 export type ParsedReceiptLike = { date: string | null; total: number | null; vendor: string | null }
 
-export function parsedFields(parsed: ParsedReceiptLike | null, method: "basic" | "llm" | null) {
+export function parsedFields(parsed: ParsedReceiptLike | null, method: "basic" | "llm" | null, note: ParseNote | null = null) {
   const date = parsed?.date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.date) ? new Date(`${parsed.date}T00:00:00Z`) : null
   return {
     // A day like 2026-02-30 rolls over in Date; only keep it if it survives the round trip.
@@ -62,6 +91,7 @@ export function parsedFields(parsed: ParsedReceiptLike | null, method: "basic" |
     parsedTotal: parsed?.total ?? null,
     parsedVendor: parsed?.vendor ?? null,
     parseMethod: method,
+    parseNote: note,
   }
 }
 
