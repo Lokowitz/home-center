@@ -1,11 +1,8 @@
 import type { Metadata } from "next"
-import { Poppins, Open_Sans } from "next/font/google"
 import { Home, SearchX } from "lucide-react"
 import Link from "next/link"
+import { fontVariables } from "./fonts"
 import "./globals.css"
-
-const openSans = Open_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-open-sans" })
-const poppins = Poppins({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-poppins" })
 
 export const metadata: Metadata = {
   title: "Not Found — HomeCenter",
@@ -14,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function GlobalNotFound() {
   return (
-    <html lang="en" className={`${openSans.variable} ${poppins.variable} h-full antialiased`}>
+    <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full bg-muted/40 text-foreground">
         <div className="min-h-svh flex items-center justify-center p-4">
           <div className="w-full max-w-sm space-y-6 text-center">

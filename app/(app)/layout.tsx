@@ -6,11 +6,12 @@ import { prisma } from "@/lib/prisma"
 import { Sidebar, MobileSidebarTrigger } from "@/components/sidebar"
 import { UserMenu } from "@/components/user-menu"
 import { NotificationBell } from "@/components/notification-bell"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ThemeNavigator } from "@/components/theme-navigator"
 import { GlobalSearch } from "@/components/global-search"
 import { resolveNotificationHrefs } from "@/lib/notification-links"
 import { loadNotificationReminders } from "@/lib/notification-reminders"
 import { loadLlmStatus } from "@/lib/llm/config"
+import { inboxCount } from "@/lib/inbox-server"
 import { ChatProvider } from "@/components/chat/chat-provider"
 import { ChatDock, ChatToggle } from "@/components/chat/chat-panel"
 import packageJson from "@/package.json"
@@ -21,13 +22,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login")
 
   const features = await loadFeatures()
-  const [notifications, llm] = await Promise.all([
+  const [notifications, llm, inbox] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: session.user.id, dismissedAt: null, ...(await visibleNotificationsWhere(features)) },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
     loadLlmStatus(),
+    inboxCount(),
   ])
   const [hrefs, reminders] = await Promise.all([resolveNotificationHrefs(notifications), loadNotificationReminders(notifications)])
   const notificationItems = notifications.map((n) => ({ ...n, href: hrefs.get(n.id) ?? "/notifications", reminder: reminders.get(n.id) }))
@@ -39,17 +41,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <ChatProvider userId={session.user.id} available={llm.available} isAdmin={isAdmin} model={llm.model}>
       <div className="flex h-svh overflow-hidden">
-        <Sidebar showAssistant={showAssistant} showHealth={features.health} />
+        <Sidebar showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
-            <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} />
+            <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
             <div className="flex min-w-0 flex-1 justify-center">
               <Suspense fallback={null}>
                 <GlobalSearch className="max-w-xl" />
               </Suspense>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <ThemeToggle />
+              <ThemeNavigator />
               {showAssistant && <ChatToggle />}
               <NotificationBell notifications={notificationItems} />
               <UserMenu name={session.user.name ?? "User"} email={session.user.email ?? ""} />
