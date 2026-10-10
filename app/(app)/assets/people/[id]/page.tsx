@@ -1,4 +1,5 @@
 import { requireHealth } from "@/lib/features-server"
+import { DropPageAsset } from "@/components/drop/drop-provider"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
@@ -69,6 +70,8 @@ export default async function PersonDetailPage({
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      {/* Files dropped anywhere on this page go to Intake for this person. */}
+      <DropPageAsset assetType="PERSON" assetId={id} name={person.name} />
       <aside className="space-y-4 lg:w-72 lg:shrink-0">
         <AssetImageUploader assetType="PERSON" assetId={id} imageFilename={person.imageFilename} alt={person.name} />
 

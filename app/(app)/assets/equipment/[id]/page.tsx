@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { DropPageAsset } from "@/components/drop/drop-provider"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -37,6 +38,8 @@ export default async function EquipmentDetailPage({
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      {/* Files dropped anywhere on this page go to Intake for this equipment. */}
+      <DropPageAsset assetType="EQUIPMENT" assetId={id} name={equipment.name} />
       <aside className="space-y-4 lg:w-72 lg:shrink-0">
         <AssetImageUploader assetType="EQUIPMENT" assetId={id} imageFilename={equipment.imageFilename} alt={equipment.name} />
 

@@ -38,7 +38,7 @@ export default async function IntakePage() {
       <div>
         <h1 className="font-heading text-2xl font-semibold">Intake</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Drop receipts, invoices and manuals here. HomeCenter reads them and suggests where they go.
+          Drop receipts, invoices and manuals here. HomeCenter reads them and suggests where they go. You can also drop files on any page.
         </p>
       </div>
       <InboxDropZone />

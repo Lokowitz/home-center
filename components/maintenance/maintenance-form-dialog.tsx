@@ -8,6 +8,7 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useDropTarget } from "@/components/drop/drop-provider"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"
@@ -110,6 +111,13 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
     setStagedFiles((prev) => [...prev, ...Array.from(files)])
     if (inputRef.current) inputRef.current.value = ""
   }
+
+  // A file dropped anywhere while this is open joins the files staged above.
+  useDropTarget({
+    label: "Add to this record's files",
+    onFiles: (files) => setStagedFiles((prev) => [...prev, ...files]),
+    enabled: open,
+  })
 
   function removeStagedFile(index: number) {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index))

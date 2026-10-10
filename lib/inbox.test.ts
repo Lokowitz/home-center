@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
   EMPTY_ITEM_MAX_AGE_MS, bestAttachMatch, chooseParser, fallbackLogLine, filedAttachmentData, inboxText, isStaleEmptyItem, llmSkipNote,
-  moveWithRollback, parsedFields, targetDir,
+  keptUserAsset, moveWithRollback, parsedFields, targetDir, userAssetReason, userAssetSuggestion,
 } from "./inbox"
 
 describe("isStaleEmptyItem", () => {
@@ -218,5 +218,38 @@ describe("moveWithRollback", () => {
     await expect(moveWithRollback(plans, f.fs, async () => { throw new Error("db") }, onUndoError)).rejects.toThrow("db")
     expect(f.log.slice(-1)).toEqual(["mv /u/service/s/a.pdf /u/inbox/i/a.pdf"])
     expect(onUndoError).toHaveBeenCalledOnce()
+  })
+})
+
+describe("userAssetSuggestion", () => {
+  it("stores the asset the file was added from, flagged as the person's own pick", () => {
+    expect(userAssetSuggestion({ assetType: "VEHICLE", assetId: "v1" }, "Blue Civic")).toEqual({
+      suggestedAssetType: "VEHICLE",
+      suggestedAssetId: "v1",
+      suggestedReason: "Added from Blue Civic's page",
+      suggestedByUser: true,
+    })
+  })
+  it("trims the name and falls back when it's blank", () => {
+    expect(userAssetReason("  Main House ")).toBe("Added from Main House's page")
+    expect(userAssetReason("   ")).toBe("Added from its page")
+  })
+})
+
+describe("keptUserAsset", () => {
+  const item = { suggestedByUser: true, suggestedAssetType: "PERSON" as const, suggestedAssetId: "p1", suggestedReason: "Added from Ann's page" }
+  it("keeps an asset the person chose, as the match", () => {
+    expect(keptUserAsset(item)).toEqual({ assetType: "PERSON", assetId: "p1", reason: "added by user", shownReason: "Added from Ann's page" })
+  })
+  it("returns null (so the reader matches) when the suggestion wasn't the person's", () => {
+    expect(keptUserAsset({ ...item, suggestedByUser: false })).toBeNull()
+  })
+  it("returns null when the flag is set but the asset is missing", () => {
+    expect(keptUserAsset({ ...item, suggestedAssetId: null })).toBeNull()
+    expect(keptUserAsset({ ...item, suggestedAssetType: null })).toBeNull()
+  })
+  it("still feeds the privacy rule: a person's file chosen by hand stays off the LLM", () => {
+    const kept = keptUserAsset(item)
+    expect(chooseParser({ mode: "LLM", llmReady: true, suggestedAssetType: kept?.assetType ?? null, healthDocumentsEnabled: false })).toBe("basic")
   })
 })

@@ -4,7 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
+import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useDropTarget } from "@/components/drop/drop-provider"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -34,6 +36,13 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
   })
   const logService = watch("logService")
   const isPerson = schedule.assetType === "PERSON"
+
+  // Files go on the service record this logs, so they're only taken while it's ticked.
+  useDropTarget({
+    label: "Add to this record's files",
+    onFiles: (dropped) => setFiles((prev) => [...prev, ...dropped]),
+    enabled: logService,
+  })
 
   async function onSubmit(values: { completedDate: string; completedMileage: string; logService: boolean; vendor: string; cost: string; notes: string }) {
     const result = await completeMaintenanceSchedule(schedule.id, values as Parameters<typeof completeMaintenanceSchedule>[1])
@@ -89,7 +98,34 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
               </div>
               <div className="col-span-2 space-y-1.5">
                 <label htmlFor="complete-files" className="text-sm font-medium">Receipt or photos</label>
-                <Input id="complete-files" type="file" multiple onChange={(e) => setFiles(Array.from(e.target.files ?? []))} />
+                <Input
+                  id="complete-files"
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    const picked = Array.from(e.target.files ?? [])
+                    setFiles((prev) => [...prev, ...picked])
+                    // Cleared so the list below is the one record of what's chosen.
+                    e.target.value = ""
+                  }}
+                />
+                {files.length > 0 && (
+                  <ul className="space-y-1">
+                    {files.map((file, index) => (
+                      <li key={index} className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                        <span className="flex-1 truncate">{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))}
+                          aria-label={`Remove "${file.name}"`}
+                          className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}

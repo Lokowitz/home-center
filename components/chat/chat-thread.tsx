@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils"
 import { uploadAccept } from "@/lib/inbox-form"
 import { INBOX_HREF, inboxFollowUpQuestion, inboxNoticeText } from "@/lib/llm/inbox"
 import { addFileToInbox } from "@/components/inbox/add-to-inbox"
+import { useDropZone } from "@/components/drop/drop-provider"
 import { useChat } from "./chat-provider"
 import { Markdown } from "./markdown"
 import type { ChatNotice } from "./use-chat-thread"
@@ -106,7 +107,6 @@ export function ChatThread({ className }: { className?: string }) {
   const router = useRouter()
   const [input, setInput] = useState("")
   const [uploading, setUploading] = useState(0)
-  const [dragging, setDragging] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const pickRef = useRef<HTMLInputElement>(null)
 
@@ -114,10 +114,13 @@ export function ChatThread({ className }: { className?: string }) {
     endRef.current?.scrollIntoView({ block: "end" })
   }, [chat.messages, chat.notices, chat.draft, chat.discarded, chat.statusLabel, chat.error])
 
+  // Dropped files go to Intake from here, with the same note in the conversation as the paperclip.
+  const { setElement: setDropElement, over: dropOver } = useDropZone({ label: "Add to Intake from this chat", onFiles: (files) => void attach(files) })
+
   if (!chat.available) return <Unavailable isAdmin={chat.isAdmin} className={className} />
 
   /** Files go to Intake, not to the model: the assistant can then read what was parsed with its intake tool. */
-  async function attach(list: FileList | null) {
+  async function attach(list: FileList | File[] | null) {
     const files = list ? Array.from(list) : []
     if (!files.length) return
     setUploading((n) => n + files.length)
@@ -136,8 +139,6 @@ export function ChatThread({ className }: { className?: string }) {
     router.refresh()
   }
 
-  const hasFiles = (e: React.DragEvent) => e.dataTransfer.types.includes("Files")
-
   function submit(text: string = input) {
     if (!text.trim() || chat.busy) return
     chat.send(text)
@@ -149,27 +150,8 @@ export function ChatThread({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn("flex min-h-0 flex-1 flex-col rounded-md", dragging && "outline-2 outline-dashed outline-primary", className)}
-      onDragEnter={(e) => {
-        if (!hasFiles(e)) return
-        e.preventDefault()
-        setDragging(true)
-      }}
-      onDragOver={(e) => {
-        if (!hasFiles(e)) return
-        e.preventDefault()
-        e.dataTransfer.dropEffect = "copy"
-      }}
-      onDragLeave={(e) => {
-        // Ignore leaving into a child element.
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
-      }}
-      onDrop={(e) => {
-        if (!hasFiles(e)) return
-        e.preventDefault()
-        setDragging(false)
-        void attach(e.dataTransfer.files)
-      }}
+      ref={setDropElement}
+      className={cn("flex min-h-0 flex-1 flex-col rounded-md", dropOver && "outline-2 outline-dashed outline-primary", className)}
     >
       <div className="flex-1 space-y-4 overflow-y-auto px-1 py-2" aria-live="polite">
         {empty && (

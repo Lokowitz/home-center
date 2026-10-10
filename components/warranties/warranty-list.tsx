@@ -4,6 +4,7 @@ import { Fragment, useCallback, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { AddSplitButton } from "@/components/inbox/add-split-button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -104,7 +105,13 @@ export function WarrantyList({ warranties: initialWarranties, assetId, assetType
     <>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted-foreground">{warranties.length} warrant{warranties.length !== 1 ? "ies" : "y"}</p>
-        <Button size="sm" onClick={() => { setEditing(null); setDialogOpen(true) }}>Add Warranty</Button>
+        <AddSplitButton
+          label="Add warranty"
+          menuLabel="More ways to add a warranty"
+          fromFileLabel="From a receipt or warranty card…"
+          onAdd={() => { setEditing(null); setDialogOpen(true) }}
+          asset={{ assetType, assetId }}
+        />
       </div>
 
       {warranties.length === 0 ? (

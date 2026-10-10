@@ -8,6 +8,8 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useDropTarget } from "@/components/drop/drop-provider"
+import { maybeShowReceiptTip } from "@/components/tips/record-receipt-tip"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
@@ -137,6 +139,13 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
     if (inputRef.current) inputRef.current.value = ""
   }
 
+  // A file dropped anywhere while this is open joins the files staged above.
+  useDropTarget({
+    label: "Add to this record's files",
+    onFiles: (files) => setStagedFiles((prev) => [...prev, ...files]),
+    enabled: open,
+  })
+
   function removeStagedFile(index: number) {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index))
   }
@@ -200,6 +209,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
     const completed = !existingId && values.scheduleId ? reminderOptions.find((r) => r.id === values.scheduleId) : undefined
     toast.success(record ? "Record updated." : completed ? `Service record added. "${completed.title}" marked complete.` : isPerson ? "Visit added." : "Service record added.")
+    // Saved without a receipt: once, point at dropping it on the page next time.
+    maybeShowReceiptTip(stagedFiles.length > 0, { isNew: !existingId })
     router.refresh()
     handleClose()
   }

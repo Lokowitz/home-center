@@ -32,6 +32,13 @@ describe("buildSystemPrompt", () => {
     }
   })
 
+  it("tells the model how files get into Intake", () => {
+    for (const health of [true, false]) {
+      const p = buildSystemPrompt({ now, health })
+      expect(p).toMatch(/^- To add files to Intake, the user can drag them onto any page or use the paperclip/m)
+    }
+  })
+
   it("appends admin instructions last", () => {
     const p = buildSystemPrompt({ now, extra: "Answer in Spanish." })
     expect(p.trimEnd().endsWith("Answer in Spanish.")).toBe(true)

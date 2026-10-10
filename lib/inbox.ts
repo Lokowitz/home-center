@@ -95,6 +95,45 @@ export function parsedFields(parsed: ParsedReceiptLike | null, method: "basic" |
   }
 }
 
+/** An asset the person picked when adding the file (it was dropped on that asset's page). */
+export type UserAsset = { assetType: AssetType; assetId: string }
+
+/** The card's line under an asset the person picked: "Added from Blue Civic's page". */
+export function userAssetReason(name: string): string {
+  const n = name.trim()
+  return n ? `Added from ${n}'s page` : "Added from its page"
+}
+
+/** The suggestion columns for an item started from an asset's page; the reader keeps them. */
+export function userAssetSuggestion(asset: UserAsset, name: string) {
+  return {
+    suggestedAssetType: asset.assetType,
+    suggestedAssetId: asset.assetId,
+    suggestedReason: userAssetReason(name),
+    suggestedByUser: true,
+  }
+}
+
+/**
+ * The asset the person picked, in the matcher's shape, so the reader skips
+ * matching and still applies the person/LLM rule to it. Null when the stored
+ * suggestion is the reader's own (or incomplete): match as usual.
+ */
+export function keptUserAsset(item: {
+  suggestedByUser: boolean
+  suggestedAssetType: AssetType | null
+  suggestedAssetId: string | null
+  suggestedReason: string | null
+}): { assetType: AssetType; assetId: string; reason: string; shownReason: string } | null {
+  if (!item.suggestedByUser || !item.suggestedAssetType || !item.suggestedAssetId) return null
+  return {
+    assetType: item.suggestedAssetType,
+    assetId: item.suggestedAssetId,
+    reason: "added by user",
+    shownReason: item.suggestedReason ?? userAssetReason(""),
+  }
+}
+
 /** The existing records an item can be attached to. */
 export const ATTACH_KINDS = ["SERVICE", "WARRANTY"] as const
 export type AttachKind = (typeof ATTACH_KINDS)[number]

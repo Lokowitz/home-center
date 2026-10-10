@@ -10,7 +10,7 @@ import { buildIdentifiers, matchAsset, type AssetMatch, type CandidateAsset } fr
 import { RECORD_KINDS, semanticQueryText, suggestByMeaning, toAssetHits, type OwnerRef } from "@/lib/capture/semantic"
 import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
 import { embedderFor } from "@/lib/documents/embed/server"
-import { chooseParser, fallbackLogLine, inboxText, llmSkipNote, parsedFields, type ParseNote, type ParserChoice } from "@/lib/inbox"
+import { chooseParser, fallbackLogLine, inboxText, keptUserAsset, llmSkipNote, parsedFields, type ParseNote, type ParserChoice } from "@/lib/inbox"
 import type { CaptureParser } from "@/app/generated/prisma/client"
 
 // Reads a capture-inbox item once its files have been extracted: the receipt
@@ -135,7 +135,11 @@ async function readReceipt(text: string, choice: ParserChoice, skipped: ParseNot
 export async function processInboxItem(itemId: string): Promise<void> {
   const item = await prisma.inboxItem.findUnique({
     where: { id: itemId },
-    select: { id: true, attachments: { select: { text: { select: { status: true, text: true, error: true } } } } },
+    select: {
+      id: true,
+      suggestedByUser: true, suggestedAssetType: true, suggestedAssetId: true, suggestedReason: true,
+      attachments: { select: { text: { select: { status: true, text: true, error: true } } } },
+    },
   })
   if (!item) return
   const { indexingEnabled } = await loadDocumentSettings()
@@ -144,11 +148,18 @@ export async function processInboxItem(itemId: string): Promise<void> {
     { indexing: indexingEnabled }
   )
   if (read.kind === "wait") return
+  // Added from an asset's page: the person's pick stands, no matching.
+  const userAsset = keptUserAsset(item)
+  // Leaves the person's pick as it is; clears the reader's own suggestion.
+  const suggestion = (match: AssetMatch | null) =>
+    userAsset
+      ? {}
+      : { suggestedAssetType: match?.assetType ?? null, suggestedAssetId: match?.assetId ?? null, suggestedReason: match?.shownReason ?? null }
 
   if (read.kind === "failed") {
     await prisma.inboxItem.updateMany({
       where: { id: itemId },
-      data: { status: "FAILED", error: read.error, ...parsedFields(null, null), suggestedAssetType: null, suggestedAssetId: null, suggestedReason: null },
+      data: { status: "FAILED", error: read.error, ...parsedFields(null, null), ...suggestion(null) },
     })
     return
   }
@@ -156,8 +167,8 @@ export async function processInboxItem(itemId: string): Promise<void> {
   const [mode, features, llm] = await Promise.all([loadCaptureParser(), loadFeatures(), loadLlmConfig()])
   // Matching is local (identifiers, then the local embedding model), so it runs
   // first: a person's file then never reaches the LLM unless allowed.
-  let match: AssetMatch | null = null
-  if (read.text.trim()) {
+  let match: AssetMatch | null = userAsset
+  if (!userAsset && read.text.trim()) {
     const candidates = await loadCaptureCandidates(features.health)
     match = matchAsset(read.text, candidates) ?? (await suggestFromMeaning(read.text, candidates, features.health))
   }
@@ -175,10 +186,8 @@ export async function processInboxItem(itemId: string): Promise<void> {
       status: "READY",
       error: null,
       ...parsedFields(parsed, method, note),
-      suggestedAssetType: match?.assetType ?? null,
-      suggestedAssetId: match?.assetId ?? null,
       // The plain-words reason ("VIN on the receipt"), never the matched value.
-      suggestedReason: match?.shownReason ?? null,
+      ...suggestion(match),
     },
   })
 }

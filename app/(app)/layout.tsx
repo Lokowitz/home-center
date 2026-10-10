@@ -14,6 +14,7 @@ import { loadLlmStatus } from "@/lib/llm/config"
 import { inboxCount } from "@/lib/inbox-server"
 import { ChatProvider } from "@/components/chat/chat-provider"
 import { ChatDock, ChatToggle } from "@/components/chat/chat-panel"
+import { DropProvider } from "@/components/drop/drop-provider"
 import packageJson from "@/package.json"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 
@@ -40,6 +41,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <ChatProvider userId={session.user.id} available={llm.available} isAdmin={isAdmin} model={llm.model}>
+      <DropProvider healthEnabled={features.health}>
       <div className="flex h-svh overflow-hidden">
         <Sidebar showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
         <div className="flex flex-1 flex-col overflow-hidden">
@@ -91,6 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </div>
+      </DropProvider>
     </ChatProvider>
   )
 }

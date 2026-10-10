@@ -14,7 +14,7 @@ import { uploadRoot } from "@/lib/upload-path"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { planMove } from "@/lib/capture/move"
 import {
-  ATTACH_KINDS, filedAttachmentData, moveWithRollback, targetDir, type AttachCandidate, type AttachKind, type FileTarget,
+  ATTACH_KINDS, filedAttachmentData, moveWithRollback, targetDir, userAssetSuggestion, type AttachCandidate, type AttachKind, type FileTarget,
 } from "@/lib/inbox"
 import { assetRecordHref } from "@/lib/documents/owner"
 import { processInboxItem } from "@/lib/capture-server"
@@ -48,13 +48,19 @@ function newRecordId(): string {
   return `c${Date.now().toString(36)}${randomBytes(8).toString("hex")}`
 }
 
-async function assetExists(type: AssetType, id: string): Promise<boolean> {
-  const where = { where: { id }, select: { id: true } } as const
-  if (type === "PROPERTY") return !!(await prisma.property.findUnique(where))
-  if (type === "VEHICLE") return !!(await prisma.vehicle.findUnique(where))
-  if (type === "EQUIPMENT") return !!(await prisma.equipment.findUnique(where))
+/** The asset's name, or null if it's gone (or a person's while Health is off). */
+async function assetName(type: AssetType, id: string): Promise<string | null> {
+  const where = { where: { id }, select: { name: true } } as const
+  if (type === "PROPERTY") return (await prisma.property.findUnique(where))?.name ?? null
+  if (type === "VEHICLE") return (await prisma.vehicle.findUnique(where))?.name ?? null
+  if (type === "EQUIPMENT") return (await prisma.equipment.findUnique(where))?.name ?? null
   // People go with the rest of Health.
-  return (await loadFeatures()).health && !!(await prisma.person.findUnique(where))
+  if (!(await loadFeatures()).health) return null
+  return (await prisma.person.findUnique(where))?.name ?? null
+}
+
+async function assetExists(type: AssetType, id: string): Promise<boolean> {
+  return (await assetName(type, id)) !== null
 }
 
 function revalidateInbox() {
@@ -63,9 +69,24 @@ function revalidateInbox() {
   revalidatePath("/", "layout")
 }
 
-export async function createInboxItem(): Promise<{ success: true; id: string }> {
+const fileSchema = z.object({ assetType: z.enum(ASSET_TYPES), assetId: z.string().min(1) })
+
+/**
+ * A new, empty item for an upload. `asset` when the file was added from that
+ * asset's page: it becomes the item's suggestion, kept by the reader (see
+ * keptUserAsset). Throws if that asset is gone, so the upload stops.
+ */
+export async function createInboxItem(asset?: { assetType: AssetType; assetId: string }): Promise<{ success: true; id: string }> {
   const session = await requireUser()
-  const item = await prisma.inboxItem.create({ data: { createdById: session.user.id }, select: { id: true } })
+  let suggestion = {}
+  if (asset) {
+    const parsed = fileSchema.safeParse(asset)
+    if (!parsed.success) throw new Error("Invalid input")
+    const name = await assetName(parsed.data.assetType, parsed.data.assetId)
+    if (name === null) throw new Error("That asset no longer exists.")
+    suggestion = userAssetSuggestion(parsed.data, name)
+  }
+  const item = await prisma.inboxItem.create({ data: { createdById: session.user.id, ...suggestion }, select: { id: true } })
   return { success: true, id: item.id }
 }
 
@@ -112,8 +133,6 @@ async function moveOut(
     return { error: failure.message }
   }
 }
-
-const fileSchema = z.object({ assetType: z.enum(ASSET_TYPES), assetId: z.string().min(1) })
 
 export type FileInboxResult =
   | { success: true; recordId: string; href: string }

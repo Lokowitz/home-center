@@ -16,6 +16,8 @@ import { bucketed, formatMoney, priorPeriod, sum, yearToDate } from "@/lib/costs
 import { SpendArea } from "@/components/charts/spend-area"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { listInboxItems } from "@/lib/inbox-server"
+import { IntakeCard } from "@/components/dashboard/intake-card"
 
 // Months of history in the dashboard's spending chart. Twelve rather than six:
 // six months cannot show a season, and a household's spending is seasonal.
@@ -38,7 +40,7 @@ export default async function DashboardPage() {
     propertyCount, vehicleCount, equipmentCount, personCount, recordCount,
     warrantyCount,
     maintenanceCandidates, mileage, expiringWarranties,
-    properties, vehicles, equipment, people, assets, activity, costRows,
+    properties, vehicles, equipment, people, assets, activity, costRows, intake,
   ] = await Promise.all([
     prisma.property.count(),
     prisma.vehicle.count(),
@@ -65,6 +67,7 @@ export default async function DashboardPage() {
     loadAssetIndex(),
     loadActivityIndex(),
     loadCostRecords(),
+    listInboxItems(now),
   ])
 
   // A schedule counts as due when its own date window says so (the card's "30d"
@@ -133,7 +136,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* Two by two until the page is wide enough for all four side by side. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <IntakeCard items={intake.items} householdNames={intake.householdNames} />
+
         {/* Upcoming reminders */}
         <Card className="py-5">
           <CardHeader className="px-5 pb-1">
