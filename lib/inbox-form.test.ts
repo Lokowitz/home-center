@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   NO_CATEGORY, assetKey, fileFormDefaults, fileFormPayload, guessTitle, hasPendingItems, localDay, parseAssetKey,
   readByLabel, uploadAccept, fieldErrorTarget, isPreviewableImage,
+  vendorDoubt, dateDoubt, totalDoubt, readFields, inboxReadiness, inboxHeadline, defaultDestination,
 } from "./inbox-form"
 
 const item = {
@@ -124,5 +125,158 @@ describe("isPreviewableImage", () => {
     expect(isPreviewableImage("image/heic")).toBe(false)
     expect(isPreviewableImage("image/tiff")).toBe(false)
     expect(isPreviewableImage("application/pdf")).toBe(false)
+  })
+})
+
+describe("vendorDoubt", () => {
+  it("trusts ordinary shop names", () => {
+    for (const v of ["Haley Mechanical", "Jiffy Lube", "THE HOME DEPOT #1234", "\tJiffy Lube\t", "Café Müller", "Ålesund Bilservice", "3M", "7-Eleven", "May Plumbing", "Job Lot Hardware", "Accountants Ltd"]) {
+      expect(vendorDoubt(v), v).toBeNull()
+    }
+  })
+  it("has nothing to doubt when there is no vendor", () => {
+    expect(vendorDoubt(null)).toBeNull()
+    expect(vendorDoubt("")).toBeNull()
+    expect(vendorDoubt("   ")).toBeNull()
+    expect(vendorDoubt("\t\n")).toBeNull()
+  })
+  it("doubts job, order, invoice and reference numbers", () => {
+    for (const v of ["Job #188202288", "Order 55123", "INVOICE NO. 4471", "Ref: A-2231", "Receipt #9", "PO 7781", "Acct 0042", "Account # 12-33", "\tJob\t#188202288"]) {
+      expect(vendorDoubt(v), v).toMatch(/number/i)
+    }
+  })
+  it("doubts names that start with punctuation", () => {
+    for (const v of [">. BELLE TIR", "#188202288", "*** THANK YOU", "- Acme"]) {
+      expect(vendorDoubt(v), v).not.toBeNull()
+    }
+  })
+  it("doubts names that are mostly digits", () => {
+    expect(vendorDoubt("188202288")).not.toBeNull()
+    expect(vendorDoubt("A 55-1234-99")).not.toBeNull()
+    expect(vendorDoubt("Tel 555 123 4567")).not.toBeNull()
+  })
+  it("doubts names that read as a date", () => {
+    for (const v of ["02/02/2026", "2026-02-02", "Feb 2, 2026", "February 2nd 2026", "2 Feb 2026", "12.31.25"]) {
+      expect(vendorDoubt(v), v).toMatch(/date/i)
+    }
+  })
+})
+
+describe("dateDoubt", () => {
+  const uploaded = new Date("2026-10-10T15:00:00Z")
+  it("trusts dates from the last three years up to the upload", () => {
+    expect(dateDoubt(new Date("2026-10-10T00:00:00Z"), uploaded)).toBeNull()
+    expect(dateDoubt(new Date("2024-04-30T00:00:00Z"), uploaded)).toBeNull()
+    expect(dateDoubt(new Date("2023-10-20T00:00:00Z"), uploaded)).toBeNull()
+  })
+  it("allows a few days of clock and time-zone slack after the upload", () => {
+    expect(dateDoubt(new Date("2026-10-12T00:00:00Z"), uploaded)).toBeNull()
+  })
+  it("doubts dates well after the upload", () => {
+    expect(dateDoubt(new Date("2026-10-20T00:00:00Z"), uploaded)).toMatch(/after/i)
+    expect(dateDoubt(new Date("2027-01-01T00:00:00Z"), uploaded)).toMatch(/after/i)
+  })
+  it("doubts dates more than about three years old", () => {
+    expect(dateDoubt(new Date("2023-09-01T00:00:00Z"), uploaded)).toMatch(/years/i)
+    expect(dateDoubt(new Date("1999-01-01T00:00:00Z"), uploaded)).toMatch(/years/i)
+  })
+  it("has nothing to doubt without a date, and doubts an invalid one", () => {
+    expect(dateDoubt(null, uploaded)).toBeNull()
+    expect(dateDoubt(new Date("nope"), uploaded)).not.toBeNull()
+  })
+})
+
+describe("totalDoubt", () => {
+  it("trusts positive totals and refunds", () => {
+    expect(totalDoubt(125)).toBeNull()
+    expect(totalDoubt(0.01)).toBeNull()
+    expect(totalDoubt(-40)).toBeNull()
+    expect(totalDoubt(null)).toBeNull()
+  })
+  it("doubts a zero or non-finite total", () => {
+    expect(totalDoubt(0)).toMatch(/zero/i)
+    expect(totalDoubt(-0)).toMatch(/zero/i)
+    expect(totalDoubt(Number.NaN)).not.toBeNull()
+    expect(totalDoubt(Number.POSITIVE_INFINITY)).not.toBeNull()
+  })
+})
+
+const ready = {
+  status: "READY" as const,
+  createdAt: new Date("2026-10-10T15:00:00Z"),
+  parsedDate: new Date("2024-04-30T00:00:00Z"),
+  parsedTotal: 125,
+  parsedVendor: "Haley Mechanical",
+  suggestedAsset: { type: "PROPERTY" as const, id: "p1", name: "Boiler" },
+  attachments: [{}],
+}
+
+describe("readFields", () => {
+  it("marks every field found", () => {
+    expect(readFields(ready)).toEqual({
+      date: { state: "found" }, total: { state: "found" }, vendor: { state: "found" }, asset: { state: "found" },
+    })
+  })
+  it("marks missing fields, including whitespace-only vendors", () => {
+    expect(readFields({ ...ready, parsedDate: null, parsedTotal: null, parsedVendor: " \t", suggestedAsset: null })).toEqual({
+      date: { state: "missing" }, total: { state: "missing" }, vendor: { state: "missing" }, asset: { state: "missing" },
+    })
+  })
+  it("marks unsure fields with the reason", () => {
+    const f = readFields({ ...ready, parsedVendor: "Job #188202288", parsedTotal: 0, parsedDate: new Date("2027-03-01T00:00:00Z") })
+    expect(f.vendor).toMatchObject({ state: "unsure", reason: expect.stringMatching(/number/i) })
+    expect(f.total).toMatchObject({ state: "unsure", reason: expect.stringMatching(/zero/i) })
+    expect(f.date).toMatchObject({ state: "unsure", reason: expect.stringMatching(/after/i) })
+  })
+  it("reads dates sent over the wire as strings", () => {
+    expect(readFields({ ...ready, createdAt: "2026-10-10T15:00:00.000Z" as unknown as Date, parsedDate: "2024-04-30T00:00:00.000Z" as unknown as Date }).date).toEqual({ state: "found" })
+  })
+})
+
+describe("inboxReadiness", () => {
+  it("is reading while uploading or pending", () => {
+    expect(inboxReadiness({ ...ready, attachments: [] })).toBe("reading")
+    expect(inboxReadiness({ ...ready, status: "PENDING" })).toBe("reading")
+  })
+  it("is failed when the file couldn't be read", () => {
+    expect(inboxReadiness({ ...ready, status: "FAILED" })).toBe("failed")
+  })
+  it("is ready with date, total and asset found and nothing unsure", () => {
+    expect(inboxReadiness(ready)).toBe("ready")
+    // A missing vendor doesn't block it.
+    expect(inboxReadiness({ ...ready, parsedVendor: null })).toBe("ready")
+  })
+  it("needs a look when anything is missing or unsure", () => {
+    expect(inboxReadiness({ ...ready, parsedTotal: null })).toBe("check")
+    expect(inboxReadiness({ ...ready, parsedDate: null })).toBe("check")
+    expect(inboxReadiness({ ...ready, suggestedAsset: null })).toBe("check")
+    expect(inboxReadiness({ ...ready, parsedVendor: ">. BELLE TIR" })).toBe("check")
+    expect(inboxReadiness({ ...ready, parsedTotal: 0 })).toBe("check")
+  })
+})
+
+describe("inboxHeadline", () => {
+  it("reads as a sentence when everything is there", () => {
+    expect(inboxHeadline({ total: "$125.00", vendor: "Haley Mechanical", date: "Apr 30, 2024" }, "r6-ai.pdf")).toBe("$125.00 at Haley Mechanical · Apr 30, 2024")
+  })
+  it("drops the parts it doesn't have", () => {
+    expect(inboxHeadline({ total: "$82.40", vendor: null, date: "Feb 2, 2026" }, "x.pdf")).toBe("$82.40 · Feb 2, 2026")
+    expect(inboxHeadline({ total: null, vendor: null, date: "Feb 2, 2026" }, "x.pdf")).toBe("Receipt from Feb 2, 2026")
+    expect(inboxHeadline({ total: null, vendor: "Haley Mechanical", date: "Apr 30, 2024" }, "x.pdf")).toBe("Haley Mechanical · Apr 30, 2024")
+    expect(inboxHeadline({ total: "$9.99", vendor: "Acme", date: null }, "x.pdf")).toBe("$9.99 at Acme")
+    expect(inboxHeadline({ total: null, vendor: "\t ", date: null }, "x.pdf")).toBe("x.pdf")
+  })
+  it("falls back to the file name when nothing was read", () => {
+    expect(inboxHeadline({ total: null, vendor: null, date: null }, "scan 1.jpg")).toBe("scan 1.jpg")
+  })
+})
+
+describe("defaultDestination", () => {
+  it("suggests the existing record when one matches the receipt", () => {
+    expect(defaultDestination({ suggestedAsset: { type: "VEHICLE", id: "v1", name: "Civic" }, matchingRecord: true })).toBe("attach")
+  })
+  it("otherwise suggests a new service record", () => {
+    expect(defaultDestination({ suggestedAsset: { type: "VEHICLE", id: "v1", name: "Civic" }, matchingRecord: false })).toBe("file")
+    expect(defaultDestination({ suggestedAsset: null, matchingRecord: true })).toBe("file")
   })
 })

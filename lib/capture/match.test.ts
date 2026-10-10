@@ -86,3 +86,18 @@ describe("matchAsset", () => {
     expect(matchAsset("Plate ABC 1234 Tacoma", [n, v])?.assetId).toBe("x")
   })
 })
+
+describe("matchAsset shownReason", () => {
+  it("says which kind of identifier matched, without its value", () => {
+    expect(matchAsset("VIN 1HGCM82633A004352", all)?.shownReason).toBe("VIN on the receipt")
+    expect(matchAsset("Unit SN-8812345 repaired", [washer])?.shownReason).toBe("serial number on the receipt")
+    expect(matchAsset("Model WM3900HWA", [washer])?.shownReason).toBe("model number on the receipt")
+    expect(matchAsset("Service address: 123 MAIN ST.", all)?.shownReason).toBe("address on the receipt")
+    expect(matchAsset("Honda Civic brake job", [civic, cabin])?.shownReason).toBe("make and model on the receipt")
+    expect(matchAsset("Visit to the Lake Cabin", [cabin])?.shownReason).toBe("name on the receipt")
+  })
+  it("falls back to a generic ID number for untagged codes", () => {
+    const plain: CandidateAsset = { assetType: "PROPERTY", id: "p9", name: "Lot", identifiers: ["PARCEL-55821"] }
+    expect(matchAsset("parcel-55821", [plain])?.shownReason).toBe("ID number on the receipt")
+  })
+})

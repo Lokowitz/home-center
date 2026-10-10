@@ -5,7 +5,8 @@ export type CaptureAssetType = "PROPERTY" | "VEHICLE" | "EQUIPMENT" | "PERSON"
 
 /** code: VIN / serial / plate / model number. Strongest evidence first. */
 export type IdentifierKind = "code" | "address" | "makeModel" | "name"
-export type Identifier = { kind: IdentifierKind; value: string }
+/** `label` names a code for people ("VIN", "serial number"); untagged codes read as "ID number". */
+export type Identifier = { kind: IdentifierKind; value: string; label?: string }
 
 export type CandidateAsset = {
   assetType: CaptureAssetType
@@ -15,11 +16,19 @@ export type CandidateAsset = {
   identifiers: (string | Identifier)[]
 }
 
-export type AssetMatch = { assetType: CaptureAssetType; assetId: string; reason: string }
+/** `reason` names the matched value, for logs and tests; `shownReason` is safe and plain enough for the inbox card. */
+export type AssetMatch = { assetType: CaptureAssetType; assetId: string; reason: string; shownReason: string }
 
 const WEIGHT: Record<IdentifierKind, number> = { code: 100, address: 50, makeModel: 20, name: 10 }
 const LABEL: Record<IdentifierKind, string> = {
   code: "identifier",
+  address: "address",
+  makeModel: "make and model",
+  name: "name",
+}
+
+const SHOWN: Record<IdentifierKind, string> = {
+  code: "ID number",
   address: "address",
   makeModel: "make and model",
   name: "name",
@@ -88,17 +97,21 @@ function containsCode(hay: string[], compact: string): boolean {
 export function matchAsset(text: string, assets: CandidateAsset[]): AssetMatch | null {
   const hay = tokens(text)
   if (!hay.length) return null
-  let best: { asset: CandidateAsset; score: number; reason: string } | null = null
+  let best: { asset: CandidateAsset; score: number; reason: string; shownReason: string } | null = null
   let tied = false
   for (const asset of assets) {
-    let top: { score: number; reason: string } | null = null
+    let top: { score: number; reason: string; shownReason: string } | null = null
     for (const raw of asset.identifiers) {
-      const id = typeof raw === "string" ? { kind: classify(raw), value: raw } : raw
+      const id: Identifier = typeof raw === "string" ? { kind: classify(raw), value: raw } : raw
       const toks = tokens(id.value)
       if (!toks.length || !usable(id.kind, toks)) continue
       const hit = containsSeq(hay, toks) || (id.kind === "code" && containsCode(hay, toks.join("")))
       if (hit && (!top || WEIGHT[id.kind] > top.score))
-        top = { score: WEIGHT[id.kind], reason: `${LABEL[id.kind]} "${id.value.trim()}" found in the text` }
+        top = {
+          score: WEIGHT[id.kind],
+          reason: `${LABEL[id.kind]} "${id.value.trim()}" found in the text`,
+          shownReason: `${id.label ?? SHOWN[id.kind]} on the receipt`,
+        }
     }
     if (!top) continue
     if (!best || top.score > best.score) {
@@ -109,13 +122,13 @@ export function matchAsset(text: string, assets: CandidateAsset[]): AssetMatch |
     }
   }
   if (!best || tied) return null
-  return { assetType: best.asset.assetType, assetId: best.asset.id, reason: best.reason }
+  return { assetType: best.asset.assetType, assetId: best.asset.id, reason: best.reason, shownReason: best.shownReason }
 }
 
 type Opt = string | null | undefined
 
-function collect(...pairs: [IdentifierKind, Opt][]): Identifier[] {
-  return pairs.flatMap(([kind, v]) => (v && v.trim() ? [{ kind, value: v.trim() }] : []))
+function collect(...pairs: [IdentifierKind, Opt, string?][]): Identifier[] {
+  return pairs.flatMap(([kind, v, label]) => (v && v.trim() ? [{ kind, value: v.trim(), ...(label ? { label } : {}) }] : []))
 }
 
 const join = (...parts: Opt[]) => parts.filter((p) => p && p.trim()).map((p) => p!.trim()).join(" ")
@@ -123,13 +136,13 @@ const join = (...parts: Opt[]) => parts.filter((p) => p && p.trim()).map((p) => 
 /** Identifier lists per asset type, from the Prisma models' own field names. */
 export const buildIdentifiers = {
   vehicle: (v: { name: string; make?: Opt; model?: Opt; vin?: Opt }): Identifier[] =>
-    collect(["code", v.vin], ["makeModel", v.make && v.model ? join(v.make, v.model) : null], ["name", v.name]),
+    collect(["code", v.vin, "VIN"], ["makeModel", v.make && v.model ? join(v.make, v.model) : null], ["name", v.name]),
   property: (p: { name: string; address?: Opt }): Identifier[] =>
     collect(["address", p.address?.split(/[,\n]/)[0]], ["name", p.name]),
   equipment: (e: { name: string; manufacturer?: Opt; modelNumber?: Opt; serialNumber?: Opt }): Identifier[] =>
     collect(
-      ["code", e.serialNumber],
-      ["code", e.modelNumber],
+      ["code", e.serialNumber, "serial number"],
+      ["code", e.modelNumber, "model number"],
       ["makeModel", e.manufacturer && e.modelNumber ? join(e.manufacturer, e.modelNumber) : null],
       ["name", e.name],
     ),

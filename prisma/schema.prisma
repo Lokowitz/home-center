@@ -556,6 +556,8 @@ model InboxItem {
   parseMethod  String?
   suggestedAssetType AssetType?
   suggestedAssetId   String?
+  /// Why that asset was suggested, in words for the card ("VIN on the receipt"). Never the matched value.
+  suggestedReason    String?
   /// Fixed phrase shown on the item, e.g. the extractor's error.
   error       String?
 

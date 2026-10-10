@@ -100,9 +100,6 @@ export function suggestByMeaning(hits: AssetHit[], opts: { allowPeople: boolean 
     runner.best - top.best >= SUGGEST_MARGIN ||
     (top.votes >= MIN_VOTES && top.votes >= 2 * runner.votes)
   if (!clear) return null
-  return {
-    assetType: top.assetType,
-    assetId: top.assetId,
-    reason: top.via === "record" ? "similar to past service records" : "similar to the asset's description",
-  }
+  const reason = top.via === "record" ? "similar to past service records" : "similar to the asset's description"
+  return { assetType: top.assetType, assetId: top.assetId, reason, shownReason: reason }
 }

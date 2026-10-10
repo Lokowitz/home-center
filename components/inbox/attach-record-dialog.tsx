@@ -106,7 +106,7 @@ export function AttachRecordDialog({
               ) : choices.error ? (
                 <p className="text-sm text-destructive">{choices.error}</p>
               ) : !choices.candidates.length ? (
-                <p className="text-sm text-muted-foreground">No service records or warranties on this asset yet. Use &ldquo;File it&rdquo; to create one.</p>
+                <p className="text-sm text-muted-foreground">No service records or warranties on this asset yet. Choose &ldquo;New service record&rdquo; on the card to create one.</p>
               ) : (
                 <ul className="max-h-72 space-y-1 overflow-y-auto rounded-md border p-1">
                   {choices.candidates.map((c) => {

@@ -138,7 +138,7 @@ export async function processInboxItem(itemId: string): Promise<void> {
   if (read.kind === "failed") {
     await prisma.inboxItem.updateMany({
       where: { id: itemId },
-      data: { status: "FAILED", error: read.error, ...parsedFields(null, null), suggestedAssetType: null, suggestedAssetId: null },
+      data: { status: "FAILED", error: read.error, ...parsedFields(null, null), suggestedAssetType: null, suggestedAssetId: null, suggestedReason: null },
     })
     return
   }
@@ -167,6 +167,8 @@ export async function processInboxItem(itemId: string): Promise<void> {
       ...parsedFields(parsed, method),
       suggestedAssetType: match?.assetType ?? null,
       suggestedAssetId: match?.assetId ?? null,
+      // The plain-words reason ("VIN on the receipt"), never the matched value.
+      suggestedReason: match?.shownReason ?? null,
     },
   })
 }
