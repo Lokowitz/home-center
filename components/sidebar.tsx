@@ -15,7 +15,7 @@ type NavItem = { href: string; label: string; icon: React.ElementType; section?:
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
+  { href: "/intake", label: "Intake", icon: Inbox },
   { href: "/chat", label: "Assistant", icon: Sparkles },
   { href: "/assets/properties", label: "Properties", icon: Building2, section: "Home" },
   { href: "/assets/vehicles", label: "Vehicles", icon: Car },
@@ -82,7 +82,7 @@ function SidebarContent({ onNavClick, showAssistant, showHealth, inboxCount = 0 
             {section && (
               <p className="mt-3 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">{section}</p>
             )}
-            <NavLink {...item} badge={item.href === "/inbox" ? inboxCount : undefined} onClick={onNavClick} />
+            <NavLink {...item} badge={item.href === "/intake" ? inboxCount : undefined} onClick={onNavClick} />
           </Fragment>
         ))}
       </nav>

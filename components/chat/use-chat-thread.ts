@@ -18,7 +18,7 @@ const CUT_OFF = "The answer was cut off — try again."
 
 /**
  * A line the page itself adds to the transcript (e.g. "Added receipt.pdf to
- * your Inbox"). Shown after the first `after` messages; never saved or sent to
+ * Intake"). Shown after the first `after` messages; never saved or sent to
  * the model, so it disappears on reload.
  */
 export type ChatNotice = { id: number; text: string; href: string; after: number }

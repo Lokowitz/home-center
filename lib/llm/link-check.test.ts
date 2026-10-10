@@ -15,9 +15,10 @@ describe("unverifiedLinks", () => {
     const text = "See [costs](/costs), [providers](/providers), [vehicles](/assets/vehicles) and [docs](https://x.com/a/b)."
     expect(unverifiedLinks(text, [])).toEqual([])
   })
-  it("allows the Inbox page", () => {
-    expect(unverifiedLinks("File it from your [Inbox](/inbox).", [])).toEqual([])
-    expect(impossibleLinks(["/inbox"])).toEqual([])
+  it("allows the Intake page", () => {
+    expect(unverifiedLinks("File it from [Intake](/intake).", [])).toEqual([])
+    expect(impossibleLinks(["/intake"])).toEqual([])
+    expect(impossibleLinks(["/inbox"])).toEqual(["/inbox"])
   })
   it("reports each bad link once", () => {
     expect(unverifiedLinks("[a](/assets/people/x1) [b](/assets/people/x1)", [])).toEqual(["/assets/people/x1"])

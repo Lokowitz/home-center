@@ -10,7 +10,7 @@ import { settingsHref } from "@/lib/settings-sections"
 import type { CaptureParser } from "@/app/generated/prisma/client"
 
 const OPTIONS: { value: CaptureParser; label: string; hint: string }[] = [
-  { value: "OFF", label: "Off", hint: "Inbox items start blank; you fill in every field." },
+  { value: "OFF", label: "Off", hint: "Intake items start blank; you fill in every field." },
   { value: "BASIC", label: "Basic", hint: "Built in and offline. Finds the date, total and shop on most printed receipts." },
   {
     value: "LLM",
@@ -19,7 +19,7 @@ const OPTIONS: { value: CaptureParser; label: string; hint: string }[] = [
   },
 ]
 
-/** Settings → Documents → "Receipt reading" for the capture inbox. Saves on change. */
+/** Settings → Documents → "Receipt reading" for Intake (the capture inbox). Saves on change. */
 export function CaptureSettings({ initial, llmReady }: { initial: CaptureParser; llmReady: boolean }) {
   const [mode, setMode] = useState(initial)
   const [pending, start] = useTransition()
@@ -48,7 +48,7 @@ export function CaptureSettings({ initial, llmReady }: { initial: CaptureParser;
           {current && <Badge variant={mode === "OFF" ? "outline" : "secondary"}>{current.label}</Badge>}
         </CardTitle>
         <CardDescription>
-          How the <Link href="/inbox" className="underline underline-offset-2">Inbox</Link> fills in the date, total and shop of a
+          How <Link href="/intake" className="underline underline-offset-2">Intake</Link> fills in the date, total and shop of a
           receipt you add. Applies to new items; use Re-read on an item to read it again.
         </CardDescription>
       </CardHeader>

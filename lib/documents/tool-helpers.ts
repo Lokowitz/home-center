@@ -41,7 +41,7 @@ const ALIASES: Record<string, AttachmentRecordType> = {
   allergy: "ALLERGY",
   immunization: "IMMUNIZATION", vaccine: "IMMUNIZATION", vaccination: "IMMUNIZATION",
   document: "DOCUMENT", assetdocument: "DOCUMENT",
-  inbox: "INBOX", inboxitem: "INBOX", unfiled: "INBOX",
+  intake: "INBOX", intakeitem: "INBOX", inbox: "INBOX", inboxitem: "INBOX", unfiled: "INBOX",
 }
 
 /** A recordType argument as models send it ("warranties", "Service records") → the enum, if visible. */

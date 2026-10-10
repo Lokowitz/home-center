@@ -6,7 +6,8 @@ import { InboxDropZone } from "@/components/inbox/inbox-drop-zone"
 import { InboxList } from "@/components/inbox/inbox-list"
 import type { InboxAssetOption, InboxReminderOption } from "@/components/inbox/asset-select"
 
-export default async function InboxPage() {
+// Shown as "Intake" (route /intake; /inbox redirects here). The database, files and code keep the internal name "inbox".
+export default async function IntakePage() {
   const features = await loadFeatures()
   const byName = { select: { id: true, name: true }, orderBy: { name: "asc" } } as const
   const [{ items, householdNames }, properties, vehicles, equipment, people, schedules] = await Promise.all([
@@ -35,9 +36,9 @@ export default async function InboxPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-semibold">Inbox</h1>
+        <h1 className="font-heading text-2xl font-semibold">Intake</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Add a receipt or invoice now and file it later. HomeCenter reads the date, total and shop, and guesses what it&apos;s for.
+          Drop receipts, invoices and manuals here. HomeCenter reads them and suggests where they go.
         </p>
       </div>
       <InboxDropZone />

@@ -58,7 +58,7 @@ async function assetExists(type: AssetType, id: string): Promise<boolean> {
 }
 
 function revalidateInbox() {
-  revalidatePath("/inbox")
+  revalidatePath("/intake")
   // The sidebar's count badge is in the shared layout.
   revalidatePath("/", "layout")
 }
@@ -240,7 +240,7 @@ export async function reparseInboxItem(id: string): Promise<{ success: true; sta
   if (!(await prisma.inboxItem.findUnique({ where: { id }, select: { id: true } }))) return { error: "Not found" }
   await processInboxItem(id)
   const after = await prisma.inboxItem.findUnique({ where: { id }, select: { status: true } })
-  revalidatePath("/inbox")
+  revalidatePath("/intake")
   return after ? { success: true, status: after.status } : { error: "Not found" }
 }
 

@@ -22,11 +22,12 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toMatch(/passwordHash/)
   })
 
-  it("describes the read-only inbox tool and where filing happens", () => {
+  it("describes the read-only intake tool and where filing happens", () => {
     for (const health of [true, false]) {
       const p = buildSystemPrompt({ now, health })
-      expect(p).toMatch(/^- inbox lists/m)
-      expect(p).toContain("[Inbox](/inbox)")
+      expect(p).toMatch(/^- intake lists/m)
+      expect(p).toContain("[Intake](/intake)")
+      expect(p).not.toContain("(/inbox)")
       expect(p).toMatch(/can't file/i)
     }
   })

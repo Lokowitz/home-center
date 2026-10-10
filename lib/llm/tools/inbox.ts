@@ -5,17 +5,17 @@ import { assetHref } from "@/lib/assets"
 import { INBOX_TOOL_DESCRIPTION, inboxToolResult } from "../inbox"
 import { defineTool, type RegisteredTool } from "./registry"
 
-// Read-only: the assistant can say what's waiting in the Inbox and point to it,
+// Read-only: the assistant can say what's waiting in Intake and point to it,
 // never file anything (the roadmap keeps write tools out of the assistant).
 // Built per request because whether person-suggested items are shown depends on
 // the health-documents setting; that filter is applied in code, not by the model.
 
 export function inboxTool(includeHealth: boolean): RegisteredTool {
   return defineTool({
-    name: "inbox",
+    name: "intake",
     description: INBOX_TOOL_DESCRIPTION,
     schema: z.object({}),
-    label: () => "Checking the Inbox…",
+    label: () => "Checking Intake…",
     async run() {
       // Unlike listInboxItems, no clean-up of abandoned uploads: a tool call only reads.
       const [rows, index] = await Promise.all([

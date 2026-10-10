@@ -68,7 +68,7 @@ function Bubble({
   )
 }
 
-/** The page's own line in the transcript, e.g. after a file went to the Inbox. Not from the model. */
+/** The page's own line in the transcript, e.g. after a file went to Intake. Not from the model. */
 function Notice({ notice }: { notice: ChatNotice }) {
   return (
     <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
@@ -76,7 +76,7 @@ function Notice({ notice }: { notice: ChatNotice }) {
       <p>
         {notice.text}{" "}
         <Link href={notice.href} className="text-primary underline">
-          Open Inbox
+          Open Intake
         </Link>
       </p>
     </div>
@@ -116,7 +116,7 @@ export function ChatThread({ className }: { className?: string }) {
 
   if (!chat.available) return <Unavailable isAdmin={chat.isAdmin} className={className} />
 
-  /** Files go to the Inbox, not to the model: the assistant can then read what was parsed with its inbox tool. */
+  /** Files go to Intake, not to the model: the assistant can then read what was parsed with its intake tool. */
   async function attach(list: FileList | null) {
     const files = list ? Array.from(list) : []
     if (!files.length) return
@@ -132,7 +132,7 @@ export function ChatThread({ className }: { className?: string }) {
     if (!names.length) return
     chat.addNotice(inboxNoticeText(names), INBOX_HREF)
     setInput((current) => current || inboxFollowUpQuestion(names))
-    // The sidebar's Inbox badge.
+    // The sidebar's Intake badge.
     router.refresh()
   }
 
@@ -263,10 +263,10 @@ export function ChatThread({ className }: { className?: string }) {
               size="sm"
               onClick={() => pickRef.current?.click()}
               disabled={uploading > 0}
-              title="Add receipts or invoices to your Inbox"
+              title="Add receipts or invoices to Intake"
             >
               {uploading > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-              <span className="sr-only md:not-sr-only">Add to Inbox</span>
+              <span className="sr-only md:not-sr-only">Add to Intake</span>
             </Button>
             <input
               ref={pickRef}

@@ -5,7 +5,7 @@ import { createInboxItem, discardInboxItem } from "@/lib/actions/inbox"
 import { uploadFile } from "@/lib/upload-client"
 import { extensionForFilename } from "@/lib/upload-types"
 
-// One file → one inbox item, shared by the Inbox drop zone and the assistant's
+// One file → one inbox item, shared by the Intake drop zone and the assistant's
 // attach button so both doors behave the same.
 
 /**

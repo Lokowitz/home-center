@@ -5,6 +5,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // No "X-Powered-By: Next.js" — it only helps someone pick an exploit.
   poweredByHeader: false,
+  // The capture inbox is shown as "Intake" now; old links and bookmarks still work.
+  async redirects() {
+    return [{ source: "/inbox", destination: "/intake", permanent: true }];
+  },
   async headers() {
     return securityHeaderRules(process.env.NODE_ENV === "development");
   },

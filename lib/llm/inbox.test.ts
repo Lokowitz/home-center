@@ -16,9 +16,9 @@ const row = (over: Partial<InboxToolRow> = {}): InboxToolRow => ({
 })
 
 describe("inboxToolResult", () => {
-  it("lists unfiled items with what was read, and links the Inbox", () => {
+  it("lists unfiled items with what was read, and links Intake", () => {
     const out = inboxToolResult([row()], { includeHealth: true })
-    expect(out.href).toBe("/inbox")
+    expect(out.href).toBe("/intake")
     expect(out.count).toBe(1)
     expect(out.items).toEqual([
       {
@@ -82,9 +82,9 @@ describe("inboxToolResult", () => {
     expect(inboxToolResult([row({ files: [] })], { includeHealth: true }).count).toBe(0)
   })
 
-  it("says the Inbox is empty", () => {
+  it("says Intake is empty", () => {
     const out = inboxToolResult([], { includeHealth: true })
-    expect(out).toMatchObject({ href: "/inbox", count: 0, items: [] })
+    expect(out).toMatchObject({ href: "/intake", count: 0, items: [] })
     expect(out.note).toMatch(/empty/i)
   })
 
@@ -100,17 +100,19 @@ describe("inboxToolResult", () => {
 describe("INBOX_TOOL_DESCRIPTION", () => {
   it("says the assistant can't file anything", () => {
     expect(INBOX_TOOL_DESCRIPTION).toMatch(/can't file/i)
-    expect(INBOX_HREF).toBe("/inbox")
+    expect(INBOX_HREF).toBe("/intake")
+    expect(INBOX_TOOL_DESCRIPTION).toMatch(/^List the files waiting in Intake/)
+    expect(INBOX_TOOL_DESCRIPTION).not.toMatch(/inbox/i)
   })
 })
 
 describe("chat notice", () => {
   it("names one file", () => {
-    expect(inboxNoticeText(["receipt.pdf"])).toBe("Added receipt.pdf to your Inbox — reading it now.")
+    expect(inboxNoticeText(["receipt.pdf"])).toBe("Added receipt.pdf to Intake — reading it now.")
   })
   it("names two, then counts", () => {
-    expect(inboxNoticeText(["a.pdf", "b.jpg"])).toBe("Added a.pdf and b.jpg to your Inbox — reading them now.")
-    expect(inboxNoticeText(["a.pdf", "b.jpg", "c.png"])).toBe("Added a.pdf and 2 more files to your Inbox — reading them now.")
+    expect(inboxNoticeText(["a.pdf", "b.jpg"])).toBe("Added a.pdf and b.jpg to Intake — reading them now.")
+    expect(inboxNoticeText(["a.pdf", "b.jpg", "c.png"])).toBe("Added a.pdf and 2 more files to Intake — reading them now.")
   })
   it("asks what was read", () => {
     expect(inboxFollowUpQuestion(["receipt.pdf"])).toBe("What did you read from receipt.pdf?")

@@ -2,7 +2,7 @@ import type { AssetType, InboxStatus } from "@/app/generated/prisma/client"
 import { ASSET_TYPES } from "@/lib/assets"
 import { UPLOAD_TYPES } from "@/lib/upload-types"
 
-// Client-safe rules for the /inbox page: what the "File it" form starts with,
+// Client-safe rules for the /intake page: what the "File it" form starts with,
 // how it becomes a ServiceRecordInput, and when the list must keep refreshing.
 
 /** Base UI Select has no empty-string option, so "no category" needs a sentinel. */

@@ -1,3 +1,5 @@
+> Shipped as 'Intake' (UI name); internal names stay inbox.
+
 # Capture inbox (F6 / M3) — design
 
 Date: 2026-10-10. Spike result (F6): deterministic parser 71% date+total on 31 real receipts

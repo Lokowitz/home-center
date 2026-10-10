@@ -4,7 +4,7 @@ import { loadFeatures } from "@/lib/features-server"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { EMPTY_ITEM_MAX_AGE_MS } from "@/lib/inbox"
 
-// Reads for the /inbox page and the sidebar badge.
+// Reads for the /intake page and the sidebar badge.
 
 export type InboxAttachment = {
   id: string

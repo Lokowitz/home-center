@@ -23,7 +23,7 @@ const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, observationLogTo
 /**
  * The chat's tools: document tools go between the shortcuts and the generic
  * tools when allowed. With Health off its own shortcuts are left out. The
- * read-only inbox tool is always there; it shows items that look like a
+ * read-only intake tool is always there; it shows items that look like a
  * person's only when health documents may go to the model (`healthDocuments`,
  * which doesn't depend on document indexing being on).
  * Shortcuts first: weaker models tend to pick from the top of the list.

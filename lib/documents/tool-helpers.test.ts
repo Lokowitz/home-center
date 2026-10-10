@@ -67,6 +67,9 @@ describe("record type rules", () => {
     expect(toRecordType("insurance_policy", false)).toBe("INSURANCE")
     expect(toRecordType("vaccines", true)).toBe("IMMUNIZATION")
     expect(toRecordType("ALLERGY", true)).toBe("ALLERGY")
+    expect(toRecordType("intake", false)).toBe("INBOX")
+    expect(toRecordType("Intake items", false)).toBe("INBOX")
+    expect(toRecordType("inbox", false)).toBe("INBOX")
   })
 
   it("rejects unknown types and health types while they're hidden, listing what's allowed", () => {

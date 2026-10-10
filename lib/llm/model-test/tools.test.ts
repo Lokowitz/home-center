@@ -12,8 +12,8 @@ describe("model test tools", () => {
     expect(names).toEqual(chatTools({ enabled: false, includeHealth: true }).map((t) => t.name))
   })
 
-  it("include the read-only inbox tool and no document tools", () => {
-    expect(names).toContain("inbox")
+  it("include the read-only intake tool and no document tools", () => {
+    expect(names).toContain("intake")
     expect(names).not.toContain("search_documents")
   })
 

@@ -102,12 +102,12 @@ describe("describeAttachment", () => {
     expect(r.record).toEqual({ type: "service record", title: "(record not found)", href: null })
   })
 
-  it("links an unfiled inbox file to the inbox, with no asset", () => {
+  it("links an unfiled file to the Intake page, with no asset", () => {
     expect(describeAttachment(row({ recordType: "INBOX", inboxItemId: "x1", originalName: "receipt.jpg" }))).toEqual({
       attachmentId: "att1",
       fileName: "receipt.jpg",
       fileHref: "/api/files/inbox/x1/3f2a.pdf",
-      record: { type: "inbox item", title: "receipt.jpg", href: "/inbox" },
+      record: { type: "intake item", title: "receipt.jpg", href: "/intake" },
       asset: null,
     })
   })
