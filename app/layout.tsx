@@ -16,7 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full bg-background text-foreground">
         {/* Each theme name lands on <html> as both a class (so "dark" is .dark) and
             data-theme (so "ledger" is [data-theme="ledger"]); see lib/themes.ts. */}
-        <ThemeProvider attribute={["class", "data-theme"]} themes={themeNames} defaultTheme="system" enableSystem>
+        <ThemeProvider attribute={["class", "data-theme"]} themes={themeNames} defaultTheme="light" enableSystem={false}>
           {children}
           <Toaster richColors />
         </ThemeProvider>

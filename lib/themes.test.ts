@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest"
 import { THEMES, isDarkTheme, nextTheme, prevTheme, themeLabel, themeNames } from "./themes"
 
 describe("THEMES", () => {
-  it("starts with System, then the two Spruce modes", () => {
-    expect(THEMES.slice(0, 3).map((t) => t.id)).toEqual(["system", "light", "dark"])
+  it("starts with the two Spruce modes and has no System entry", () => {
+    expect(THEMES.slice(0, 2).map((t) => t.id)).toEqual(["light", "dark"])
+    expect(THEMES.map((t) => t.id)).not.toContain("system")
   })
   it("lists every design once, in order", () => {
     expect(THEMES.map((t) => t.label)).toEqual([
-      "System",
       "Spruce",
       "Spruce Night",
       "Ledger",
@@ -31,36 +31,35 @@ describe("THEMES", () => {
 })
 
 describe("themeNames", () => {
-  it("is every stored theme except system, which next-themes adds itself", () => {
-    expect(themeNames).not.toContain("system")
-    expect(themeNames).toHaveLength(THEMES.length - 1)
+  it("is every theme id", () => {
+    expect(themeNames).toEqual(THEMES.map((t) => t.id))
   })
 })
 
 describe("nextTheme / prevTheme", () => {
   it("steps through the list", () => {
-    expect(nextTheme("system")).toBe("light")
     expect(nextTheme("light")).toBe("dark")
     expect(prevTheme("dark")).toBe("light")
   })
   it("wraps at both ends", () => {
-    expect(nextTheme("brutal")).toBe("system")
-    expect(prevTheme("system")).toBe("brutal")
+    expect(nextTheme("brutal")).toBe("light")
+    expect(prevTheme("light")).toBe("brutal")
   })
-  it("treats an unknown or missing id as system", () => {
-    expect(nextTheme("nope")).toBe("light")
+  it("treats an unknown, missing or old \"system\" id as Spruce", () => {
+    expect(nextTheme("nope")).toBe("dark")
     expect(prevTheme("nope")).toBe("brutal")
-    expect(nextTheme(undefined)).toBe("light")
-    expect(nextTheme("")).toBe("light")
+    expect(nextTheme(undefined)).toBe("dark")
+    expect(nextTheme("")).toBe("dark")
+    expect(nextTheme("system")).toBe("dark")
   })
   it("visits every theme once in a full lap", () => {
     const seen: string[] = []
-    let id = "system"
+    let id = "light"
     for (let i = 0; i < THEMES.length; i++) {
       seen.push(id)
       id = nextTheme(id)
     }
-    expect(id).toBe("system")
+    expect(id).toBe("light")
     expect(seen).toEqual(THEMES.map((t) => t.id))
   })
 })
@@ -70,15 +69,16 @@ describe("themeLabel", () => {
     expect(themeLabel("dark")).toBe("Spruce Night")
     expect(themeLabel("observatory")).toBe("Observatory")
   })
-  it("falls back to System", () => {
-    expect(themeLabel("nope")).toBe("System")
-    expect(themeLabel(undefined)).toBe("System")
+  it("falls back to Spruce", () => {
+    expect(themeLabel("nope")).toBe("Spruce")
+    expect(themeLabel(undefined)).toBe("Spruce")
+    expect(themeLabel("system")).toBe("Spruce")
   })
 })
 
 describe("globals.css agrees with THEMES", () => {
   const css = readFileSync(join(__dirname, "..", "app", "globals.css"), "utf8")
-  const named = THEMES.filter((t) => t.id !== "system" && t.id !== "light" && t.id !== "dark")
+  const named = THEMES.filter((t) => t.id !== "light" && t.id !== "dark")
 
   it("has a palette block for every named theme", () => {
     for (const t of named) expect(css).toContain(`[data-theme="${t.id}"] {`)

@@ -32,7 +32,7 @@ export function ThemeNavigator() {
     return <div className="h-10 w-10 sm:h-9 sm:w-[9.5rem]" aria-hidden="true" />
   }
 
-  const current = theme ?? "system"
+  const current = theme ?? "light"
   const label = themeLabel(current)
 
   return (
@@ -51,7 +51,7 @@ export function ThemeNavigator() {
         <DropdownMenuContent align="center" className="w-44">
           <DropdownMenuRadioGroup value={current} onValueChange={(value) => setTheme(String(value))}>
             {THEMES.map((t) => (
-              <DropdownMenuRadioItem key={t.id} value={t.id}>
+              <DropdownMenuRadioItem key={t.id} value={t.id} closeOnClick>
                 {t.label}
               </DropdownMenuRadioItem>
             ))}
