@@ -6,7 +6,10 @@ import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DOCUMENT_SETTINGS_ID, loadDocumentSettings } from "@/lib/documents/settings"
 import { parseReceipt, type ParsedReceipt } from "@/lib/capture/parse"
 import { askViaChat, llmParseReceipt } from "@/lib/capture/llm-parse"
-import { buildIdentifiers, matchAsset, type CandidateAsset } from "@/lib/capture/match"
+import { buildIdentifiers, matchAsset, type AssetMatch, type CandidateAsset } from "@/lib/capture/match"
+import { RECORD_KINDS, semanticQueryText, suggestByMeaning, toAssetHits, type OwnerRef } from "@/lib/capture/semantic"
+import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
+import { embedderFor } from "@/lib/documents/embed/server"
 import { chooseParser, inboxText, parsedFields, type ParserChoice } from "@/lib/inbox"
 import type { CaptureParser } from "@/app/generated/prisma/client"
 
@@ -37,6 +40,52 @@ export async function loadCaptureCandidates(includePeople: boolean): Promise<Can
     ...equipment.map((e): CandidateAsset => ({ assetType: "EQUIPMENT", id: e.id, name: e.name, identifiers: buildIdentifiers.equipment(e) })),
     ...people.map((p): CandidateAsset => ({ assetType: "PERSON", id: p.id, name: p.name, identifiers: buildIdentifiers.person(p) })),
   ]
+}
+
+/** Record chunks fetched by meaning before they vote for their assets. */
+const SUGGEST_POOL = 40
+
+/** The asset each SERVICE / WARRANTY / MAINTENANCE hit belongs to, keyed "KIND:id". */
+async function loadRecordOwners(hits: { kind: string; entityId: string }[]): Promise<Map<string, OwnerRef>> {
+  const ids = (kind: (typeof RECORD_KINDS)[number]) => [...new Set(hits.filter((h) => h.kind === kind).map((h) => h.entityId))]
+  const select = { id: true, assetType: true, assetId: true } as const
+  const [service, warranty, maintenance] = await Promise.all([
+    prisma.serviceRecord.findMany({ where: { id: { in: ids("SERVICE") } }, select }),
+    prisma.warranty.findMany({ where: { id: { in: ids("WARRANTY") } }, select }),
+    prisma.maintenanceSchedule.findMany({ where: { id: { in: ids("MAINTENANCE") } }, select }),
+  ])
+  const owners = new Map<string, OwnerRef>()
+  const add = (kind: string, rows: { id: string; assetType: OwnerRef["assetType"]; assetId: string }[]) => {
+    for (const r of rows) owners.set(`${kind}:${r.id}`, { assetType: r.assetType, assetId: r.assetId })
+  }
+  add("SERVICE", service)
+  add("WARRANTY", warranty)
+  add("MAINTENANCE", maintenance)
+  return owners
+}
+
+/**
+ * Fallback when no identifier matched: the asset whose description or past
+ * records read most like this receipt. Null when semantic search is off, its
+ * vectors don't fit the model, nothing is close enough, or anything fails.
+ * Only `candidates` can be suggested, so people stay out while Health is off.
+ */
+async function suggestFromMeaning(text: string, candidates: CandidateAsset[], allowPeople: boolean): Promise<AssetMatch | null> {
+  try {
+    const model = await semanticSearchModel()
+    if (!model) return null
+    const query = semanticQueryText(parseReceipt(text).vendor, text)
+    if (!query) return null
+    const vector = await embedderFor(model).embedQuery(query)
+    const raw = await (await searchIndex()).entityVectorSearch(vector, SUGGEST_POOL)
+    const known = new Set(candidates.map((c) => `${c.assetType}:${c.id}`))
+    const hits = toAssetHits(raw, await loadRecordOwners(raw)).filter((h) => known.has(`${h.assetType}:${h.assetId}`))
+    return suggestByMeaning(hits, { allowPeople })
+  } catch (error) {
+    // Never log the error text: it could carry the receipt's text.
+    console.error("[inbox] suggestion by meaning failed, leaving it empty:", error instanceof Error ? error.name : typeof error)
+    return null
+  }
 }
 
 async function readWithLlm(text: string): Promise<ParsedReceipt | null> {
@@ -95,8 +144,13 @@ export async function processInboxItem(itemId: string): Promise<void> {
   }
 
   const [mode, features, llm] = await Promise.all([loadCaptureParser(), loadFeatures(), loadLlmConfig()])
-  // Matching is local, so it runs first: a person's file then never reaches the LLM unless allowed.
-  const match = read.text.trim() ? matchAsset(read.text, await loadCaptureCandidates(features.health)) : null
+  // Matching is local (identifiers, then the local embedding model), so it runs
+  // first: a person's file then never reaches the LLM unless allowed.
+  let match: AssetMatch | null = null
+  if (read.text.trim()) {
+    const candidates = await loadCaptureCandidates(features.health)
+    match = matchAsset(read.text, candidates) ?? (await suggestFromMeaning(read.text, candidates, features.health))
+  }
   const choice = chooseParser({
     mode,
     llmReady: isLlmReady(llm),
