@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { useTheme } from "next-themes"
 import { Moon, Sun } from "lucide-react"
 
+const noSubscribe = () => () => {}
+
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => setMounted(true), [])
+  // false during SSR and hydration, true after — the theme is only known on the client.
+  const mounted = useSyncExternalStore(noSubscribe, () => true, () => false)
 
   if (!mounted) {
     return <div className="h-9 w-9" aria-hidden="true" />

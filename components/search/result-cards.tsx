@@ -65,6 +65,15 @@ function OwnerChip({ owner }: { owner: AssetThumb }) {
   )
 }
 
+/** Marks a result found by meaning rather than by the search words. */
+function SemanticBadge({ className }: { className?: string }) {
+  return (
+    <Badge variant="outline" className={cn("gap-1", className)} title="Related by meaning, not by your search words">
+      <Sparkles className="h-3 w-3" /> Semantic
+    </Badge>
+  )
+}
+
 export function AssetCard({ item, terms }: { item: AssetResult; terms: string[] }) {
   return (
     <article className={cardBase}>
@@ -78,7 +87,10 @@ export function AssetCard({ item, terms }: { item: AssetResult; terms: string[] 
         />
         <div className="absolute inset-x-2 top-2 flex items-start justify-between gap-2">
           {item.badge ? <Badge variant="secondary" className="bg-background/85 backdrop-blur-sm">{item.badge}</Badge> : <span />}
-          {item.status && <Badge variant={item.status.tone} className="backdrop-blur-sm">{item.status.label}</Badge>}
+          <div className="flex flex-col items-end gap-1">
+            {item.status && <Badge variant={item.status.tone} className="backdrop-blur-sm">{item.status.label}</Badge>}
+            {item.matchedBy === "semantic" && <SemanticBadge className="bg-background/85 backdrop-blur-sm" />}
+          </div>
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -133,6 +145,7 @@ export function RecordCard({ item, terms }: { item: RecordResult; terms: string[
         <div className="flex shrink-0 flex-col items-end gap-1">
           {item.amount && <span className="text-sm font-semibold tabular-nums">{item.amount}</span>}
           {item.status && <Badge variant={item.status.tone}>{item.status.label}</Badge>}
+          {item.matchedBy === "semantic" && <SemanticBadge />}
         </div>
       </div>
       {item.subtitle && (
@@ -179,9 +192,7 @@ export function DocumentCard({ item, terms }: { item: DocumentResult; terms: str
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {item.matchedBy === "semantic" && (
-            <Badge variant="outline" className="gap-1"><Sparkles className="h-3 w-3" /> Semantic</Badge>
-          )}
+          {item.matchedBy === "semantic" && <SemanticBadge />}
           {item.fileHref && (
             <a
               href={item.fileHref}

@@ -25,6 +25,6 @@ export async function deleteAttachment(id: string) {
   revalidatePath("/records")
   revalidatePath("/warranties")
   revalidatePath("/insurance")
-  revalidatePath("/assets/people", "layout")
+  revalidatePath("/assets", "layout")
   return { success: true }
 }

@@ -65,7 +65,7 @@ export function PropertyList({ properties, initialView }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This will also delete all associated records.`)) return
+    if (!confirm(`Delete "${name}"? This will also delete all associated records. Equipment in it is kept.`)) return
     await deleteProperty(id)
     toast.success(`"${name}" deleted.`)
   }

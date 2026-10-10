@@ -6,12 +6,15 @@ import { Badge } from "@/components/ui/badge"
 import { Paperclip, Trash2, Upload, FileText, Image } from "lucide-react"
 import { toast } from "sonner"
 import { deleteAttachment } from "@/lib/actions/attachments"
+import { uploadFile } from "@/lib/upload-client"
 import type { Attachment, AttachmentRecordType } from "@/app/generated/prisma/client"
 
 interface Props {
   recordId: string
   recordType: AttachmentRecordType
   attachments: Attachment[]
+  /** Heading over the list. Defaults to "Attachments". */
+  label?: string
 }
 
 function fileIcon(mimeType: string) {
@@ -25,26 +28,26 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function AttachmentList({ recordId, recordType, attachments: initial }: Props) {
+export function AttachmentList({ recordId, recordType, attachments: initial, label = "Attachments" }: Props) {
   const [attachments, setAttachments] = useState(initial)
   const [uploading, setUploading] = useState(false)
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("recordId", recordId)
-      formData.append("recordType", recordType)
-      const res = await fetch("/api/uploads", { method: "POST", body: formData })
-      const json = await res.json()
-      if (!res.ok) { toast.error(json.error ?? "Upload failed"); return }
-      setAttachments((prev) => [...prev, json.attachment])
-      toast.success(`"${file.name}" uploaded.`)
+      for (const file of files) {
+        try {
+          const attachment = await uploadFile(file, recordType, recordId)
+          setAttachments((prev) => [...prev, attachment])
+          toast.success(`"${file.name}" uploaded.`)
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Upload failed")
+        }
+      }
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ""
@@ -67,12 +70,13 @@ export function AttachmentList({ recordId, recordType, attachments: initial }: P
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
           <Paperclip className="h-3.5 w-3.5" />
-          Attachments {attachments.length > 0 && <Badge variant="secondary" className="h-4 px-1.5 text-xs">{attachments.length}</Badge>}
+          {label} {attachments.length > 0 && <Badge variant="secondary" className="h-4 px-1.5 text-xs">{attachments.length}</Badge>}
         </div>
         <label>
           <input
             ref={inputRef}
             type="file"
+            multiple
             className="hidden"
             onChange={handleUpload}
             disabled={uploading}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { decide, type Prior } from "./repeat"
+import { cycleKeyOf, decide, maintenanceCycleKey, type Prior } from "./repeat"
 
 const prior = (over: Partial<Prior> = {}): Prior => ({
   id: "n1",
@@ -67,5 +67,18 @@ describe("decide — notifications from before cycles were tracked", () => {
   })
   it("a read legacy one is ignored", () => {
     expect(decide("ONCE", "REACHED", "2026-10-01", [prior({ cycleKey: null, stage: null, isRead: true })])).toEqual({ action: "create" })
+  })
+})
+
+describe("maintenanceCycleKey", () => {
+  const due = new Date("2026-10-01T00:00:00.000Z")
+  it("keeps the two-part key for a reminder that was never snoozed", () => {
+    expect(maintenanceCycleKey({ nextDueDate: due, nextDueMileage: 46000, snoozedUntil: null })).toBe(cycleKeyOf(due, 46000))
+  })
+  it("starts a new cycle for each snooze", () => {
+    const week = maintenanceCycleKey({ nextDueDate: due, nextDueMileage: null, snoozedUntil: new Date("2026-10-08T00:00:00.000Z") })
+    const month = maintenanceCycleKey({ nextDueDate: due, nextDueMileage: null, snoozedUntil: new Date("2026-11-01T00:00:00.000Z") })
+    expect(week).not.toBe(cycleKeyOf(due, null))
+    expect(week).not.toBe(month)
   })
 })

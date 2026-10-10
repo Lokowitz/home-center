@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Poppins, Open_Sans } from "next/font/google"
 import { Home, SearchX } from "lucide-react"
+import Link from "next/link"
 import "./globals.css"
 
 const openSans = Open_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-open-sans" })
@@ -29,9 +30,9 @@ export default function GlobalNotFound() {
               <p className="text-sm text-muted-foreground mt-1">
                 The page you&apos;re looking for doesn&apos;t exist or may have been moved.
               </p>
-              <a href="/" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 transition-colors mt-5">
+              <Link href="/" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 transition-colors mt-5">
                 Back to Dashboard
-              </a>
+              </Link>
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { MapPin, Calendar, DollarSign, Maximize, Download, Home, FileText } from
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
@@ -26,11 +27,12 @@ export default async function PropertyDetailPage({
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
 
-  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment] = await Promise.all([
+  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
-    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY", isActive: true }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
+    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.equipment.findMany({ where: { propertyId: id }, select: { id: true, name: true } }),
+    prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
   ])
 
   const equipmentIds = equipment.map((e) => e.id)
@@ -48,7 +50,7 @@ export default async function PropertyDetailPage({
           orderBy: { expirationDate: "asc" },
         }),
         prisma.maintenanceSchedule.findMany({
-          where: { assetId: { in: equipmentIds }, assetType: "EQUIPMENT", isActive: true },
+          where: { assetId: { in: equipmentIds }, assetType: "EQUIPMENT" },
           include: { attachments: true },
           orderBy: { nextDueDate: "asc" },
         }),
@@ -109,15 +111,19 @@ export default async function PropertyDetailPage({
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
             <TabsTrigger value="maintenance">Maintenance Reminders ({maintenanceSchedules.length})</TabsTrigger>
+            <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
             <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "maintenance" ? open : undefined} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-4">
+            <AssetDocuments assetId={id} documents={documents} hint="Deed, survey, closing papers, floor plans: files for the property itself, not one service." />
           </TabsContent>
         </Tabs>
       </div>

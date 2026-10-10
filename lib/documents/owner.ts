@@ -24,6 +24,7 @@ export type AttachmentOwnerRow = AttachmentLocation & {
   allergy: ({ substance: string } & OnPerson) | null
   immunization: ({ vaccine: string } & OnPerson) | null
   insurancePolicy: { carrier: string } | null
+  assetType: AssetType | null
 }
 
 export type DocumentRef = {
@@ -93,6 +94,11 @@ function owner(a: AttachmentOwnerRow): Owner {
       return a.allergy ? onPerson("allergy", a.allergy.substance, a.allergy.personId, "allergies") : missing("allergy")
     case "IMMUNIZATION":
       return a.immunization ? onPerson("immunization", a.immunization.vaccine, a.immunization.personId, "immunizations", a.immunizationId) : missing("immunization")
+    case "DOCUMENT":
+      // Filed on the asset itself: the file is its own record.
+      return a.assetType && a.assetId
+        ? { record: { type: "document", title: a.originalName, href: tabHref(assetHref(a.assetType, a.assetId), "documents") }, asset: { type: a.assetType, id: a.assetId } }
+        : missing("document")
     case "INSURANCE":
       return a.insurancePolicy
         ? { record: { type: "insurance policy", title: a.insurancePolicy.carrier, href: "/insurance" }, asset: null }

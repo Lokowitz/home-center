@@ -9,6 +9,7 @@ import { NotificationBell } from "@/components/notification-bell"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { GlobalSearch } from "@/components/global-search"
 import { resolveNotificationHrefs } from "@/lib/notification-links"
+import { loadNotificationReminders } from "@/lib/notification-reminders"
 import { loadLlmStatus } from "@/lib/llm/config"
 import { ChatProvider } from "@/components/chat/chat-provider"
 import { ChatDock, ChatToggle } from "@/components/chat/chat-panel"
@@ -28,8 +29,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }),
     loadLlmStatus(),
   ])
-  const hrefs = await resolveNotificationHrefs(notifications)
-  const notificationItems = notifications.map((n) => ({ ...n, href: hrefs.get(n.id) ?? "/notifications" }))
+  const [hrefs, reminders] = await Promise.all([resolveNotificationHrefs(notifications), loadNotificationReminders(notifications)])
+  const notificationItems = notifications.map((n) => ({ ...n, href: hrefs.get(n.id) ?? "/notifications", reminder: reminders.get(n.id) }))
   const isAdmin = session.user.role === "ADMIN"
   // Admins see the entry points even when it's off, so they can find the setup —
   // unless it's been explicitly hidden.

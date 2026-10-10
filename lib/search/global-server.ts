@@ -20,7 +20,7 @@ import { loadFeatures } from "@/lib/features-server"
 import type { Features } from "@/lib/features"
 import type { Hit } from "@/lib/documents/index-db"
 import {
-  bestPerKey, idsNamed, MAX_RECORD_DISTANCE, nearest, RECORD_WINDOW, searchTerms, semanticOnly, termsWhere,
+  bestPerKey, idsNamed, MAX_RECORD_DISTANCE, mergeSemantic, nearest, RECORD_WINDOW, searchTerms, semanticOnly, termsWhere,
 } from "./query"
 import type { EntityKind } from "./entities/text"
 import type {
@@ -28,8 +28,8 @@ import type {
 } from "./types"
 
 // The search behind the header box: every kind of record by keyword, the
-// text of uploaded files by keyword, and — only when asked — the files again
-// by meaning, leaving out any file the keyword pass already returned.
+// text of uploaded files by keyword, and — unless turned off — records and
+// files by meaning, leaving out anything the keyword pass already returned.
 
 const PER_SECTION = 12
 const DOC_POOL = 60
@@ -219,15 +219,13 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
   const where = withFeatures(idWheres(ids), features)
   const [assets, records] = await Promise.all([searchAssets(where, now), searchRecords(where, owners, now)])
   const byRank = (section: Section) => (item: Section["items"][number]) => rank.get(entityKeyOf(section, item) ?? "") ?? Infinity
-  const ranked = [...assets, ...records]
+  return [...assets, ...records]
     .filter((sec) => sec.items.length > 0)
     .map((sec) => {
       const r = byRank(sec)
-      const items = [...sec.items].sort((a, b) => r(a) - r(b))
-      return { section: { ...sec, key: `semantic-${sec.key}`, items, more: false } as Section, best: r(items[0]) }
+      const items = [...sec.items].sort((a, b) => r(a) - r(b)).map((item) => ({ ...item, matchedBy: "semantic" as const }))
+      return { ...sec, items, more: false } as Section
     })
-  // The section holding the single best match comes first.
-  return ranked.sort((a, b) => a.best - b.best).map((x) => x.section)
 }
 
 async function searchAssets(where: Wheres, now: Date): Promise<Section[]> {
@@ -612,6 +610,7 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
   const kwDocs = await toDocuments(keyword.hits, parsed?.terms ?? terms, "keyword", owners)
 
   let semantic: SemanticState = { state: "off" }
+  let bySemantic: Section[] = []
   if (opts.semantic) {
     const model = await semanticSearchModel().catch(() => null)
     if (!model) {
@@ -628,13 +627,11 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
         ])
         const fresh = semanticOnly(visibleHits(docHits), new Set(keyword.hits.map((h) => h.attachmentId)))
         const docs = await toDocuments(fresh, [], "semantic", owners)
-        semantic = {
-          state: "ok",
-          sections: [
-            ...records,
-            ...(docs.items.length ? [{ key: "semantic-documents", title: "Documents", layout: "documents" as const, ...docs }] : []),
-          ],
-        }
+        bySemantic = [
+          ...records,
+          ...(docs.items.length ? [{ key: "documents", title: "Documents", layout: "documents" as const, ...docs, more: false }] : []),
+        ]
+        semantic = { state: "ok", found: bySemantic.reduce((n, sec) => n + sec.items.length, 0) }
       } catch (error) {
         console.error("[search] semantic search failed:", error instanceof Error ? error.name : typeof error)
         semantic = { state: "failed" }
@@ -642,12 +639,12 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
     }
   }
 
-  const sections: Section[] = [
+  const keywordSections: Section[] = [
     ...assetSections,
     ...recordSections,
     { key: "documents", title: "Documents", layout: "documents" as const, ...kwDocs },
-  ].filter((s) => s.items.length > 0)
-  const count = (list: Section[]) => list.reduce((n, sec) => n + sec.items.length, 0)
-  const total = count(sections) + (semantic.state === "ok" ? count(semantic.sections) : 0)
+  ]
+  const sections = mergeSemantic(keywordSections, bySemantic).filter((s) => s.items.length > 0)
+  const total = sections.reduce((n, sec) => n + sec.items.length, 0)
   return { query: q, terms: [...new Set([...terms, ...(parsed?.terms ?? [])])], sections, semantic, total }
 }

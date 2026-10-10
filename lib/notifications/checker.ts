@@ -5,7 +5,7 @@ import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { daysUntil, HEALTH_WINDOWS, immunizationDue, insuranceExpiring, isSupersededImmunization, refillDue } from "@/lib/health"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
-import { cycleKeyOf, decide, type NotificationRepeat, type Stage } from "./repeat"
+import { cycleKeyOf, decide, maintenanceCycleKey, type NotificationRepeat, type Stage } from "./repeat"
 
 const WARRANTY_WARN_DAYS = 60
 const MAINTENANCE_WINDOW_DAYS = 30
@@ -117,7 +117,7 @@ export async function checkAndNotify(): Promise<number> {
     const due = scheduleDue(s, mileage, now)
     if (!due.overdue && !due.dueSoon) continue
     const stage = stageOf(due.overdue || due.daysLeft === 0 || due.milesLeft === 0)
-    const cycleKey = cycleKeyOf(s.nextDueDate, s.nextDueMileage)
+    const cycleKey = maintenanceCycleKey(s)
 
     for (const user of users) {
       wanted.push({

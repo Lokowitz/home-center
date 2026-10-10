@@ -8,7 +8,7 @@ import type { DocumentRef } from "./owner"
 // Rules for the assistant's document tools that don't need the database.
 
 export const RECORD_TYPES = [
-  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION",
+  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT",
 ] as const satisfies readonly AttachmentRecordType[]
 
 export function hiddenRecordTypes(includeHealth: boolean): AttachmentRecordType[] {
@@ -40,6 +40,7 @@ const ALIASES: Record<string, AttachmentRecordType> = {
   medication: "MEDICATION", medicine: "MEDICATION", prescription: "MEDICATION",
   allergy: "ALLERGY",
   immunization: "IMMUNIZATION", vaccine: "IMMUNIZATION", vaccination: "IMMUNIZATION",
+  document: "DOCUMENT", assetdocument: "DOCUMENT",
 }
 
 /** A recordType argument as models send it ("warranties", "Service records") → the enum, if visible. */
@@ -70,7 +71,7 @@ export function groupHits(hits: Hit[], limit: number, perDoc = 3): { attachmentI
 
 export function searchDocumentsDescription(includeHealth: boolean): string {
   return (
-    "Search the text of files uploaded to records — receipts, manuals, warranty cards, insurance policies" +
+    "Search the text of uploaded files — receipts, manuals, titles, deeds, warranty cards, insurance policies" +
     (includeHealth ? ", medical documents" : "") +
     ". Use it when the answer is likely written in a document rather than stored as a field: filter sizes, part numbers, " +
     "deductibles, coverage terms, instructions. Understands meaning as well as exact words: a plain question works, and model or part numbers match exactly. " +
@@ -80,7 +81,7 @@ export function searchDocumentsDescription(includeHealth: boolean): string {
 
 export function listDocumentsDescription(includeHealth: boolean): string {
   return (
-    "List the files uploaded to records — receipts, manuals, warranty cards, insurance policies" +
+    "List the uploaded files — receipts, manuals, titles, deeds, warranty cards, insurance policies" +
     (includeHealth ? ", medical documents" : "") +
     ", newest first. Use it for 'what documents do we have', to see the files for one asset or person, " +
     "or of one record type. It lists names, not contents: use search_documents or read_document for what's inside."

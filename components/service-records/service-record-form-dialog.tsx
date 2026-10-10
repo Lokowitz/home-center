@@ -36,6 +36,7 @@ const schema = z.object({
   mileageAtService: z.string().optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
+  scheduleId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -56,6 +57,8 @@ interface Props {
   /** People only: the provider directory and this person's conditions. */
   providerOptions?: { id: string; name: string }[]
   conditionOptions?: { id: string; name: string }[]
+  /** Active reminders on this asset (and, on a property, its equipment). A new record can complete one. */
+  reminderOptions?: { id: string; title: string; assetType: AssetType; assetId: string }[]
 }
 
 function targetKey(assetType: AssetType, assetId: string) {
@@ -73,7 +76,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES", providerOptions, conditionOptions }: Props) {
+export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES", providerOptions, conditionOptions, reminderOptions = [] }: Props) {
   const isPerson = assetType === "PERSON"
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
@@ -99,9 +102,13 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       assetId, assetType,
       date: new Date().toISOString().split("T")[0],
       title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "",
-      providerId: "", conditionId: "",
+      providerId: "", conditionId: "", scheduleId: "",
     },
   })
+
+  const targetType = form.watch("assetType")
+  const targetId = form.watch("assetId")
+  const targetReminders = reminderOptions.filter((r) => r.assetType === targetType && r.assetId === targetId)
 
   useEffect(() => {
     if (record) {
@@ -116,9 +123,10 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
         mileageAtService: record.mileageAtService?.toString() ?? "",
         providerId: record.providerId ?? "",
         conditionId: record.conditionId ?? "",
+        scheduleId: "",
       })
     } else {
-      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "" })
+      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", scheduleId: "" })
     }
   }, [record, open, form, assetId, assetType])
 
@@ -149,6 +157,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       category: values.category === NO_CATEGORY ? "" : values.category,
       providerId: values.providerId === NO_LINK ? "" : values.providerId,
       conditionId: values.conditionId === NO_LINK ? "" : values.conditionId,
+      // Only a new record completes a reminder; the edit path ignores it.
+      scheduleId: (record?.id ?? createdRecordId) ? "" : values.scheduleId,
     } as unknown as Parameters<typeof createServiceRecord>[0]
     const existingId = record?.id ?? createdRecordId
     const result = existingId
@@ -188,7 +198,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       }
     }
 
-    toast.success(record ? "Record updated." : isPerson ? "Visit added." : "Service record added.")
+    const completed = !existingId && values.scheduleId ? reminderOptions.find((r) => r.id === values.scheduleId) : undefined
+    toast.success(record ? "Record updated." : completed ? `Service record added. "${completed.title}" marked complete.` : isPerson ? "Visit added." : "Service record added.")
     router.refresh()
     handleClose()
   }
@@ -218,6 +229,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                     const [type, ...rest] = value.split(":")
                     form.setValue("assetType", type as FormValues["assetType"])
                     form.setValue("assetId", rest.join(":"))
+                    form.setValue("scheduleId", "")
                   }}
                 >
                   <FormControl>
@@ -235,6 +247,34 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                   </SelectContent>
                 </Select>
               </FormItem>
+            )}
+
+            {!record && targetReminders.length > 0 && (
+              <FormField control={form.control} name="scheduleId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Completes reminder</FormLabel>
+                  <Select
+                    value={field.value || NO_LINK}
+                    onValueChange={(v) => {
+                      const id = !v || v === NO_LINK ? "" : v
+                      field.onChange(id)
+                      const reminder = targetReminders.find((r) => r.id === id)
+                      if (reminder && !form.getValues("title")) form.setValue("title", reminder.title)
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{(v: string) => targetReminders.find((r) => r.id === v)?.title ?? "None"}</SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_LINK}>None</SelectItem>
+                      {targetReminders.map((r) => <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
             )}
 
             <div className="grid grid-cols-2 gap-4">

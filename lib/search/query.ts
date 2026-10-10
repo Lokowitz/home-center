@@ -1,4 +1,5 @@
 import type { Hit } from "@/lib/documents/index-db"
+import type { Section } from "./types"
 
 // Pure pieces of the global search: turning the box's text into terms,
 // building the "every term matches somewhere" filter for each record type,
@@ -114,6 +115,21 @@ export function semanticOnly(
   if (!semantic.length) return []
   const cutoff = Math.min(maxDistance, Math.min(...semantic.map((h) => h.score)) + window)
   return semantic.filter((h) => h.score <= cutoff && !keywordAttachmentIds.has(h.attachmentId))
+}
+
+/**
+ * Folds meaning-based results into the keyword sections of the same type, after
+ * that type's keyword matches, keeping the keyword sections' order. A type only
+ * found by meaning is added after the others.
+ */
+export function mergeSemantic(keyword: Section[], semantic: Section[]): Section[] {
+  const extra = new Map(semantic.map((s) => [s.key, s]))
+  const merged = keyword.map((s): Section => {
+    const add = extra.get(s.key)
+    extra.delete(s.key)
+    return add ? ({ ...s, items: [...s.items, ...add.items] } as Section) : s
+  })
+  return [...merged, ...extra.values()]
 }
 
 export type Segment = { text: string; match: boolean }

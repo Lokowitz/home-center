@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, Car, Wrench, ShieldCheck, Calendar, AlertTriangle, Clock, Refrigerator, PiggyBank, HeartPulse } from "lucide-react"
+import { Building2, Car, Wrench, ShieldCheck, Calendar, Clock, Refrigerator, PiggyBank, HeartPulse } from "lucide-react"
 import { SummaryCard } from "@/components/dashboard/summary-card"
+import { ReminderRow } from "@/components/dashboard/reminder-row"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { loadActivityIndex, mostRecentlyActive } from "@/lib/asset-activity"
 import { assetHref } from "@/lib/assets"
@@ -150,22 +151,18 @@ export default async function DashboardPage() {
             {urgentMaintenance.length === 0 ? (
               <EmptyPanel icon={Clock} message="Nothing due in the next 30 days." />
             ) : urgentMaintenance.map(({ s, due }) => {
-              const assetName = assets.assetName(s.assetType, s.assetId)
-              const href = assetHref(s.assetType, s.assetId)
-              const overdue = due.overdue
+              const reading = s.assetType === "VEHICLE" ? mileage.get(s.assetId) : undefined
               return (
-                <Link
+                <ReminderRow
                   key={s.id}
-                  href={href}
-                  className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors duration-150 hover:bg-muted/60"
-                >
-                  {overdue ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" /> : <Clock className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />}
-                  <span className="flex-1 truncate">{s.title}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">{assetName}</span>
-                  <Badge variant={overdue ? "destructive" : "secondary"} className="shrink-0 text-xs">
-                    {dueLabel(due)}
-                  </Badge>
-                </Link>
+                  schedule={s}
+                  assetName={assets.assetName(s.assetType, s.assetId)}
+                  href={assetHref(s.assetType, s.assetId)}
+                  overdue={due.overdue}
+                  dueLabel={dueLabel(due)}
+                  currentMileage={reading?.value ?? null}
+                  meterUnit={reading?.unit ?? "MILES"}
+                />
               )
             })}
           </CardContent>

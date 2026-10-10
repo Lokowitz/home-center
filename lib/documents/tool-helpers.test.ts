@@ -58,7 +58,7 @@ describe("record type rules", () => {
   it("hides exactly the five health types unless health documents are on", () => {
     expect(hiddenRecordTypes(false)).toEqual(["CONDITION", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION"])
     expect(hiddenRecordTypes(true)).toEqual([])
-    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE"])
+    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE", "DOCUMENT"])
   })
 
   it("accepts the loose names models use", () => {

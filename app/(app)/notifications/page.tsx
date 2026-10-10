@@ -4,6 +4,8 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { dismissNotification, markAllNotificationsRead, restoreNotification } from "@/lib/actions/notifications"
 import { resolveNotificationHrefs } from "@/lib/notification-links"
+import { loadNotificationReminders } from "@/lib/notification-reminders"
+import { ReminderActions } from "@/components/maintenance/reminder-actions"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -39,7 +41,7 @@ export default async function NotificationsPage({
   ])
 
   const unread = notifications.filter((n) => !n.isRead).length
-  const hrefs = await resolveNotificationHrefs(notifications)
+  const [hrefs, reminders] = await Promise.all([resolveNotificationHrefs(notifications), loadNotificationReminders(notifications)])
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -78,6 +80,7 @@ export default async function NotificationsPage({
           {notifications.map((n) => {
             const Icon = typeIcon[n.type] ?? Bell
             const dismissed = n.dismissedAt !== null
+            const reminder = reminders.get(n.id)
             return (
               <div
                 key={n.id}
@@ -88,20 +91,30 @@ export default async function NotificationsPage({
                 )}
               >
                 <Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-                <Link href={hrefs.get(n.id) ?? "#"} className="flex-1 min-w-0 hover:underline">
-                  <div className="flex items-center gap-2">
-                    <p className={cn("text-sm font-medium", !n.isRead && "text-foreground")}>{n.title}</p>
-                    {!n.isRead && <Badge variant="secondary" className="h-4 px-1.5 text-xs">New</Badge>}
-                    {dismissed && <Badge variant="outline" className="h-4 px-1.5 text-xs">Dismissed</Badge>}
+                <div className="flex-1 min-w-0">
+                  <Link href={hrefs.get(n.id) ?? "#"} className="block hover:underline">
+                    <div className="flex items-center gap-2">
+                      <p className={cn("text-sm font-medium", !n.isRead && "text-foreground")}>{n.title}</p>
+                      {!n.isRead && <Badge variant="secondary" className="h-4 px-1.5 text-xs">New</Badge>}
+                      {dismissed && <Badge variant="outline" className="h-4 px-1.5 text-xs">Dismissed</Badge>}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                  </Link>
+                </div>
+                {/* A due reminder is dealt with by completing or snoozing it, which
+                    also clears the notification. Dismissing would only hide it. */}
+                {reminder ? (
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+                    <ReminderActions {...reminder} />
                   </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
-                </Link>
-                <form action={(dismissed ? restoreNotification : dismissNotification).bind(null, n.id)}>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0" type="submit">
-                    {dismissed ? "Restore" : "Dismiss"}
-                  </Button>
-                </form>
+                ) : (
+                  <form action={(dismissed ? restoreNotification : dismissNotification).bind(null, n.id)}>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs shrink-0" type="submit">
+                      {dismissed ? "Restore" : "Dismiss"}
+                    </Button>
+                  </form>
+                )}
               </div>
             )
           })}

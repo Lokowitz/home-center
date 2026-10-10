@@ -1,3 +1,6 @@
+npm run dev
+
+
 <div align="center">
 
 # HomeCenter
@@ -57,6 +60,7 @@ Give each thing you own a page: photo, details, and every repair, warranty and r
 - **Properties:** houses, condos, cabins and land.
 - **Vehicles:** service history that tracks mileage.
 - **Equipment:** linked to the property it's in, with model and serial numbers.
+- **Documents** that belong to the thing itself, like a deed, a car title or a manual, with no service record needed.
 - **Download all files** for any asset as a zip.
 
 ![A house and its service records](docs/screenshots/3.House.png)
@@ -75,7 +79,8 @@ Set a reminder once, by days or miles. HomeCenter works out the next due date an
 - **Date or mileage** intervals, with as much warning as you want.
 - **Warranty status** at a glance: active, expiring or expired.
 - **Overviews** across every asset, sortable and filterable.
-- **Logging a service** moves the reminder forward.
+- **Closing the loop:** completing a reminder logs it in the service history with cost, vendor and receipt, and a service you log can mark its reminder done.
+- **Snooze or pause** a reminder from the dashboard or its asset page. Snoozed reminders come back when the snooze ends; paused ones stay quiet until resumed.
 
 ![Maintenance overview](docs/screenshots/11.MaintenanceReminderOverview.png)
 

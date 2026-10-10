@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useCallback, useEffect, useState } from "react"
+import { Fragment, useCallback, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -60,11 +60,12 @@ export function WarrantyList({ warranties: initialWarranties, assetId, assetType
   const [dialogOpen, setDialogOpen] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!openId) return
-    const match = initialWarranties.find((w) => w.id === openId)
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? initialWarranties.find((w) => w.id === openId) : undefined
     if (match) { setEditing(match); setDialogOpen(true) }
-  }, [openId])
+  }
 
   if (initialWarranties !== prevInitialWarranties) {
     setPrevInitialWarranties(initialWarranties)

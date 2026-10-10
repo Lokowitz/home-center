@@ -82,6 +82,7 @@ enum Relationship {
   SPOUSE
   CHILD
   PARENT
+  PET
   OTHER
 }
 
@@ -114,6 +115,8 @@ enum AttachmentRecordType {
   MEDICATION
   ALLERGY
   IMMUNIZATION
+  /// A file on the asset itself — a manual, title, deed — with no record around it.
+  DOCUMENT
 }
 
 enum NotificationRepeat {
@@ -452,7 +455,10 @@ model MaintenanceSchedule {
   nextDueMileage       Int?
   reminderDaysBefore   Int       @default(14)
   reminderMilesBefore  Int       @default(500)
+  /// False while paused: kept on the asset page, left out of due counts and notifications.
   isActive             Boolean   @default(true)
+  /// Hidden from the dashboard and notifications until then. The due date doesn't move.
+  snoozedUntil         DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -499,7 +505,15 @@ model Attachment {
 
   immunizationId        String?
   immunization          Immunization?        @relation(fields: [immunizationId], references: [id], onDelete: Cascade)
+
+  /// DOCUMENT only: the property, vehicle, equipment or person the file sits on.
+  /// Polymorphic like ServiceRecord's, so no foreign key: deleting the asset
+  /// deletes these rows itself (lib/asset-delete-server.ts, deletePerson).
+  assetType             AssetType?
+  assetId               String?
   text                  AttachmentText?
+
+  @@index([assetType, assetId])
 }
 
 // ─── Mail settings ────────────────────────────────────────────────────────────

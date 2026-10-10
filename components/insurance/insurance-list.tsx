@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -52,11 +52,12 @@ export function InsuranceList({ policies, people, openId }: Props) {
   const [editing, setEditing] = useState<PolicyRow | null>(null)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (!openId) return
-    const match = policies.find((p) => p.id === openId)
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? policies.find((p) => p.id === openId) : undefined
     if (match) { setEditing(match); setOpen(true) }
-  }, [openId])
+  }
 
   const fields: FieldConfig[] = [
     { name: "carrier", label: "Carrier", kind: "text", required: true, placeholder: "Blue Cross" },

@@ -8,6 +8,7 @@ import { SERVICE_CATEGORY_VALUES } from "@/lib/costs"
 import type { AssetType } from "@/app/generated/prisma/client"
 import { redirect } from "next/navigation"
 import { removeUploadDir } from "@/lib/upload-fs"
+import { scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
 import { z } from "zod"
 
 const schema = z.object({
@@ -17,11 +18,14 @@ const schema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   vendor: z.string().optional(),
-  cost: z.coerce.number().optional().or(z.literal("")),
+  // "" is tried first: coerce would turn a blank field into 0.
+  cost: z.literal("").or(z.coerce.number()).optional(),
   category: z.enum(SERVICE_CATEGORY_VALUES).optional().or(z.literal("")),
-  mileageAtService: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  mileageAtService: z.literal("").or(z.coerce.number().int().min(0)).optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
+  /// New records only: the maintenance reminder this service completes.
+  scheduleId: z.string().optional(),
 })
 
 function clean(v: z.infer<typeof schema>, userId: string) {
@@ -56,10 +60,27 @@ export async function createServiceRecord(data: z.infer<typeof schema>) {
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  const record = await prisma.serviceRecord.create({ data: await withProviderVendor(clean(parsed.data, session.user.id)) })
-  revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
+  const row = await withProviderVendor(clean(parsed.data, session.user.id))
+
+  // "Completes reminder": the reminder must belong to the same asset, so a
+  // stale form can't advance some other asset's schedule.
+  const scheduleId = parsed.data.scheduleId
+  const schedule = scheduleId
+    ? await prisma.maintenanceSchedule.findFirst({ where: { id: scheduleId, assetType: row.assetType, assetId: row.assetId } })
+    : null
+  if (scheduleId && !schedule) return { error: { scheduleId: ["That reminder isn't on this asset."] } }
+
+  const [record] = await prisma.$transaction([
+    prisma.serviceRecord.create({ data: row, select: { id: true } }),
+    ...(schedule ? scheduleCompletionWrites(schedule, row.date, row.mileageAtService) : []),
+  ])
+  revalidatePath(assetHref(row.assetType, row.assetId))
   revalidatePath("/records")
-  return { success: true, id: record.id }
+  if (schedule) {
+    revalidatePath("/maintenance")
+    revalidatePath("/")
+  }
+  return { success: true, id: (record as { id: string }).id }
 }
 
 export async function updateServiceRecord(id: string, data: z.infer<typeof schema>) {

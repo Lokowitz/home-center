@@ -20,6 +20,8 @@ export type AssetResult = {
   subtitle: string | null
   facts: Fact[]
   status: Status | null
+  /** Set when found by meaning; keyword matches leave it out. */
+  matchedBy?: "keyword" | "semantic"
 }
 
 export type RecordKind =
@@ -42,6 +44,8 @@ export type RecordResult = {
   owner: AssetThumb | null
   /** Shown instead of an owner, e.g. an insurance policy's members. */
   people: string | null
+  /** Set when found by meaning; keyword matches leave it out. */
+  matchedBy?: "keyword" | "semantic"
 }
 
 export type DocumentResult = {
@@ -64,12 +68,13 @@ export type SemanticState =
   | { state: "off" }
   | { state: "unavailable" }
   | { state: "failed" }
-  /** Records and files found by meaning that keyword search didn't return, grouped like the keyword sections. */
-  | { state: "ok"; sections: Section[] }
+  /** How many records and files were found by meaning; they're in `sections`, after each type's keyword matches. */
+  | { state: "ok"; found: number }
 
 export type SearchResults = {
   query: string
   terms: string[]
+  /** Keyword matches first in each section, then anything found by meaning. */
   sections: Section[]
   semantic: SemanticState
   total: number

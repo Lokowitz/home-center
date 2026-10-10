@@ -6,6 +6,7 @@ import { Calendar, Download, Factory, Tag, Fingerprint, MapPin, Building2, Dolla
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { EquipmentEditButton } from "@/components/equipment/equipment-edit-button"
 import { categoryLabel } from "@/components/equipment/categories"
@@ -26,11 +27,12 @@ export default async function EquipmentDetailPage({
   })
   if (!equipment) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, properties] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, properties, documents] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
-    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT", isActive: true }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
+    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "EQUIPMENT", assetId: id }, orderBy: { uploadedAt: "asc" } }),
   ])
 
   return (
@@ -98,15 +100,19 @@ export default async function EquipmentDetailPage({
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
             <TabsTrigger value="maintenance">Maintenance Reminders ({maintenanceSchedules.length})</TabsTrigger>
+            <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="EQUIPMENT" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
             <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-4">
+            <AssetDocuments assetId={id} documents={documents} hint="Manual, install guide, spec sheet: files for the equipment itself, not one service." />
           </TabsContent>
         </Tabs>
       </div>

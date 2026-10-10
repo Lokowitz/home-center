@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { bestPerKey, highlight, idsNamed, nearest, searchTerms, semanticOnly, termsWhere } from "./query"
+import { bestPerKey, highlight, idsNamed, mergeSemantic, nearest, searchTerms, semanticOnly, termsWhere } from "./query"
 import type { Hit } from "@/lib/documents/index-db"
+import type { AssetResult, Section } from "./types"
 
 describe("searchTerms", () => {
   it("lowercases, drops stop words and short words, dedupes", () => {
@@ -112,5 +113,35 @@ describe("nearest / bestPerKey", () => {
 
   it("returns nothing for no hits", () => {
     expect(nearest([], new Set(), 0.4, 0.08)).toEqual([])
+  })
+})
+
+describe("mergeSemantic", () => {
+  const car = (id: string, matchedBy?: "semantic"): AssetResult => ({
+    type: "VEHICLE", id, href: `/v/${id}`, name: id, imageFilename: null, badge: null, subtitle: null, facts: [], status: null, matchedBy,
+  })
+  const section = (key: string, items: AssetResult[], more = false): Section => ({ key, title: key, layout: "assets", items, more })
+  const ids = (sections: Section[]) => sections.map((s) => `${s.key}:${s.items.map((i) => (i as AssetResult).id).join(",")}`)
+
+  it("puts a type's meaning matches after its keyword matches", () => {
+    const merged = mergeSemantic(
+      [section("properties", []), section("vehicles", [car("civic"), car("truck")], true)],
+      [section("vehicles", [car("van", "semantic")])]
+    )
+    expect(ids(merged)).toEqual(["properties:", "vehicles:civic,truck,van"])
+    expect(merged[1].more).toBe(true)
+  })
+
+  it("keeps the keyword order of sections, and adds types only found by meaning at the end", () => {
+    const merged = mergeSemantic(
+      [section("properties", [car("house")]), section("vehicles", [])],
+      [section("people", [car("ann", "semantic")]), section("vehicles", [car("van", "semantic")])]
+    )
+    expect(ids(merged)).toEqual(["properties:house", "vehicles:van", "people:ann"])
+  })
+
+  it("leaves keyword results alone when nothing is found by meaning", () => {
+    const kw = [section("vehicles", [car("civic")])]
+    expect(mergeSemantic(kw, [])).toEqual(kw)
   })
 })

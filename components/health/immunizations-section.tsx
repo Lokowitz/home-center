@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -48,11 +48,12 @@ export function ImmunizationsSection({ personId, immunizations, openId }: { pers
   const [editing, setEditing] = useState<ImmunizationRow | null>(null)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (!openId) return
-    const match = immunizations.find((i) => i.id === openId)
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? immunizations.find((i) => i.id === openId) : undefined
     if (match) { setEditing(match); setOpen(true) }
-  }, [openId])
+  }
 
   // Superseded doses (an older row for the same vaccine, now replaced by a
   // later one) never nag — computed here since this is the full per-person list.
