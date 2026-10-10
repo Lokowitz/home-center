@@ -41,7 +41,7 @@ function scopeWhere(f: { attachmentIds: string[] | null; recordTypes: Attachment
 export const OWNER_SELECT = {
   id: true, recordType: true, filename: true, originalName: true,
   serviceRecordId: true, warrantyId: true, maintenanceScheduleId: true, healthConditionId: true, insurancePolicyId: true,
-  observationId: true, medicationId: true, allergyId: true, immunizationId: true, assetId: true, assetType: true,
+  observationId: true, medicationId: true, allergyId: true, immunizationId: true, assetId: true, assetType: true, inboxItemId: true,
   serviceRecord: { select: { title: true, assetType: true, assetId: true } },
   warranty: { select: { productName: true, assetType: true, assetId: true } },
   maintenanceSchedule: { select: { title: true, assetType: true, assetId: true } },

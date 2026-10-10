@@ -9,9 +9,11 @@ import { maxUploadBytes, oversizedBody } from "@/lib/upload-limits"
 import { extensionForFilename, UPLOAD_TYPES } from "@/lib/upload-types"
 import { enqueueDocument } from "@/lib/documents/indexer-server"
 import { loadFeatures } from "@/lib/features-server"
+import { loadDocumentSettings } from "@/lib/documents/settings"
+import { processInboxItem } from "@/lib/capture-server"
 import type { AssetType } from "@/app/generated/prisma/client"
 
-const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT"] as const
+const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX"] as const
 type RecordType = (typeof RECORD_TYPES)[number]
 
 function isRecordType(v: string | null): v is RecordType {
@@ -30,6 +32,8 @@ async function recordExists(type: Exclude<RecordType, "DOCUMENT">, id: string): 
   if (type === "MEDICATION") return !!(await prisma.medication.findUnique(where))
   if (type === "ALLERGY") return !!(await prisma.allergy.findUnique(where))
   if (type === "IMMUNIZATION") return !!(await prisma.immunization.findUnique(where))
+  // Any signed-in member of the household may add to the shared inbox.
+  if (type === "INBOX") return !!(await prisma.inboxItem.findUnique(where))
   return !!(await prisma.insurancePolicy.findUnique(where))
 }
 
@@ -101,11 +105,15 @@ export async function POST(request: NextRequest) {
       immunizationId: recordType === "IMMUNIZATION" ? recordId : null,
       assetType: documentOn,
       assetId: recordType === "DOCUMENT" ? recordId : null,
+      inboxItemId: recordType === "INBOX" ? recordId : null,
       // Every upload is indexed in the background; the response doesn't wait.
       text: { create: {} },
     },
   })
 
   enqueueDocument(attachment.id)
+  // With indexing off nothing will read the file, so the item is settled now
+  // (ready to file by hand) instead of waiting forever.
+  if (recordType === "INBOX" && !(await loadDocumentSettings()).indexingEnabled) await processInboxItem(recordId)
   return NextResponse.json({ attachment })
 }

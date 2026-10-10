@@ -22,6 +22,15 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toMatch(/passwordHash/)
   })
 
+  it("describes the read-only inbox tool and where filing happens", () => {
+    for (const health of [true, false]) {
+      const p = buildSystemPrompt({ now, health })
+      expect(p).toMatch(/^- inbox lists/m)
+      expect(p).toContain("[Inbox](/inbox)")
+      expect(p).toMatch(/can't file/i)
+    }
+  })
+
   it("appends admin instructions last", () => {
     const p = buildSystemPrompt({ now, extra: "Answer in Spanish." })
     expect(p.trimEnd().endsWith("Answer in Spanish.")).toBe(true)

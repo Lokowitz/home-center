@@ -16,6 +16,13 @@ function storage() {
 const SESSION_EXPIRED = "Your session has expired — sign in again."
 const CUT_OFF = "The answer was cut off — try again."
 
+/**
+ * A line the page itself adds to the transcript (e.g. "Added receipt.pdf to
+ * your Inbox"). Shown after the first `after` messages; never saved or sent to
+ * the model, so it disappears on reload.
+ */
+export type ChatNotice = { id: number; text: string; href: string; after: number }
+
 export function useChatThread(userId: string) {
   const [messages, setMessages] = useState<ThreadMessage[]>([])
   /** The in-flight assistant text; null when no turn is running. */
@@ -25,8 +32,10 @@ export function useChatThread(userId: string) {
   const [statusLabel, setStatusLabel] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [notices, setNotices] = useState<ChatNotice[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const generation = useRef(0)
+  const noticeId = useRef(0)
 
   // sessionStorage only exists in the browser, so the thread loads after mount.
   useEffect(() => {
@@ -140,12 +149,22 @@ export function useChatThread(userId: string) {
 
   const stop = useCallback(() => abortRef.current?.abort(), [])
 
+  const addNotice = useCallback(
+    (text: string, href: string) => {
+      noticeId.current += 1
+      const notice = { id: noticeId.current, text, href, after: messages.length }
+      setNotices((ns) => [...ns, notice])
+    },
+    [messages.length]
+  )
+
   const reset = useCallback(() => {
     generation.current += 1
     abortRef.current?.abort()
     abortRef.current = null
     clearThread(storage(), userId)
     setMessages([])
+    setNotices([])
     setError(null)
     setBusy(false)
     setDraft(null)
@@ -153,5 +172,5 @@ export function useChatThread(userId: string) {
     setStatusLabel(null)
   }, [userId])
 
-  return { messages, draft, discarded, statusLabel, error, busy, send, retry, stop, reset }
+  return { messages, notices, draft, discarded, statusLabel, error, busy, send, retry, stop, reset, addNotice }
 }

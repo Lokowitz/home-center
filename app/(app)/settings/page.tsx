@@ -12,6 +12,8 @@ import { isMailConfigured } from "@/lib/notifications/mailer"
 import { loadLlmConfig } from "@/lib/llm/config"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DocumentSettings } from "@/components/settings/document-settings"
+import { CaptureSettings } from "@/components/settings/capture-settings"
+import { loadCaptureParser } from "@/lib/capture-server"
 import { loadDocumentSettings } from "@/lib/documents/settings"
 import { documentIndexStats } from "@/lib/documents/indexer-server"
 import { loadModelStatus } from "@/lib/documents/embed/server"
@@ -37,7 +39,7 @@ export default async function SettingsPage({
   // gating the whole page on ADMIN would leave ordinary users unable to turn
   // their own mail off. resolveSection keeps the admin-only sections from
   // non-admins, and only the open section's data is loaded.
-  const [me, users, recipients, mail, storedMail, llm, docs, features] = await Promise.all([
+  const [me, users, recipients, mail, storedMail, llm, docs, features, capture] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
@@ -58,6 +60,9 @@ export default async function SettingsPage({
         ? loadDocumentSettings().then((d) => [d, null, null] as const)
         : Promise.resolve(null),
     is("features") || is("assistant") ? loadFeatures() : Promise.resolve(null),
+    is("documents")
+      ? Promise.all([loadCaptureParser(), loadLlmConfig()]).then(([mode, c]) => ({ mode, llmReady: isLlmReady(c) }))
+      : Promise.resolve(null),
   ])
   // A signed-in session whose user row is gone — the demo seeder wipes users,
   // so a cookie from before it survives the account it points at. Redirecting
@@ -153,15 +158,18 @@ export default async function SettingsPage({
           )}
 
           {is("documents") && docs && docs[1] !== null && docs[2] !== null && (
-            <DocumentSettings
-              initial={{
-                indexingEnabled: docs[0].indexingEnabled,
-                ocrEnabled: docs[0].ocrEnabled,
-                semanticEnabled: docs[0].semanticEnabled,
-              }}
-              stats={docs[1]}
-              models={docs[2]}
-            />
+            <div className="space-y-6">
+              <DocumentSettings
+                initial={{
+                  indexingEnabled: docs[0].indexingEnabled,
+                  ocrEnabled: docs[0].ocrEnabled,
+                  semanticEnabled: docs[0].semanticEnabled,
+                }}
+                stats={docs[1]}
+                models={docs[2]}
+              />
+              {capture && <CaptureSettings initial={capture.mode} llmReady={capture.llmReady} />}
+            </div>
           )}
 
           {is("users") && <UserManagement users={users} currentUserId={session.user.id} />}

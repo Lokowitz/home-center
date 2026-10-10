@@ -70,6 +70,11 @@ export type IndexerDeps = {
   /** Called whenever the queue empties — frees the OCR worker. */
   idle?: () => Promise<void>
   log?: Pick<Console, "info" | "error">
+  /**
+   * Called after each file's result is saved (any status), e.g. to read a
+   * capture-inbox receipt. Errors are logged; they never fail the job.
+   */
+  processed?: (job: Job, status: SaveResult["status"]) => Promise<void>
   /** Present when the semantic layer is wired up; begin() returns null when it can't run right now. */
   semantic?: { begin(): Promise<SemanticSession | null> }
 }
@@ -113,12 +118,22 @@ export function createIndexer(deps: IndexerDeps): Indexer {
   async function processOne(id: string, ocr: boolean) {
     const job = await deps.store.loadJob(id)
     if (!job) return
+    const status = await extractOne(id, job, ocr)
+    if (!deps.processed) return
+    try {
+      await deps.processed(job, status)
+    } catch (error) {
+      log.error(`[documents] after ${id} failed:`, nameOf(error))
+    }
+  }
+
+  async function extractOne(id: string, job: Job, ocr: boolean): Promise<SaveResult["status"]> {
     await deps.store.claim(id)
     // A failed re-read leaves no text behind, so its old chunks must go too.
     if (!job.filePath) {
       await deps.store.save(id, { status: "FAILED", error: "File missing on disk" })
       await removeFromIndex(id)
-      return
+      return "FAILED"
     }
     let out: Extracted
     try {
@@ -128,21 +143,22 @@ export function createIndexer(deps: IndexerDeps): Indexer {
       await deps.store.save(id, { status: "FAILED", error: message })
       await removeFromIndex(id)
       log.error(`[documents] extract ${id} failed:`, nameOf(error))
-      return
+      return "FAILED"
     }
     if (out.kind === "unsupported") {
       await deps.store.save(id, { status: "UNSUPPORTED" })
       await removeFromIndex(id)
-      return
+      return "UNSUPPORTED"
     }
     const joined = joinPages(out.pages)
     if (!hasText(joined.text)) {
       await deps.store.save(id, { status: "EMPTY" })
       await removeFromIndex(id)
-      return
+      return "EMPTY"
     }
     await deps.store.save(id, { status: "DONE", method: out.method, ...joined })
     await indexText(id, joined.text, job)
+    return "DONE"
   }
 
   // Chunks without a vector for the active model get one. Runs after the file

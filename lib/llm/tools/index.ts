@@ -4,6 +4,7 @@ import {
 } from "./shortcuts"
 import { aggregateTool, findRecordsTool, getRecordTool } from "./generic"
 import { documentTools } from "./documents"
+import { inboxTool } from "./inbox"
 import type { DocumentAccess } from "@/lib/documents/tool-helpers"
 
 const SHORTCUT_TOOLS: RegisteredTool[] = [
@@ -24,9 +25,17 @@ const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, observationLogTo
 
 /**
  * The chat's tools: document tools go between the shortcuts and the generic
- * tools when allowed. With Health off its own shortcuts are left out.
+ * tools when allowed. With Health off its own shortcuts are left out. The
+ * read-only inbox tool is always there; it shows items that look like a
+ * person's only when health documents may go to the model (`healthDocuments`,
+ * which doesn't depend on document indexing being on).
  */
-export function chatTools(access: DocumentAccess, health = true): RegisteredTool[] {
+export function chatTools(access: DocumentAccess, health = true, healthDocuments = access.includeHealth): RegisteredTool[] {
   const shortcuts = health ? SHORTCUT_TOOLS : SHORTCUT_TOOLS.filter((t) => !HEALTH_TOOLS.has(t))
-  return [...shortcuts, ...(access.enabled ? documentTools(access.includeHealth) : []), ...GENERIC_TOOLS]
+  return [
+    ...shortcuts,
+    inboxTool(health && healthDocuments),
+    ...(access.enabled ? documentTools(access.includeHealth) : []),
+    ...GENERIC_TOOLS,
+  ]
 }

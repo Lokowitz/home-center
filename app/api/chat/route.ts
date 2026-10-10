@@ -77,7 +77,7 @@ export async function POST(request: Request) {
           history: parsed.data.messages,
           systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health }),
           chat,
-          tools: chatTools(docs, health),
+          tools: chatTools(docs, health, config.healthDocumentsEnabled),
           ctx: { userId, now, health },
           signal,
           model,

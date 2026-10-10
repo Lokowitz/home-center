@@ -99,6 +99,9 @@ function owner(a: AttachmentOwnerRow): Owner {
       return a.assetType && a.assetId
         ? { record: { type: "document", title: a.originalName, href: tabHref(assetHref(a.assetType, a.assetId), "documents") }, asset: { type: a.assetType, id: a.assetId } }
         : missing("document")
+    case "INBOX":
+      // Not filed yet: the inbox page is where it can be opened and filed.
+      return { record: { type: "inbox item", title: a.originalName, href: "/inbox" }, asset: null }
     case "INSURANCE":
       return a.insurancePolicy
         ? { record: { type: "insurance policy", title: a.insurancePolicy.carrier, href: "/insurance" }, asset: null }

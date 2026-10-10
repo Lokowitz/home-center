@@ -1,0 +1,188 @@
+"use server"
+
+import { auth } from "@/auth"
+import { prisma } from "@/lib/prisma"
+import { revalidatePath } from "next/cache"
+import { redirect } from "next/navigation"
+import { mkdir, rename } from "fs/promises"
+import { randomBytes } from "crypto"
+import { z } from "zod"
+import type { AssetType, CaptureParser, InboxStatus, Prisma } from "@/app/generated/prisma/client"
+import { ASSET_TYPES, assetHref } from "@/lib/assets"
+import { loadFeatures } from "@/lib/features-server"
+import { uploadRoot } from "@/lib/upload-path"
+import { removeUploadDir } from "@/lib/upload-fs"
+import { planMove } from "@/lib/capture/move"
+import { filedAttachmentData, moveWithRollback, targetDir, type FileTarget } from "@/lib/inbox"
+import { processInboxItem } from "@/lib/capture-server"
+import { reindexMovedDocuments, searchIndex } from "@/lib/documents/indexer-server"
+import { DOCUMENT_SETTINGS_ID } from "@/lib/documents/settings"
+import {
+  newServiceRecordWrites, prepareNewServiceRecord, revalidateNewServiceRecord,
+  type ServiceRecordFieldErrors, type ServiceRecordInput,
+} from "@/lib/service-record-server"
+
+// The capture inbox: files dropped before anyone chose a record, then filed as
+// a service record, kept as an asset document, or discarded. Any signed-in
+// member of the household can use it.
+
+async function requireUser() {
+  const session = await auth()
+  if (!session) redirect("/login")
+  return session
+}
+
+async function requireAdmin() {
+  const session = await requireUser()
+  if (session.user.role !== "ADMIN") redirect("/")
+  return session
+}
+
+// Inbox item ids also name an upload directory, and filing must know the new
+// record's id before the files move (so the move and the database change can
+// be undone together). cuid-shaped, like Prisma's own.
+function newRecordId(): string {
+  return `c${Date.now().toString(36)}${randomBytes(8).toString("hex")}`
+}
+
+async function assetExists(type: AssetType, id: string): Promise<boolean> {
+  const where = { where: { id }, select: { id: true } } as const
+  if (type === "PROPERTY") return !!(await prisma.property.findUnique(where))
+  if (type === "VEHICLE") return !!(await prisma.vehicle.findUnique(where))
+  if (type === "EQUIPMENT") return !!(await prisma.equipment.findUnique(where))
+  // People go with the rest of Health.
+  return (await loadFeatures()).health && !!(await prisma.person.findUnique(where))
+}
+
+function revalidateInbox() {
+  revalidatePath("/inbox")
+  // The sidebar's count badge is in the shared layout.
+  revalidatePath("/", "layout")
+}
+
+export async function createInboxItem(): Promise<{ success: true; id: string }> {
+  const session = await requireUser()
+  const item = await prisma.inboxItem.create({ data: { createdById: session.user.id }, select: { id: true } })
+  return { success: true, id: item.id }
+}
+
+/**
+ * Moves every file of the item to the target, then (in one transaction) runs
+ * `writes`, repoints the attachments and deletes the item. Files are moved
+ * back if the database step fails.
+ */
+async function moveOut(itemId: string, target: FileTarget, writes: () => Prisma.PrismaPromise<unknown>[]) {
+  const item = await prisma.inboxItem.findUnique({
+    where: { id: itemId },
+    select: { id: true, attachments: { select: { id: true, filename: true } } },
+  })
+  if (!item) return null
+  const root = uploadRoot()
+  const plans = item.attachments.map((a) => planMove(root, { recordType: "INBOX", recordId: item.id }, targetDir(target), a.filename))
+  const ids = item.attachments.map((a) => a.id)
+  await moveWithRollback(
+    plans,
+    { mkdir: (dir) => mkdir(dir, { recursive: true }), rename },
+    () =>
+      prisma.$transaction([
+        ...writes(),
+        prisma.attachment.updateMany({ where: { id: { in: ids } }, data: filedAttachmentData(target) }),
+        // Cascades to anything uploaded after the files were listed; its file goes with the directory below.
+        prisma.inboxItem.delete({ where: { id: item.id } }),
+      ]),
+    (error, plan) => console.error("[inbox] couldn't move a file back", plan.toPath, error instanceof Error ? error.message : error)
+  )
+  await removeUploadDir("inbox", item.id)
+  await reindexMovedDocuments(ids).catch((error) => console.error("[inbox] reindex failed:", error instanceof Error ? error.name : error))
+  revalidateInbox()
+  return { attachmentIds: ids }
+}
+
+const fileSchema = z.object({ assetType: z.enum(ASSET_TYPES), assetId: z.string().min(1) })
+
+export type FileInboxResult =
+  | { success: true; recordId: string; href: string }
+  | { error: string; fieldErrors?: ServiceRecordFieldErrors }
+
+/** Files the item as a new service record, optionally completing one of the asset's reminders (scheduleId). */
+export async function fileInboxItem(id: string, data: ServiceRecordInput): Promise<FileInboxResult> {
+  const session = await requireUser()
+  const prepared = await prepareNewServiceRecord(data, session.user.id)
+  if ("error" in prepared) return { error: "Check the highlighted fields.", fieldErrors: prepared.error }
+  const { row } = prepared.ok
+  if (!(await assetExists(row.assetType, row.assetId))) return { error: "That asset no longer exists." }
+
+  const recordId = newRecordId()
+  try {
+    const done = await moveOut(id, { kind: "SERVICE", recordId }, () => [...newServiceRecordWrites(prepared.ok, recordId)])
+    if (!done) return { error: "Not found" }
+  } catch (error) {
+    console.error("[inbox] filing failed:", error instanceof Error ? error.message : error)
+    return { error: "Couldn't file this item. Nothing was changed; try again." }
+  }
+  revalidateNewServiceRecord(prepared.ok)
+  return { success: true, recordId, href: `${assetHref(row.assetType, row.assetId)}?tab=${row.assetType === "PERSON" ? "visits" : "service"}&open=${recordId}` }
+}
+
+export type InboxActionResult = { success: true; href: string } | { error: string }
+
+/** Keeps the item's files on an asset as documents (manual, title, warranty card), with no record around them. */
+export async function keepAsDocument(id: string, assetType: AssetType, assetId: string): Promise<InboxActionResult> {
+  await requireUser()
+  const parsed = fileSchema.safeParse({ assetType, assetId })
+  if (!parsed.success) return { error: "Invalid input" }
+  if (!(await assetExists(parsed.data.assetType, parsed.data.assetId))) return { error: "That asset no longer exists." }
+
+  const target: FileTarget = { kind: "DOCUMENT", assetType: parsed.data.assetType, assetId: parsed.data.assetId }
+  try {
+    const done = await moveOut(id, target, () => [])
+    if (!done) return { error: "Not found" }
+  } catch (error) {
+    console.error("[inbox] keep as document failed:", error instanceof Error ? error.message : error)
+    return { error: "Couldn't move this item. Nothing was changed; try again." }
+  }
+  const href = assetHref(parsed.data.assetType, parsed.data.assetId)
+  revalidatePath(href)
+  return { success: true, href: `${href}?tab=documents` }
+}
+
+/** Deletes the item, its files and their search entries. */
+export async function discardInboxItem(id: string): Promise<{ success: true } | { error: string }> {
+  await requireUser()
+  const item = await prisma.inboxItem.findUnique({ where: { id }, select: { id: true, attachments: { select: { id: true } } } })
+  if (!item) return { error: "Not found" }
+  // Cascades to the attachments and their extracted text.
+  await prisma.inboxItem.delete({ where: { id: item.id } })
+  await removeUploadDir("inbox", item.id)
+  // Best effort: reconcile() removes anything left behind.
+  const ids = item.attachments.map((a) => a.id)
+  if (ids.length) await searchIndex().then((index) => index.remove(ids)).catch(() => {})
+  revalidateInbox()
+  return { success: true }
+}
+
+/** "Re-read": runs the receipt reader and asset match again, e.g. after changing the setting. */
+export async function reparseInboxItem(id: string): Promise<{ success: true; status: InboxStatus } | { error: string }> {
+  await requireUser()
+  if (!(await prisma.inboxItem.findUnique({ where: { id }, select: { id: true } }))) return { error: "Not found" }
+  await processInboxItem(id)
+  const after = await prisma.inboxItem.findUnique({ where: { id }, select: { status: true } })
+  revalidatePath("/inbox")
+  return after ? { success: true, status: after.status } : { error: "Not found" }
+}
+
+const parserSchema = z.enum(["OFF", "BASIC", "LLM"])
+
+/** Settings → "Receipt reading". Admins only. */
+export async function setCaptureParser(mode: CaptureParser): Promise<{ success: true; mode: CaptureParser } | { error: string }> {
+  await requireAdmin()
+  const parsed = parserSchema.safeParse(mode)
+  if (!parsed.success) return { error: "Invalid input." }
+  await prisma.documentSettings.upsert({
+    where: { id: DOCUMENT_SETTINGS_ID },
+    create: { id: DOCUMENT_SETTINGS_ID, captureParser: parsed.data },
+    update: { captureParser: parsed.data },
+  })
+  revalidatePath("/settings")
+  return { success: true, mode: parsed.data }
+}

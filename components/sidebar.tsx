@@ -8,13 +8,14 @@ import { isHealthPath } from "@/lib/features"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
   LayoutDashboard, Building2, Car, Refrigerator, Wrench, ShieldCheck,
-  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, ShieldPlus, Sparkles,
+  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, ShieldPlus, Sparkles, Inbox,
 } from "lucide-react"
 
 type NavItem = { href: string; label: string; icon: React.ElementType; section?: string }
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/chat", label: "Assistant", icon: Sparkles },
   { href: "/assets/properties", label: "Properties", icon: Building2, section: "Home" },
   { href: "/assets/vehicles", label: "Vehicles", icon: Car },
@@ -31,7 +32,7 @@ const navItems: NavItem[] = [
 
 const bottomItems = [{ href: "/settings", label: "Settings", icon: Settings }]
 
-function NavLink({ href, label, icon: Icon, onClick }: { href: string; label: string; icon: React.ElementType; onClick?: () => void }) {
+function NavLink({ href, label, icon: Icon, badge, onClick }: { href: string; label: string; icon: React.ElementType; badge?: number; onClick?: () => void }) {
   const pathname = usePathname()
   const active = pathname === href || (href !== "/" && pathname.startsWith(href))
   return (
@@ -54,13 +55,19 @@ function NavLink({ href, label, icon: Icon, onClick }: { href: string; label: st
       />
       <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
       {label}
+      {badge ? (
+        <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold leading-5 text-primary-foreground tabular-nums">
+          {badge > 99 ? "99+" : badge}
+          <span className="sr-only"> waiting</span>
+        </span>
+      ) : null}
     </Link>
   )
 }
 
-type NavProps = { showAssistant: boolean; showHealth: boolean }
+type NavProps = { showAssistant: boolean; showHealth: boolean; inboxCount?: number }
 
-function SidebarContent({ onNavClick, showAssistant, showHealth }: NavProps & { onNavClick?: () => void }) {
+function SidebarContent({ onNavClick, showAssistant, showHealth, inboxCount = 0 }: NavProps & { onNavClick?: () => void }) {
   return (
     <div className="flex flex-col h-full px-3 py-4">
       <div className="mb-6 flex items-center gap-2 px-3">
@@ -75,7 +82,7 @@ function SidebarContent({ onNavClick, showAssistant, showHealth }: NavProps & { 
             {section && (
               <p className="mt-3 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">{section}</p>
             )}
-            <NavLink {...item} onClick={onNavClick} />
+            <NavLink {...item} badge={item.href === "/inbox" ? inboxCount : undefined} onClick={onNavClick} />
           </Fragment>
         ))}
       </nav>

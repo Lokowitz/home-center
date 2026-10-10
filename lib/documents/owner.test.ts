@@ -3,7 +3,7 @@ import { describeAttachment, type AttachmentOwnerRow } from "./owner"
 
 const none = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null, insurancePolicyId: null,
-  observationId: null, medicationId: null, allergyId: null, immunizationId: null,
+  observationId: null, medicationId: null, allergyId: null, immunizationId: null, inboxItemId: null,
   serviceRecord: null, warranty: null, maintenanceSchedule: null, healthCondition: null, observation: null,
   medication: null, allergy: null, immunization: null, insurancePolicy: null,
 }
@@ -91,5 +91,15 @@ describe("describeAttachment", () => {
     const r = describeAttachment(row({ recordType: "SERVICE", serviceRecordId: null, serviceRecord: null }))
     expect(r.fileHref).toBeNull()
     expect(r.record).toEqual({ type: "service record", title: "(record not found)", href: null })
+  })
+
+  it("links an unfiled inbox file to the inbox, with no asset", () => {
+    expect(describeAttachment(row({ recordType: "INBOX", inboxItemId: "x1", originalName: "receipt.jpg" }))).toEqual({
+      attachmentId: "att1",
+      fileName: "receipt.jpg",
+      fileHref: "/api/files/inbox/x1/3f2a.pdf",
+      record: { type: "inbox item", title: "receipt.jpg", href: "/inbox" },
+      asset: null,
+    })
   })
 })
