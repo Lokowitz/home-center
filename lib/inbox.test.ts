@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
-  EMPTY_ITEM_MAX_AGE_MS, chooseParser, filedAttachmentData, inboxText, isStaleEmptyItem, moveWithRollback, parsedFields,
+  EMPTY_ITEM_MAX_AGE_MS, bestAttachMatch, chooseParser, filedAttachmentData, inboxText, isStaleEmptyItem, moveWithRollback, parsedFields,
+  targetDir,
 } from "./inbox"
 
 describe("isStaleEmptyItem", () => {
@@ -80,6 +81,54 @@ describe("filedAttachmentData", () => {
     expect(filedAttachmentData({ kind: "DOCUMENT", assetType: "VEHICLE", assetId: "v1" })).toEqual({
       recordType: "DOCUMENT", serviceRecordId: null, assetType: "VEHICLE", assetId: "v1", inboxItemId: null,
     })
+  })
+  it("points an inbox file at an existing warranty", () => {
+    expect(filedAttachmentData({ kind: "WARRANTY", recordId: "w1" })).toEqual({
+      recordType: "WARRANTY", warrantyId: "w1", serviceRecordId: null, assetType: null, assetId: null, inboxItemId: null,
+    })
+  })
+})
+
+describe("targetDir", () => {
+  it("names the upload directory the files move to, as the upload route lays it out", () => {
+    expect(targetDir({ kind: "SERVICE", recordId: "s1" })).toEqual({ recordType: "SERVICE", recordId: "s1" })
+    expect(targetDir({ kind: "WARRANTY", recordId: "w1" })).toEqual({ recordType: "WARRANTY", recordId: "w1" })
+    expect(targetDir({ kind: "DOCUMENT", assetType: "PROPERTY", assetId: "p1" })).toEqual({ recordType: "DOCUMENT", recordId: "p1" })
+  })
+})
+
+describe("bestAttachMatch", () => {
+  const day = (s: string) => new Date(`${s}T00:00:00Z`)
+  const records = [
+    { id: "oil", date: day("2026-10-05"), cost: 89.99 },
+    { id: "tires", date: day("2026-09-20"), cost: 640 },
+    { id: "brakes", date: day("2026-10-04"), cost: 310 },
+    { id: "warranty", date: day("2026-10-05"), cost: null },
+  ]
+  it("picks the record with the same day and total", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-05"), total: 89.99 })).toBe("oil")
+  })
+  it("a matching total outweighs a nearby day", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-04"), total: 640 })).toBe("tires")
+  })
+  it("matches the total to the cent", () => {
+    expect(bestAttachMatch(records, { date: null, total: 640.004 })).toBe("tires")
+    expect(bestAttachMatch(records, { date: null, total: 640.5 })).toBeNull()
+  })
+  it("with only a date, takes the closest record within a week, preferring one with a cost on a tie", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-06"), total: null })).toBe("oil")
+    expect(bestAttachMatch(records, { date: day("2026-10-03"), total: null })).toBe("brakes")
+    expect(bestAttachMatch(records, { date: day("2026-08-01"), total: null })).toBeNull()
+  })
+  it("with only a date, a warranty on that exact day is fine when nothing else is near", () => {
+    expect(bestAttachMatch([{ id: "w", date: day("2026-05-01"), cost: null }], { date: day("2026-05-01"), total: null })).toBe("w")
+  })
+  it("preselects nothing without parsed values, or without candidates", () => {
+    expect(bestAttachMatch(records, { date: null, total: null })).toBeNull()
+    expect(bestAttachMatch([], { date: day("2026-10-05"), total: 89.99 })).toBeNull()
+  })
+  it("ignores records with no date or cost", () => {
+    expect(bestAttachMatch([{ id: "x", date: null, cost: null }], { date: day("2026-10-05"), total: 1 })).toBeNull()
   })
 })
 

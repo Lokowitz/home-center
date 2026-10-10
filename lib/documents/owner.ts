@@ -63,6 +63,10 @@ function onAsset(kind: keyof typeof ASSET_TABS, recordId: string | null, title: 
     asset: { type: o.assetType, id: o.assetId },
   }
 }
+/** The page showing a service record or warranty, opened on it where its tab supports that. */
+export function assetRecordHref(kind: "SERVICE" | "WARRANTY", recordId: string, o: OnAsset): string {
+  return onAsset(kind, recordId, "", o).record.href ?? assetHref(o.assetType, o.assetId)
+}
 const onPerson = (type: string, title: string, personId: string, tab: string, openId?: string | null): Owner => ({
   record: { type, title, href: tabHref(assetHref("PERSON", personId), tab, openId) },
   asset: { type: "PERSON", id: personId },

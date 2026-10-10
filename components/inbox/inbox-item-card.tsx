@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { AlertTriangle, FileText, FolderInput, Loader2, RotateCw, Trash2 } from "lucide-react"
+import { AlertTriangle, FileText, FolderInput, Link2, Loader2, RotateCw, Trash2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FileInboxDialog } from "@/components/inbox/file-inbox-dialog"
 import { KeepDocumentDialog } from "@/components/inbox/keep-document-dialog"
+import { AttachRecordDialog, loadAttachChoices, type AttachChoices } from "@/components/inbox/attach-record-dialog"
 import type { InboxAssetOption, InboxReminderOption } from "@/components/inbox/asset-select"
 import { discardInboxItem, reparseInboxItem } from "@/lib/actions/inbox"
 import { assetIcon, assetLabel } from "@/lib/assets"
@@ -18,7 +19,7 @@ import { assetKey, fileFormDefaults, isPreviewableImage, localDay, readByLabel, 
 // Type only: inbox-server reaches Prisma.
 import type { InboxListItem } from "@/lib/inbox-server"
 
-type OpenDialog = { kind: "file"; defaults: FileFormValues } | { kind: "keep" } | null
+type OpenDialog = { kind: "file"; defaults: FileFormValues } | { kind: "keep" } | { kind: "attach"; initial: AttachChoices } | null
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -68,9 +69,18 @@ export function InboxItemCard({
   const readBy = readByLabel(item.parseMethod)
   const SuggestedIcon = item.suggestedAsset ? assetIcon[item.suggestedAsset.type] : null
   const nothingRead = item.status === "READY" && !item.parsedDate && item.parsedTotal == null && !item.parsedVendor
+  const parsed = { date: item.parsedDate ? new Date(item.parsedDate) : null, total: item.parsedTotal }
 
   function openFile() {
     setDialog({ kind: "file", defaults: fileFormDefaults(item, localDay(new Date())) })
+  }
+
+  function openAttach() {
+    // Load the suggested asset's records first, so the dialog opens with the best match already chosen.
+    start(async () => {
+      const key = item.suggestedAsset ? assetKey(item.suggestedAsset.type, item.suggestedAsset.id) : ""
+      setDialog({ kind: "attach", initial: await loadAttachChoices(key, parsed) })
+    })
   }
 
   function reread() {
@@ -176,6 +186,10 @@ export function InboxItemCard({
           <FolderInput />
           Keep as document
         </Button>
+        <Button type="button" size="sm" variant="outline" disabled={uploading || pending} onClick={openAttach}>
+          <Link2 />
+          Attach to record
+        </Button>
         <div className="ml-auto flex items-center gap-1">
           <Button type="button" size="sm" variant="ghost" disabled={uploading || pending} onClick={reread} title="Read the file again, e.g. after changing Receipt reading in Settings">
             {pending ? <Loader2 className="animate-spin" /> : <RotateCw />}
@@ -203,6 +217,16 @@ export function InboxItemCard({
           itemId={item.id}
           fileName={fileName}
           initialAssetKey={item.suggestedAsset ? assetKey(item.suggestedAsset.type, item.suggestedAsset.id) : ""}
+          assets={assets}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "attach" && (
+        <AttachRecordDialog
+          itemId={item.id}
+          fileName={fileName}
+          parsed={parsed}
+          initial={dialog.initial}
           assets={assets}
           onClose={() => setDialog(null)}
         />

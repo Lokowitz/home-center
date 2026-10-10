@@ -65,20 +65,66 @@ export function parsedFields(parsed: ParsedReceiptLike | null, method: "basic" |
   }
 }
 
+/** The existing records an item can be attached to. */
+export const ATTACH_KINDS = ["SERVICE", "WARRANTY"] as const
+export type AttachKind = (typeof ATTACH_KINDS)[number]
+
 export type FileTarget =
-  | { kind: "SERVICE"; recordId: string }
+  | { kind: AttachKind; recordId: string }
   | { kind: "DOCUMENT"; assetType: AssetType; assetId: string }
 
 /** The attachment columns once the file leaves the inbox; every other owner key is already null. */
 export function filedAttachmentData(t: FileTarget) {
-  return t.kind === "SERVICE"
-    ? { recordType: "SERVICE" as const, serviceRecordId: t.recordId, assetType: null, assetId: null, inboxItemId: null }
-    : { recordType: "DOCUMENT" as const, serviceRecordId: null, assetType: t.assetType, assetId: t.assetId, inboxItemId: null }
+  switch (t.kind) {
+    case "SERVICE":
+      return { recordType: "SERVICE" as const, serviceRecordId: t.recordId, assetType: null, assetId: null, inboxItemId: null }
+    case "WARRANTY":
+      return { recordType: "WARRANTY" as const, warrantyId: t.recordId, serviceRecordId: null, assetType: null, assetId: null, inboxItemId: null }
+    case "DOCUMENT":
+      return { recordType: "DOCUMENT" as const, serviceRecordId: null, assetType: t.assetType, assetId: t.assetId, inboxItemId: null }
+  }
 }
 
 /** The upload directory a filed file moves to: [recordType, recordId]. */
 export function targetDir(t: FileTarget): { recordType: string; recordId: string } {
-  return t.kind === "SERVICE" ? { recordType: "SERVICE", recordId: t.recordId } : { recordType: "DOCUMENT", recordId: t.assetId }
+  return t.kind === "DOCUMENT" ? { recordType: "DOCUMENT", recordId: t.assetId } : { recordType: t.kind, recordId: t.recordId }
+}
+
+export type AttachCandidateLike = { id: string; date: Date | null; cost: number | null }
+
+/** A service record (dated, maybe with a cost) or warranty (purchase date, no cost) offered in "Attach to record". */
+export type AttachCandidate = AttachCandidateLike & { kind: AttachKind; title: string }
+
+const DAY_MS = 24 * 60 * 60 * 1000
+/** A record dated within this many days of the receipt is a plausible match. */
+const NEAR_DAYS = 7
+
+/**
+ * Which existing record a receipt most likely belongs to, to preselect in
+ * "Attach to record": the same total (to the cent) counts most, then the same
+ * day, then a day within a week. Ties go to the closer day, then to a record
+ * with a cost. Null when nothing matches at all; the user then picks.
+ */
+export function bestAttachMatch(
+  candidates: AttachCandidateLike[],
+  parsed: { date: Date | null; total: number | null }
+): string | null {
+  let best: { id: string; score: number; days: number; hasCost: boolean } | null = null
+  for (const c of candidates) {
+    const days = c.date && parsed.date ? Math.round(Math.abs(c.date.getTime() - parsed.date.getTime()) / DAY_MS) : Infinity
+    const sameTotal = c.cost != null && parsed.total != null && Math.abs(c.cost - parsed.total) < 0.005
+    const score = (sameTotal ? 3 : 0) + (days === 0 ? 2 : days <= NEAR_DAYS ? 1 : 0)
+    if (score === 0) continue
+    const hasCost = c.cost != null
+    if (
+      !best ||
+      score > best.score ||
+      (score === best.score && (days < best.days || (days === best.days && hasCost && !best.hasCost)))
+    ) {
+      best = { id: c.id, score, days, hasCost }
+    }
+  }
+  return best?.id ?? null
 }
 
 export type MoveFs = {

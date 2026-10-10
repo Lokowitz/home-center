@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest"
-import { describeAttachment, type AttachmentOwnerRow } from "./owner"
+import { assetRecordHref, describeAttachment, type AttachmentOwnerRow } from "./owner"
+
+describe("assetRecordHref", () => {
+  it("opens the record on its tab, or the person's page where there is no tab", () => {
+    expect(assetRecordHref("SERVICE", "s1", { assetType: "VEHICLE", assetId: "v1" })).toBe("/assets/vehicles/v1?tab=service&open=s1")
+    expect(assetRecordHref("SERVICE", "s1", { assetType: "PERSON", assetId: "p1" })).toBe("/assets/people/p1?tab=visits&open=s1")
+    expect(assetRecordHref("WARRANTY", "w1", { assetType: "EQUIPMENT", assetId: "e1" })).toBe("/assets/equipment/e1?tab=warranties&open=w1")
+    expect(assetRecordHref("WARRANTY", "w1", { assetType: "PERSON", assetId: "p1" })).toBe("/assets/people/p1")
+  })
+})
 
 const none = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null, insurancePolicyId: null,

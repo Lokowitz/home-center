@@ -13,7 +13,10 @@ import { loadFeatures } from "@/lib/features-server"
 import { uploadRoot } from "@/lib/upload-path"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { planMove } from "@/lib/capture/move"
-import { filedAttachmentData, moveWithRollback, targetDir, type FileTarget } from "@/lib/inbox"
+import {
+  ATTACH_KINDS, filedAttachmentData, moveWithRollback, targetDir, type AttachCandidate, type AttachKind, type FileTarget,
+} from "@/lib/inbox"
+import { assetRecordHref } from "@/lib/documents/owner"
 import { processInboxItem } from "@/lib/capture-server"
 import { reindexMovedDocuments, searchIndex } from "@/lib/documents/indexer-server"
 import { DOCUMENT_SETTINGS_ID } from "@/lib/documents/settings"
@@ -67,35 +70,47 @@ export async function createInboxItem(): Promise<{ success: true; id: string }> 
 }
 
 /**
- * Moves every file of the item to the target, then (in one transaction) runs
- * `writes`, repoints the attachments and deletes the item. Files are moved
- * back if the database step fails.
+ * Shared by every way out of the inbox (file as a new record, attach to an
+ * existing one, keep as a document). Moves every file of the item to the
+ * target, then (in one transaction) runs `writes`, repoints the attachments
+ * and deletes the item. Files are moved back if the database step fails, and
+ * a failure comes back as `failure.message` with nothing changed.
  */
-async function moveOut(itemId: string, target: FileTarget, writes: () => Prisma.PrismaPromise<unknown>[]) {
-  const item = await prisma.inboxItem.findUnique({
-    where: { id: itemId },
-    select: { id: true, attachments: { select: { id: true, filename: true } } },
-  })
-  if (!item) return null
-  const root = uploadRoot()
-  const plans = item.attachments.map((a) => planMove(root, { recordType: "INBOX", recordId: item.id }, targetDir(target), a.filename))
-  const ids = item.attachments.map((a) => a.id)
-  await moveWithRollback(
-    plans,
-    { mkdir: (dir) => mkdir(dir, { recursive: true }), rename },
-    () =>
-      prisma.$transaction([
-        ...writes(),
-        prisma.attachment.updateMany({ where: { id: { in: ids } }, data: filedAttachmentData(target) }),
-        // Cascades to anything uploaded after the files were listed; its file goes with the directory below.
-        prisma.inboxItem.delete({ where: { id: item.id } }),
-      ]),
-    (error, plan) => console.error("[inbox] couldn't move a file back", plan.toPath, error instanceof Error ? error.message : error)
-  )
-  await removeUploadDir("inbox", item.id)
-  await reindexMovedDocuments(ids).catch((error) => console.error("[inbox] reindex failed:", error instanceof Error ? error.name : error))
-  revalidateInbox()
-  return { attachmentIds: ids }
+async function moveOut(
+  itemId: string,
+  target: FileTarget,
+  writes: () => Prisma.PrismaPromise<unknown>[],
+  failure: { log: string; message: string }
+): Promise<{ success: true; attachmentIds: string[] } | { error: string }> {
+  try {
+    const item = await prisma.inboxItem.findUnique({
+      where: { id: itemId },
+      select: { id: true, attachments: { select: { id: true, filename: true } } },
+    })
+    if (!item) return { error: "Not found" }
+    const root = uploadRoot()
+    const plans = item.attachments.map((a) => planMove(root, { recordType: "INBOX", recordId: item.id }, targetDir(target), a.filename))
+    const ids = item.attachments.map((a) => a.id)
+    await moveWithRollback(
+      plans,
+      { mkdir: (dir) => mkdir(dir, { recursive: true }), rename },
+      () =>
+        prisma.$transaction([
+          ...writes(),
+          prisma.attachment.updateMany({ where: { id: { in: ids } }, data: filedAttachmentData(target) }),
+          // Cascades to anything uploaded after the files were listed; its file goes with the directory below.
+          prisma.inboxItem.delete({ where: { id: item.id } }),
+        ]),
+      (error, plan) => console.error("[inbox] couldn't move a file back", plan.toPath, error instanceof Error ? error.message : error)
+    )
+    await removeUploadDir("inbox", item.id)
+    await reindexMovedDocuments(ids).catch((error) => console.error("[inbox] reindex failed:", error instanceof Error ? error.name : error))
+    revalidateInbox()
+    return { success: true, attachmentIds: ids }
+  } catch (error) {
+    console.error(`[inbox] ${failure.log} failed:`, error instanceof Error ? error.message : error)
+    return { error: failure.message }
+  }
 }
 
 const fileSchema = z.object({ assetType: z.enum(ASSET_TYPES), assetId: z.string().min(1) })
@@ -113,13 +128,11 @@ export async function fileInboxItem(id: string, data: ServiceRecordInput): Promi
   if (!(await assetExists(row.assetType, row.assetId))) return { error: "That asset no longer exists." }
 
   const recordId = newRecordId()
-  try {
-    const done = await moveOut(id, { kind: "SERVICE", recordId }, () => [...newServiceRecordWrites(prepared.ok, recordId)])
-    if (!done) return { error: "Not found" }
-  } catch (error) {
-    console.error("[inbox] filing failed:", error instanceof Error ? error.message : error)
-    return { error: "Couldn't file this item. Nothing was changed; try again." }
-  }
+  const done = await moveOut(id, { kind: "SERVICE", recordId }, () => [...newServiceRecordWrites(prepared.ok, recordId)], {
+    log: "filing",
+    message: "Couldn't file this item. Nothing was changed; try again.",
+  })
+  if ("error" in done) return done
   revalidateNewServiceRecord(prepared.ok)
   return { success: true, recordId, href: `${assetHref(row.assetType, row.assetId)}?tab=${row.assetType === "PERSON" ? "visits" : "service"}&open=${recordId}` }
 }
@@ -134,16 +147,76 @@ export async function keepAsDocument(id: string, assetType: AssetType, assetId: 
   if (!(await assetExists(parsed.data.assetType, parsed.data.assetId))) return { error: "That asset no longer exists." }
 
   const target: FileTarget = { kind: "DOCUMENT", assetType: parsed.data.assetType, assetId: parsed.data.assetId }
-  try {
-    const done = await moveOut(id, target, () => [])
-    if (!done) return { error: "Not found" }
-  } catch (error) {
-    console.error("[inbox] keep as document failed:", error instanceof Error ? error.message : error)
-    return { error: "Couldn't move this item. Nothing was changed; try again." }
-  }
+  const done = await moveOut(id, target, () => [], {
+    log: "keep as document",
+    message: "Couldn't move this item. Nothing was changed; try again.",
+  })
+  if ("error" in done) return done
   const href = assetHref(parsed.data.assetType, parsed.data.assetId)
   revalidatePath(href)
   return { success: true, href: `${href}?tab=documents` }
+}
+
+const attachSchema = z.object({ recordType: z.enum(ATTACH_KINDS), recordId: z.string().min(1) })
+
+/** The asset a service record or warranty sits on; null if it's gone, or a person's while Health is off. */
+async function attachableRecord(kind: AttachKind, id: string): Promise<{ assetType: AssetType; assetId: string } | null> {
+  const query = { where: { id }, select: { assetType: true, assetId: true } } as const
+  const record = kind === "SERVICE" ? await prisma.serviceRecord.findUnique(query) : await prisma.warranty.findUnique(query)
+  if (!record) return null
+  // A person's records go with the rest of Health, like the upload route's.
+  if (record.assetType === "PERSON" && !(await loadFeatures()).health) return null
+  return record
+}
+
+/**
+ * Attaches the item's files to a service record or warranty that already
+ * exists (entered by hand before the receipt turned up). Pure attach: the
+ * record's own fields, cost and vendor included, are left as they are.
+ */
+export async function attachToRecord(itemId: string, recordType: AttachKind, recordId: string): Promise<InboxActionResult> {
+  await requireUser()
+  const parsed = attachSchema.safeParse({ recordType, recordId })
+  if (!parsed.success) return { error: "Invalid input" }
+  const { recordType: kind, recordId: id } = parsed.data
+  const owner = await attachableRecord(kind, id)
+  if (!owner) return { error: "That record no longer exists." }
+
+  const done = await moveOut(
+    itemId,
+    { kind, recordId: id },
+    // Fails the transaction (moving the files back) if the record was deleted since the check above.
+    () => [
+      kind === "SERVICE"
+        ? prisma.serviceRecord.update({ where: { id }, data: {}, select: { id: true } })
+        : prisma.warranty.update({ where: { id }, data: {}, select: { id: true } }),
+    ],
+    { log: "attach to record", message: "Couldn't attach this item. Nothing was changed; try again." }
+  )
+  if ("error" in done) return done
+  revalidatePath(assetHref(owner.assetType, owner.assetId))
+  revalidatePath(kind === "SERVICE" ? "/records" : "/warranties")
+  return { success: true, href: assetRecordHref(kind, id, owner) }
+}
+
+/** "Attach to record": an asset's most recent service records and warranties, newest first. */
+export async function listAttachCandidates(assetType: AssetType, assetId: string): Promise<{ success: true; candidates: AttachCandidate[] } | { error: string }> {
+  await requireUser()
+  const parsed = fileSchema.safeParse({ assetType, assetId })
+  if (!parsed.success) return { error: "Invalid input" }
+  if (!(await assetExists(parsed.data.assetType, parsed.data.assetId))) return { error: "That asset no longer exists." }
+  const where = { assetType: parsed.data.assetType, assetId: parsed.data.assetId }
+  const [records, warranties] = await Promise.all([
+    prisma.serviceRecord.findMany({ where, orderBy: { date: "desc" }, take: 25, select: { id: true, date: true, title: true, cost: true } }),
+    prisma.warranty.findMany({ where, orderBy: { purchaseDate: "desc" }, take: 10, select: { id: true, purchaseDate: true, productName: true } }),
+  ])
+  return {
+    success: true,
+    candidates: [
+      ...records.map((r) => ({ kind: "SERVICE" as const, id: r.id, date: r.date, title: r.title, cost: r.cost })),
+      ...warranties.map((w) => ({ kind: "WARRANTY" as const, id: w.id, date: w.purchaseDate, title: w.productName, cost: null })),
+    ],
+  }
 }
 
 /** Deletes the item, its files and their search entries. */
