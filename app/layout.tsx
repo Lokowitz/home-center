@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             data-theme (so "ledger" is [data-theme="ledger"]); see lib/themes.ts. */}
         <ThemeProvider attribute={["class", "data-theme"]} themes={themeNames} defaultTheme="light" enableSystem={false}>
           {children}
-          <Toaster richColors />
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
