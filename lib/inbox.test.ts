@@ -1,0 +1,255 @@
+import { describe, expect, it, vi } from "vitest"
+import {
+  EMPTY_ITEM_MAX_AGE_MS, bestAttachMatch, chooseParser, fallbackLogLine, filedAttachmentData, inboxText, isStaleEmptyItem, llmSkipNote,
+  keptUserAsset, moveWithRollback, parsedFields, targetDir, userAssetReason, userAssetSuggestion,
+} from "./inbox"
+
+describe("isStaleEmptyItem", () => {
+  const now = new Date("2026-10-10T12:00:00Z")
+  it("removes items with no files once they're over an hour old", () => {
+    expect(isStaleEmptyItem({ createdAt: new Date(now.getTime() - EMPTY_ITEM_MAX_AGE_MS - 1), attachmentCount: 0 }, now)).toBe(true)
+  })
+  it("keeps recent empty items (an upload may still be running) and anything with files", () => {
+    expect(isStaleEmptyItem({ createdAt: new Date(now.getTime() - 60_000), attachmentCount: 0 }, now)).toBe(false)
+    expect(isStaleEmptyItem({ createdAt: new Date(0), attachmentCount: 1 }, now)).toBe(false)
+  })
+})
+
+describe("inboxText", () => {
+  it("waits while any file is unread, or there are no files yet", () => {
+    expect(inboxText([])).toEqual({ kind: "wait" })
+    expect(inboxText([{ status: "DONE", text: "a", error: null }, { status: "PENDING", text: null, error: null }])).toEqual({ kind: "wait" })
+  })
+  it("joins the text of every read file", () => {
+    expect(inboxText([{ status: "DONE", text: "one", error: null }, { status: "EMPTY", text: null, error: null }, { status: "DONE", text: "two", error: null }]))
+      .toEqual({ kind: "text", text: "one\ftwo" })
+  })
+  it("fails only when nothing was read and something failed", () => {
+    expect(inboxText([{ status: "FAILED", text: null, error: "Password-protected PDF" }])).toEqual({ kind: "failed", error: "Password-protected PDF" })
+    expect(inboxText([{ status: "FAILED", text: null, error: null }])).toEqual({ kind: "failed", error: "Couldn't read this file" })
+    expect(inboxText([{ status: "FAILED", text: null, error: "x" }, { status: "DONE", text: "ok", error: null }])).toEqual({ kind: "text", text: "ok" })
+  })
+  it("with indexing off, unread files will never be read: settle with what there is", () => {
+    const pending = { status: "PENDING" as const, text: null, error: null }
+    expect(inboxText([pending], { indexing: false })).toEqual({ kind: "text", text: "" })
+    expect(inboxText([pending, { status: "DONE", text: "old", error: null }], { indexing: false })).toEqual({ kind: "text", text: "old" })
+    expect(inboxText([], { indexing: false })).toEqual({ kind: "wait" })
+  })
+  it("treats files with no text as an empty read, not a failure", () => {
+    expect(inboxText([{ status: "EMPTY", text: null, error: null }, { status: "UNSUPPORTED", text: null, error: null }])).toEqual({ kind: "text", text: "" })
+  })
+})
+
+describe("chooseParser", () => {
+  const base = { mode: "LLM" as const, llmReady: true, suggestedAssetType: null, healthDocumentsEnabled: false }
+  it("follows the setting", () => {
+    expect(chooseParser({ ...base, mode: "OFF" })).toBe("none")
+    expect(chooseParser({ ...base, mode: "BASIC" })).toBe("basic")
+    expect(chooseParser(base)).toBe("llm")
+  })
+  it("falls back to basic when the LLM isn't ready", () => {
+    expect(chooseParser({ ...base, llmReady: false })).toBe("basic")
+  })
+  it("keeps a person's file away from the LLM unless health documents are allowed", () => {
+    expect(chooseParser({ ...base, suggestedAssetType: "PERSON" })).toBe("basic")
+    expect(chooseParser({ ...base, suggestedAssetType: "PERSON", healthDocumentsEnabled: true })).toBe("llm")
+    expect(chooseParser({ ...base, suggestedAssetType: "VEHICLE" })).toBe("llm")
+  })
+})
+
+describe("llmSkipNote", () => {
+  const base = { mode: "LLM" as const, llmReady: true, suggestedAssetType: null, healthDocumentsEnabled: false }
+  it("says why Local AI was chosen but not used", () => {
+    expect(llmSkipNote({ ...base, llmReady: false })).toBe("llm-not-ready")
+    expect(llmSkipNote({ ...base, suggestedAssetType: "PERSON" })).toBe("llm-health")
+  })
+  it("is null when Local AI is used, or wasn't chosen", () => {
+    expect(llmSkipNote(base)).toBeNull()
+    expect(llmSkipNote({ ...base, suggestedAssetType: "PERSON", healthDocumentsEnabled: true })).toBeNull()
+    expect(llmSkipNote({ ...base, mode: "BASIC", llmReady: false })).toBeNull()
+    expect(llmSkipNote({ ...base, mode: "OFF", suggestedAssetType: "PERSON" })).toBeNull()
+  })
+  it("agrees with chooseParser", () => {
+    for (const llmReady of [true, false])
+      for (const suggestedAssetType of [null, "PERSON", "VEHICLE"] as const)
+        for (const healthDocumentsEnabled of [true, false]) {
+          const c = { ...base, llmReady, suggestedAssetType, healthDocumentsEnabled }
+          expect(llmSkipNote(c) !== null).toBe(chooseParser(c) === "basic")
+        }
+  })
+})
+
+describe("fallbackLogLine", () => {
+  it("is one line naming the reason, with a detail when there is one", () => {
+    expect(fallbackLogLine("llm-failed", "unreachable")).toBe("[inbox] Local AI not used (llm-failed: unreachable); read with the built-in parser")
+    expect(fallbackLogLine("llm-health")).toBe("[inbox] Local AI not used (llm-health); read with the built-in parser")
+  })
+  it("never spans lines", () => {
+    expect(fallbackLogLine("llm-no-answer", "a\nb\r\nc")).not.toMatch(/[\r\n]/)
+  })
+})
+
+describe("parsedFields", () => {
+  it("turns a parsed receipt into the item's columns", () => {
+    expect(parsedFields({ date: "2026-10-05", total: 108.25, vendor: "Acme" }, "basic")).toEqual({
+      parsedDate: new Date("2026-10-05T00:00:00Z"), parsedTotal: 108.25, parsedVendor: "Acme", parseMethod: "basic", parseNote: null,
+    })
+  })
+  it("records why Local AI wasn't used", () => {
+    expect(parsedFields({ date: null, total: 1, vendor: null }, "basic", "llm-no-answer").parseNote).toBe("llm-no-answer")
+  })
+  it("clears everything when nothing was parsed", () => {
+    expect(parsedFields(null, null)).toEqual({ parsedDate: null, parsedTotal: null, parsedVendor: null, parseMethod: null, parseNote: null })
+  })
+  it("drops a malformed date rather than storing Invalid Date", () => {
+    expect(parsedFields({ date: "2026-13-40", total: null, vendor: null }, "llm").parsedDate).toBeNull()
+  })
+})
+
+describe("filedAttachmentData", () => {
+  it("points an inbox file at a service record", () => {
+    expect(filedAttachmentData({ kind: "SERVICE", recordId: "s1" })).toEqual({
+      recordType: "SERVICE", serviceRecordId: "s1", assetType: null, assetId: null, inboxItemId: null,
+    })
+  })
+  it("points an inbox file at an asset as a document", () => {
+    expect(filedAttachmentData({ kind: "DOCUMENT", assetType: "VEHICLE", assetId: "v1" })).toEqual({
+      recordType: "DOCUMENT", serviceRecordId: null, assetType: "VEHICLE", assetId: "v1", inboxItemId: null,
+    })
+  })
+  it("points an inbox file at an existing warranty", () => {
+    expect(filedAttachmentData({ kind: "WARRANTY", recordId: "w1" })).toEqual({
+      recordType: "WARRANTY", warrantyId: "w1", serviceRecordId: null, assetType: null, assetId: null, inboxItemId: null,
+    })
+  })
+})
+
+describe("targetDir", () => {
+  it("names the upload directory the files move to, as the upload route lays it out", () => {
+    expect(targetDir({ kind: "SERVICE", recordId: "s1" })).toEqual({ recordType: "SERVICE", recordId: "s1" })
+    expect(targetDir({ kind: "WARRANTY", recordId: "w1" })).toEqual({ recordType: "WARRANTY", recordId: "w1" })
+    expect(targetDir({ kind: "DOCUMENT", assetType: "PROPERTY", assetId: "p1" })).toEqual({ recordType: "DOCUMENT", recordId: "p1" })
+  })
+})
+
+describe("bestAttachMatch", () => {
+  const day = (s: string) => new Date(`${s}T00:00:00Z`)
+  const records = [
+    { id: "oil", date: day("2026-10-05"), cost: 89.99 },
+    { id: "tires", date: day("2026-09-20"), cost: 640 },
+    { id: "brakes", date: day("2026-10-04"), cost: 310 },
+    { id: "warranty", date: day("2026-10-05"), cost: null },
+  ]
+  it("picks the record with the same day and total", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-05"), total: 89.99 })).toBe("oil")
+  })
+  it("a matching total outweighs a nearby day", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-04"), total: 640 })).toBe("tires")
+  })
+  it("matches the total to the cent", () => {
+    expect(bestAttachMatch(records, { date: null, total: 640.004 })).toBe("tires")
+    expect(bestAttachMatch(records, { date: null, total: 640.5 })).toBeNull()
+  })
+  it("with only a date, takes the closest record within a week, preferring one with a cost on a tie", () => {
+    expect(bestAttachMatch(records, { date: day("2026-10-06"), total: null })).toBe("oil")
+    expect(bestAttachMatch(records, { date: day("2026-10-03"), total: null })).toBe("brakes")
+    expect(bestAttachMatch(records, { date: day("2026-08-01"), total: null })).toBeNull()
+  })
+  it("with only a date, a warranty on that exact day is fine when nothing else is near", () => {
+    expect(bestAttachMatch([{ id: "w", date: day("2026-05-01"), cost: null }], { date: day("2026-05-01"), total: null })).toBe("w")
+  })
+  it("preselects nothing without parsed values, or without candidates", () => {
+    expect(bestAttachMatch(records, { date: null, total: null })).toBeNull()
+    expect(bestAttachMatch([], { date: day("2026-10-05"), total: 89.99 })).toBeNull()
+  })
+  it("ignores records with no date or cost", () => {
+    expect(bestAttachMatch([{ id: "x", date: null, cost: null }], { date: day("2026-10-05"), total: 1 })).toBeNull()
+  })
+})
+
+describe("moveWithRollback", () => {
+  const plans = [
+    { fromPath: "/u/inbox/i/a.pdf", toPath: "/u/service/s/a.pdf", toDir: "/u/service/s" },
+    { fromPath: "/u/inbox/i/b.pdf", toPath: "/u/service/s/b.pdf", toDir: "/u/service/s" },
+  ]
+  function fakeFs(failOn?: string) {
+    const log: string[] = []
+    return {
+      log,
+      fs: {
+        mkdir: vi.fn(async (dir: string) => void log.push(`mkdir ${dir}`)),
+        rename: vi.fn(async (from: string, to: string) => {
+          if (from === failOn) throw new Error("EBUSY")
+          log.push(`mv ${from} ${to}`)
+        }),
+      },
+    }
+  }
+
+  it("moves every file, then commits", async () => {
+    const f = fakeFs()
+    const commit = vi.fn(async () => "ok")
+    expect(await moveWithRollback(plans, f.fs, commit)).toBe("ok")
+    expect(f.log).toEqual(["mkdir /u/service/s", "mv /u/inbox/i/a.pdf /u/service/s/a.pdf", "mv /u/inbox/i/b.pdf /u/service/s/b.pdf"])
+    expect(commit).toHaveBeenCalledOnce()
+  })
+
+  it("moves files back and never commits when a rename fails", async () => {
+    const f = fakeFs("/u/inbox/i/b.pdf")
+    const commit = vi.fn(async () => "ok")
+    await expect(moveWithRollback(plans, f.fs, commit)).rejects.toThrow("EBUSY")
+    expect(commit).not.toHaveBeenCalled()
+    expect(f.log.slice(-1)).toEqual(["mv /u/service/s/a.pdf /u/inbox/i/a.pdf"])
+  })
+
+  it("moves files back when the commit fails", async () => {
+    const f = fakeFs()
+    await expect(moveWithRollback(plans, f.fs, async () => { throw new Error("SQLITE_BUSY") })).rejects.toThrow("SQLITE_BUSY")
+    expect(f.log.slice(-2)).toEqual(["mv /u/service/s/b.pdf /u/inbox/i/b.pdf", "mv /u/service/s/a.pdf /u/inbox/i/a.pdf"])
+  })
+
+  it("keeps going when moving one file back fails, and reports the original error", async () => {
+    const f = fakeFs()
+    f.fs.rename.mockImplementation(async (from: string, to: string) => {
+      if (from === "/u/service/s/b.pdf") throw new Error("gone")
+      f.log.push(`mv ${from} ${to}`)
+    })
+    const onUndoError = vi.fn()
+    await expect(moveWithRollback(plans, f.fs, async () => { throw new Error("db") }, onUndoError)).rejects.toThrow("db")
+    expect(f.log.slice(-1)).toEqual(["mv /u/service/s/a.pdf /u/inbox/i/a.pdf"])
+    expect(onUndoError).toHaveBeenCalledOnce()
+  })
+})
+
+describe("userAssetSuggestion", () => {
+  it("stores the asset the file was added from, flagged as the person's own pick", () => {
+    expect(userAssetSuggestion({ assetType: "VEHICLE", assetId: "v1" }, "Blue Civic")).toEqual({
+      suggestedAssetType: "VEHICLE",
+      suggestedAssetId: "v1",
+      suggestedReason: "Added from Blue Civic's page",
+      suggestedByUser: true,
+    })
+  })
+  it("trims the name and falls back when it's blank", () => {
+    expect(userAssetReason("  Main House ")).toBe("Added from Main House's page")
+    expect(userAssetReason("   ")).toBe("Added from its page")
+  })
+})
+
+describe("keptUserAsset", () => {
+  const item = { suggestedByUser: true, suggestedAssetType: "PERSON" as const, suggestedAssetId: "p1", suggestedReason: "Added from Ann's page" }
+  it("keeps an asset the person chose, as the match", () => {
+    expect(keptUserAsset(item)).toEqual({ assetType: "PERSON", assetId: "p1", reason: "added by user", shownReason: "Added from Ann's page" })
+  })
+  it("returns null (so the reader matches) when the suggestion wasn't the person's", () => {
+    expect(keptUserAsset({ ...item, suggestedByUser: false })).toBeNull()
+  })
+  it("returns null when the flag is set but the asset is missing", () => {
+    expect(keptUserAsset({ ...item, suggestedAssetId: null })).toBeNull()
+    expect(keptUserAsset({ ...item, suggestedAssetType: null })).toBeNull()
+  })
+  it("still feeds the privacy rule: a person's file chosen by hand stays off the LLM", () => {
+    const kept = keptUserAsset(item)
+    expect(chooseParser({ mode: "LLM", llmReady: true, suggestedAssetType: kept?.assetType ?? null, healthDocumentsEnabled: false })).toBe("basic")
+  })
+})

@@ -82,6 +82,7 @@ enum Relationship {
   SPOUSE
   CHILD
   PARENT
+  PET
   OTHER
 }
 
@@ -114,6 +115,25 @@ enum AttachmentRecordType {
   MEDICATION
   ALLERGY
   IMMUNIZATION
+  /// A file on the asset itself — a manual, title, deed — with no record around it.
+  DOCUMENT
+  /// Dropped into the capture inbox and not yet filed anywhere.
+  INBOX
+}
+
+/// Where a capture-inbox item is: waiting for its text, read, or unreadable.
+enum InboxStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+/// How the capture inbox reads a receipt: not at all, the built-in parser, or
+/// the configured LLM (falling back to the built-in parser).
+enum CaptureParser {
+  OFF
+  BASIC
+  LLM
 }
 
 enum NotificationRepeat {
@@ -157,6 +177,7 @@ model User {
   serviceRecords ServiceRecord[]
   observations   Observation[]
   attachments    Attachment[]
+  inboxItems     InboxItem[]
 }
 
 // ─── Assets ───────────────────────────────────────────────────────────────────
@@ -452,7 +473,10 @@ model MaintenanceSchedule {
   nextDueMileage       Int?
   reminderDaysBefore   Int       @default(14)
   reminderMilesBefore  Int       @default(500)
+  /// False while paused: kept on the asset page, left out of due counts and notifications.
   isActive             Boolean   @default(true)
+  /// Hidden from the dashboard and notifications until then. The due date doesn't move.
+  snoozedUntil         DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
@@ -499,7 +523,51 @@ model Attachment {
 
   immunizationId        String?
   immunization          Immunization?        @relation(fields: [immunizationId], references: [id], onDelete: Cascade)
+
+  /// DOCUMENT only: the property, vehicle, equipment or person the file sits on.
+  /// Polymorphic like ServiceRecord's, so no foreign key: deleting the asset
+  /// deletes these rows itself (lib/asset-delete-server.ts, deletePerson).
+  assetType             AssetType?
+  assetId               String?
+
+  inboxItemId           String?
+  inboxItem             InboxItem?           @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+
   text                  AttachmentText?
+
+  @@index([assetType, assetId])
+  @@index([inboxItemId])
+}
+
+// ─── Capture inbox ────────────────────────────────────────────────────────────
+
+/// A file dropped into the inbox before anyone chose its record. The parsed
+/// fields are suggestions for the filing form, never applied on their own.
+model InboxItem {
+  id          String      @id @default(cuid())
+  createdAt   DateTime    @default(now())
+  createdById String
+  createdBy   User        @relation(fields: [createdById], references: [id])
+  status      InboxStatus @default(PENDING)
+  parsedDate   DateTime?
+  parsedTotal  Float?
+  parsedVendor String?
+  /// "basic" or "llm"; null when nothing was parsed (reading off, or no text).
+  parseMethod  String?
+  /// Why Local AI was chosen but the built-in parser read it: "llm-not-ready", "llm-health",
+  /// "llm-failed" or "llm-no-answer". Null otherwise. A fixed code, never receipt text.
+  parseNote    String?
+  suggestedAssetType AssetType?
+  suggestedAssetId   String?
+  /// Why that asset was suggested, in words for the card ("VIN on the receipt"). Never the matched value.
+  suggestedReason    String?
+  /// The suggestion was set by the person adding the file (dropped on an asset's
+  /// page), so the reader keeps it instead of matching.
+  suggestedByUser    Boolean     @default(false)
+  /// Fixed phrase shown on the item, e.g. the extractor's error.
+  error       String?
+
+  attachments Attachment[]
 }
 
 // ─── Mail settings ────────────────────────────────────────────────────────────
@@ -607,6 +675,8 @@ model DocumentSettings {
   semanticEnabled Boolean  @default(true)
   /// Vetted model id (lib/documents/embed/models.ts). Default is the built-in one.
   embeddingModel  String   @default("bge-small-en-v1.5")
+  /// How the capture inbox reads receipts. LLM falls back to BASIC when the assistant is off.
+  captureParser   CaptureParser @default(BASIC)
   updatedAt       DateTime @updatedAt
 }
 

@@ -12,6 +12,8 @@ import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/t
 import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { RecordsAddButton } from "@/components/service-records/records-add-button"
+import { emptyStateCopy } from "@/lib/intake-ui"
 
 const DEFAULT_SORT = "date"
 const DEFAULT_DIR = "desc"
@@ -75,6 +77,9 @@ export default async function RecordsPage({
   if (page > pageCount) redirect(`/records${withParams(params, { page: pageCount === 1 ? undefined : pageCount })}`)
 
   const totalCost = costTotal._sum.cost ?? 0
+  const assetOptions = (Object.entries(assets.names) as [AssetType, Record<string, string>][]).flatMap(([type, byId]) =>
+    Object.entries(byId).map(([id, name]) => ({ type, id, name }))
+  )
 
   return (
     <div className="space-y-6">
@@ -86,6 +91,7 @@ export default async function RecordsPage({
             {totalCost > 0 && ` · $${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total`}
           </p>
         </div>
+        <RecordsAddButton assets={assetOptions} />
       </div>
 
       <Suspense>
@@ -97,10 +103,14 @@ export default async function RecordsPage({
 
       {total === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No records {q || assetId ? "match those filters" : "yet"}</p>
-          <p className="text-sm mt-1">
-            {q || assetId ? "Try clearing the search or filter." : "Add records from a property, vehicle, equipment, or person detail page."}
-          </p>
+          {q || assetId ? (
+            <>
+              <p className="font-medium">No records match those filters</p>
+              <p className="text-sm mt-1">Try clearing the search or filter.</p>
+            </>
+          ) : (
+            <p className="font-medium">{emptyStateCopy("records")}</p>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">

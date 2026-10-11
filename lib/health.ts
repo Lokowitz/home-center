@@ -13,6 +13,7 @@ export const RELATIONSHIPS: FieldOption[] = [
   { value: "SPOUSE", label: "Spouse" },
   { value: "CHILD", label: "Child" },
   { value: "PARENT", label: "Parent" },
+  { value: "PET", label: "Pet" },
   { value: "OTHER", label: "Other" },
 ]
 

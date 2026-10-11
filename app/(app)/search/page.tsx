@@ -3,7 +3,8 @@ import { SearchX, Sparkles } from "lucide-react"
 import { globalSearch } from "@/lib/search/global-server"
 import type { Section, SemanticState } from "@/lib/search/types"
 import { AssetCard, DocumentCard, RecordCard } from "@/components/search/result-cards"
-import { searchHref } from "@/lib/search/href"
+import { searchHref, semanticOn } from "@/lib/search/href"
+import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Search" }
 
@@ -15,15 +16,11 @@ const GRID: Record<Section["layout"], string> = {
   documents: "grid gap-3 lg:grid-cols-2",
 }
 
-function SectionBlock({ section, terms, sub }: { section: Section; terms: string[]; sub?: boolean }) {
+function SectionBlock({ section, terms }: { section: Section; terms: string[] }) {
   return (
     <section id={section.key} className="scroll-mt-4 space-y-3">
       <div className="flex items-baseline gap-2">
-        {sub ? (
-          <h3 className="font-heading text-base font-semibold">{section.title}</h3>
-        ) : (
-          <h2 className="font-heading text-lg font-semibold">{section.title}</h2>
-        )}
+        <h2 className="font-heading text-lg font-semibold">{section.title}</h2>
         <span className="text-sm text-muted-foreground">
           {section.items.length}
           {section.more ? "+" : ""}
@@ -41,22 +38,31 @@ function SectionBlock({ section, terms, sub }: { section: Section; terms: string
   )
 }
 
-function SemanticNote({ state, q }: { state: SemanticState; q: string }) {
+/** Turns semantic results on or off for this search by reloading it. */
+function SemanticSwitch({ q, on }: { q: string; on: boolean }) {
+  return (
+    <Link
+      href={searchHref(q, !on)}
+      role="switch"
+      aria-checked={on}
+      title={on ? "Also showing results related by meaning. Click for keyword matches only." : "Keyword matches only. Click to also show results related by meaning."}
+      className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border/60 bg-card py-1 pl-2.5 pr-1 text-xs font-medium hover:bg-muted"
+    >
+      <Sparkles className={cn("h-3.5 w-3.5", on ? "text-primary" : "text-muted-foreground")} />
+      Semantic
+      <span className={cn("relative h-4 w-7 rounded-full transition-colors", on ? "bg-primary" : "bg-muted-foreground/30")}>
+        <span className={cn("absolute top-0.5 h-3 w-3 rounded-full bg-background shadow-xs transition-all", on ? "left-3.5" : "left-0.5")} />
+      </span>
+    </Link>
+  )
+}
+
+function SemanticNote({ state }: { state: SemanticState }) {
   const box = "flex items-start gap-2 rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground"
   switch (state.state) {
     case "off":
-      return (
-        <p className={box}>
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            Keyword results only.{" "}
-            <Link href={searchHref(q, true)} className="font-medium text-foreground underline-offset-4 hover:underline">
-              Turn on semantic search
-            </Link>{" "}
-            to also find records and documents related by meaning.
-          </span>
-        </p>
-      )
+      // The switch at the top says so.
+      return null
     case "unavailable":
       return (
         <p className={box}>
@@ -76,12 +82,8 @@ function SemanticNote({ state, q }: { state: SemanticState; q: string }) {
         </p>
       )
     case "ok":
-      return state.sections.length ? null : (
-        <p className={box}>
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Nothing else is close in meaning beyond the keyword matches above.</span>
-        </p>
-      )
+      // Its finds sit in the sections above, marked "Semantic".
+      return null
   }
 }
 
@@ -92,7 +94,7 @@ export default async function SearchPage({
 }) {
   const params = await searchParams
   const q = first(params.q).trim()
-  const semantic = first(params.semantic) === "1"
+  const semantic = semanticOn(first(params.semantic))
 
   if (!q) {
     return (
@@ -107,25 +109,22 @@ export default async function SearchPage({
   }
 
   const results = await globalSearch(q, { semantic })
-  const semanticSections = results.semantic.state === "ok" ? results.semantic.sections : []
-  const jump = [
-    ...results.sections.map((s) => ({ key: s.key, title: s.title, count: `${s.items.length}${s.more ? "+" : ""}`, semantic: false })),
-    ...(semanticSections.length
-      ? [{ key: "semantic", title: "Related by meaning", count: String(semanticSections.reduce((n, s) => n + s.items.length, 0)), semantic: true }]
-      : []),
-  ]
+  const jump = results.sections.map((s) => ({ key: s.key, title: s.title, count: `${s.items.length}${s.more ? "+" : ""}` }))
 
   return (
     <div className="space-y-8">
       <div className="space-y-3">
-        <div>
-          <h1 className="font-heading text-2xl font-semibold">
-            Results for <span className="text-primary">&ldquo;{results.query}&rdquo;</span>
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {results.total} {results.total === 1 ? "match" : "matches"}
-            {semantic ? " · keyword + semantic" : " · keyword"}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-heading text-2xl font-semibold">
+              Results for <span className="text-primary">&ldquo;{results.query}&rdquo;</span>
+            </h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {results.total} {results.total === 1 ? "match" : "matches"}
+              {semantic ? " · keyword + semantic" : " · keyword"}
+            </p>
+          </div>
+          <SemanticSwitch q={results.query} on={semantic} />
         </div>
         {jump.length > 1 && (
           <nav aria-label="Result sections" className="flex flex-wrap gap-1.5">
@@ -135,7 +134,6 @@ export default async function SearchPage({
                 href={`#${s.key}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1 text-xs font-medium hover:bg-muted"
               >
-                {s.semantic && <Sparkles className="h-3 w-3" />}
                 {s.title}
                 <span className="text-muted-foreground">{s.count}</span>
               </a>
@@ -144,7 +142,7 @@ export default async function SearchPage({
         )}
       </div>
 
-      {results.sections.length === 0 && semanticSections.length === 0 && (
+      {results.sections.length === 0 && (
         <div className="flex flex-col items-center rounded-xl border border-dashed p-12 text-center text-muted-foreground">
           <SearchX className="h-8 w-8" strokeWidth={1.5} />
           <p className="mt-3 font-medium text-foreground">Nothing matched &ldquo;{results.query}&rdquo;</p>
@@ -153,21 +151,7 @@ export default async function SearchPage({
       )}
 
       {results.sections.map((s) => <SectionBlock key={s.key} section={s} terms={results.terms} />)}
-
-      {semanticSections.length > 0 && (
-        <div id="semantic" className="scroll-mt-4 space-y-6 rounded-2xl border border-primary/20 bg-primary/[0.03] p-4 sm:p-5">
-          <div>
-            <h2 className="flex items-center gap-2 font-heading text-lg font-semibold">
-              <Sparkles className="h-4 w-4 text-primary" /> Related by meaning
-            </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Close in meaning to &ldquo;{results.query}&rdquo; but not matched by its words. Best matches first.
-            </p>
-          </div>
-          {semanticSections.map((s) => <SectionBlock key={s.key} section={s} terms={[]} sub />)}
-        </div>
-      )}
-      <SemanticNote state={results.semantic} q={results.query} />
+      <SemanticNote state={results.semantic} />
     </div>
   )
 }

@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, Car, Wrench, ShieldCheck, Calendar, AlertTriangle, Clock, Refrigerator, PiggyBank, HeartPulse } from "lucide-react"
+import { Building2, Car, Wrench, ShieldCheck, Calendar, Clock, Refrigerator, PiggyBank, HeartPulse } from "lucide-react"
 import { SummaryCard } from "@/components/dashboard/summary-card"
+import { ReminderRow } from "@/components/dashboard/reminder-row"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { loadActivityIndex, mostRecentlyActive } from "@/lib/asset-activity"
 import { assetHref } from "@/lib/assets"
@@ -15,6 +16,8 @@ import { bucketed, formatMoney, priorPeriod, sum, yearToDate } from "@/lib/costs
 import { SpendArea } from "@/components/charts/spend-area"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { listInboxItems } from "@/lib/inbox-server"
+import { IntakeCard } from "@/components/dashboard/intake-card"
 
 // Months of history in the dashboard's spending chart. Twelve rather than six:
 // six months cannot show a season, and a household's spending is seasonal.
@@ -37,7 +40,7 @@ export default async function DashboardPage() {
     propertyCount, vehicleCount, equipmentCount, personCount, recordCount,
     warrantyCount,
     maintenanceCandidates, mileage, expiringWarranties,
-    properties, vehicles, equipment, people, assets, activity, costRows,
+    properties, vehicles, equipment, people, assets, activity, costRows, intake,
   ] = await Promise.all([
     prisma.property.count(),
     prisma.vehicle.count(),
@@ -64,6 +67,7 @@ export default async function DashboardPage() {
     loadAssetIndex(),
     loadActivityIndex(),
     loadCostRecords(),
+    listInboxItems(now),
   ])
 
   // A schedule counts as due when its own date window says so (the card's "30d"
@@ -132,7 +136,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* Two by two until the page is wide enough for all four side by side. */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <IntakeCard items={intake.items} householdNames={intake.householdNames} />
+
         {/* Upcoming reminders */}
         <Card className="py-5">
           <CardHeader className="px-5 pb-1">
@@ -150,22 +157,18 @@ export default async function DashboardPage() {
             {urgentMaintenance.length === 0 ? (
               <EmptyPanel icon={Clock} message="Nothing due in the next 30 days." />
             ) : urgentMaintenance.map(({ s, due }) => {
-              const assetName = assets.assetName(s.assetType, s.assetId)
-              const href = assetHref(s.assetType, s.assetId)
-              const overdue = due.overdue
+              const reading = s.assetType === "VEHICLE" ? mileage.get(s.assetId) : undefined
               return (
-                <Link
+                <ReminderRow
                   key={s.id}
-                  href={href}
-                  className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors duration-150 hover:bg-muted/60"
-                >
-                  {overdue ? <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" /> : <Clock className="h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />}
-                  <span className="flex-1 truncate">{s.title}</span>
-                  <span className="text-xs text-muted-foreground shrink-0">{assetName}</span>
-                  <Badge variant={overdue ? "destructive" : "secondary"} className="shrink-0 text-xs">
-                    {dueLabel(due)}
-                  </Badge>
-                </Link>
+                  schedule={s}
+                  assetName={assets.assetName(s.assetType, s.assetId)}
+                  href={assetHref(s.assetType, s.assetId)}
+                  overdue={due.overdue}
+                  dueLabel={dueLabel(due)}
+                  currentMileage={reading?.value ?? null}
+                  meterUnit={reading?.unit ?? "MILES"}
+                />
               )
             })}
           </CardContent>

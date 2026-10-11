@@ -27,6 +27,13 @@ describe("createDeltaAccumulator", () => {
     expect(acc.result()).toEqual({ content: "Hello", toolCalls: [] })
   })
 
+  it("keeps the finish reason, so a cut-off reply can be told apart", () => {
+    const acc = createDeltaAccumulator(() => {})
+    acc.push(chunk({ reasoning_content: "thinking" }))
+    acc.push(JSON.stringify({ choices: [{ delta: {}, finish_reason: "length" }] }))
+    expect(acc.result()).toEqual({ content: "", toolCalls: [], finishReason: "length" })
+  })
+
   it("assembles parallel tool calls from fragments", () => {
     const acc = createDeltaAccumulator(() => {})
     acc.push(chunk({ tool_calls: [{ index: 0, id: "a", type: "function", function: { name: "search", arguments: "" } }] }))

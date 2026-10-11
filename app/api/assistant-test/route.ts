@@ -5,7 +5,7 @@ import { DEFAULT_TIMEOUT_SECONDS, DEFAULT_TOOL_ROUNDS, parseExtraBody } from "@/
 import { createChatClient } from "@/lib/llm/client"
 import { LlmError } from "@/lib/llm/errors"
 import { buildSystemPrompt } from "@/lib/llm/prompt"
-import { TOOLS } from "@/lib/llm/tools"
+import { MODEL_TEST_TOOLS } from "@/lib/llm/tools"
 import { MODEL_TEST_CASES } from "@/lib/llm/model-test/cases"
 import { parseModelTestRequest } from "@/lib/llm/model-test/request"
 import { runSuite } from "@/lib/llm/model-test/runner"
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
 
         summary = await runSuite({
           chat,
-          tools: TOOLS,
+          tools: MODEL_TEST_TOOLS,
           systemPrompt,
           maxRounds,
           signal: request.signal,

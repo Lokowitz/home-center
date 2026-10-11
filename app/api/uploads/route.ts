@@ -8,8 +8,12 @@ import { resolveUploadPath } from "@/lib/upload-path"
 import { maxUploadBytes, oversizedBody } from "@/lib/upload-limits"
 import { extensionForFilename, UPLOAD_TYPES } from "@/lib/upload-types"
 import { enqueueDocument } from "@/lib/documents/indexer-server"
+import { loadFeatures } from "@/lib/features-server"
+import { loadDocumentSettings } from "@/lib/documents/settings"
+import { processInboxItem } from "@/lib/capture-server"
+import type { AssetType } from "@/app/generated/prisma/client"
 
-const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION"] as const
+const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX"] as const
 type RecordType = (typeof RECORD_TYPES)[number]
 
 function isRecordType(v: string | null): v is RecordType {
@@ -18,7 +22,7 @@ function isRecordType(v: string | null): v is RecordType {
 
 // The record must exist before anything touches the disk: the id becomes a
 // directory name, and a made-up id must not be able to create one.
-async function recordExists(type: RecordType, id: string): Promise<boolean> {
+async function recordExists(type: Exclude<RecordType, "DOCUMENT">, id: string): Promise<boolean> {
   const where = { where: { id }, select: { id: true } } as const
   if (type === "SERVICE") return !!(await prisma.serviceRecord.findUnique(where))
   if (type === "WARRANTY") return !!(await prisma.warranty.findUnique(where))
@@ -28,7 +32,26 @@ async function recordExists(type: RecordType, id: string): Promise<boolean> {
   if (type === "MEDICATION") return !!(await prisma.medication.findUnique(where))
   if (type === "ALLERGY") return !!(await prisma.allergy.findUnique(where))
   if (type === "IMMUNIZATION") return !!(await prisma.immunization.findUnique(where))
+  // Any signed-in member of the household may add to the shared inbox.
+  if (type === "INBOX") return !!(await prisma.inboxItem.findUnique(where))
   return !!(await prisma.insurancePolicy.findUnique(where))
+}
+
+// A document's recordId is the asset's own id. Ids are cuids, unique across
+// tables, so whichever asset table holds it says what kind of asset it is.
+async function documentAssetType(id: string): Promise<AssetType | null> {
+  const where = { where: { id }, select: { id: true } } as const
+  const [property, vehicle, equipment, person] = await Promise.all([
+    prisma.property.findUnique(where),
+    prisma.vehicle.findUnique(where),
+    prisma.equipment.findUnique(where),
+    prisma.person.findUnique(where),
+  ])
+  if (property) return "PROPERTY"
+  if (vehicle) return "VEHICLE"
+  if (equipment) return "EQUIPMENT"
+  if (person && (await loadFeatures()).health) return "PERSON"
+  return null
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +76,8 @@ export async function POST(request: NextRequest) {
   if (!ext) {
     return NextResponse.json({ error: "File type not allowed." }, { status: 400 })
   }
-  if (!(await recordExists(recordType, recordId))) {
+  const documentOn = recordType === "DOCUMENT" ? await documentAssetType(recordId) : null
+  if (recordType === "DOCUMENT" ? !documentOn : !(await recordExists(recordType, recordId))) {
     return NextResponse.json({ error: "Record not found" }, { status: 404 })
   }
 
@@ -79,11 +103,17 @@ export async function POST(request: NextRequest) {
       medicationId: recordType === "MEDICATION" ? recordId : null,
       allergyId: recordType === "ALLERGY" ? recordId : null,
       immunizationId: recordType === "IMMUNIZATION" ? recordId : null,
+      assetType: documentOn,
+      assetId: recordType === "DOCUMENT" ? recordId : null,
+      inboxItemId: recordType === "INBOX" ? recordId : null,
       // Every upload is indexed in the background; the response doesn't wait.
       text: { create: {} },
     },
   })
 
   enqueueDocument(attachment.id)
+  // With indexing off nothing will read the file, so the item is settled now
+  // (ready to file by hand) instead of waiting forever.
+  if (recordType === "INBOX" && !(await loadDocumentSettings()).indexingEnabled) await processInboxItem(recordId)
   return NextResponse.json({ attachment })
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { DropPageAsset } from "@/components/drop/drop-provider"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -6,6 +7,7 @@ import { Calendar, Gauge, Palette, Download, Factory, Tag, Fingerprint, FileText
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { VehicleEditButton } from "@/components/vehicles/vehicle-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
@@ -23,14 +25,17 @@ export default async function VehicleDetailPage({
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, documents] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
-    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "VEHICLE", isActive: true }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
+    prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
+    prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "VEHICLE", assetId: id }, orderBy: { uploadedAt: "asc" } }),
   ])
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+      {/* Files dropped anywhere on this page go to Intake for this vehicle. */}
+      <DropPageAsset assetType="VEHICLE" assetId={id} name={vehicle.name} />
       <aside className="space-y-4 lg:w-72 lg:shrink-0">
         <AssetImageUploader assetType="VEHICLE" assetId={id} imageFilename={vehicle.imageFilename} alt={vehicle.name} />
 
@@ -85,15 +90,19 @@ export default async function VehicleDetailPage({
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
             <TabsTrigger value="maintenance">Maintenance Reminders ({maintenanceSchedules.length})</TabsTrigger>
+            <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="VEHICLE" meterUnit={vehicle.meterUnit} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="VEHICLE" meterUnit={vehicle.meterUnit} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="VEHICLE" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
             <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="VEHICLE" currentMileage={vehicle.currentMileage} meterUnit={vehicle.meterUnit} openId={tab === "maintenance" ? open : undefined} />
+          </TabsContent>
+          <TabsContent value="documents" className="mt-4">
+            <AssetDocuments assetId={id} documents={documents} hint="Title, registration, owner's manual: files for the vehicle itself, not one service." />
           </TabsContent>
         </Tabs>
       </div>

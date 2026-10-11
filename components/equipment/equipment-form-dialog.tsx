@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -14,6 +15,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { createEquipment, updateEquipment } from "@/lib/actions/equipment"
 import { EQUIPMENT_CATEGORIES, categoryLabel } from "./categories"
 import type { Equipment, EquipmentCategory } from "@/app/generated/prisma/client"
+import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 
 // Base UI Select has no empty-string option, so "unassigned" needs a sentinel.
 const NO_PROPERTY = "__none__"
@@ -51,6 +53,7 @@ const EMPTY: FormValues = {
 }
 
 export function EquipmentFormDialog({ open, onClose, equipment, properties }: Props) {
+  const router = useRouter()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: EMPTY,
@@ -76,7 +79,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
     )
   }, [equipment, open, form])
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
     const payload = {
       ...values,
       propertyId: values.propertyId === NO_PROPERTY ? "" : values.propertyId,
@@ -92,6 +95,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
     }
     toast.success(equipment ? "Equipment updated." : "Equipment added.")
     onClose()
+    if (then === "reminders" && result && "id" in result && typeof result.id === "string") router.push(remindersHref("EQUIPMENT", result.id))
   }
 
   return (
@@ -102,7 +106,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((v) => onSubmit(v))} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
@@ -210,6 +214,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              {!equipment && <AddRemindersSubmit pending={form.formState.isSubmitting} onClick={form.handleSubmit((v) => onSubmit(v, "reminders"))} />}
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Saving…" : equipment ? "Save Changes" : "Add Equipment"}
               </Button>

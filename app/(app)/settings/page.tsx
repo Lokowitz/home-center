@@ -9,9 +9,14 @@ import { MailSettings } from "@/components/settings/mail-settings"
 import { LlmSettings } from "@/components/settings/llm-settings"
 import { loadMailConfig, SETTINGS_ID } from "@/lib/notifications/mail-config"
 import { isMailConfigured } from "@/lib/notifications/mailer"
-import { loadLlmConfig } from "@/lib/llm/config"
+import { loadLlmConfig, loadLlmStatus } from "@/lib/llm/config"
+import { cookies } from "next/headers"
+import { PLACEMENTS, readPlacement } from "@/lib/placement"
+import { PlacementSettings } from "@/components/settings/placement-settings"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DocumentSettings } from "@/components/settings/document-settings"
+import { CaptureSettings } from "@/components/settings/capture-settings"
+import { loadCaptureParser } from "@/lib/capture-server"
 import { loadDocumentSettings } from "@/lib/documents/settings"
 import { documentIndexStats } from "@/lib/documents/indexer-server"
 import { loadModelStatus } from "@/lib/documents/embed/server"
@@ -37,7 +42,7 @@ export default async function SettingsPage({
   // gating the whole page on ADMIN would leave ordinary users unable to turn
   // their own mail off. resolveSection keeps the admin-only sections from
   // non-admins, and only the open section's data is loaded.
-  const [me, users, recipients, mail, storedMail, llm, docs, features] = await Promise.all([
+  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
@@ -58,6 +63,17 @@ export default async function SettingsPage({
         ? loadDocumentSettings().then((d) => [d, null, null] as const)
         : Promise.resolve(null),
     is("features") || is("assistant") ? loadFeatures() : Promise.resolve(null),
+    is("documents")
+      ? Promise.all([loadCaptureParser(), loadLlmConfig()]).then(([mode, c]) => ({ mode, llmReady: isLlmReady(c) }))
+      : Promise.resolve(null),
+    is("appearance")
+      ? Promise.all([loadLlmStatus(), cookies()]).then(([s, jar]) => ({
+          assistant: readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value),
+          intake: readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value),
+          // Same rule as the layout.
+          assistantShown: !s.hidden && (s.available || isAdmin),
+        }))
+      : Promise.resolve(null),
   ])
   // A signed-in session whose user row is gone — the demo seeder wipes users,
   // so a cookie from before it survives the account it points at. Redirecting
@@ -83,7 +99,8 @@ export default async function SettingsPage({
         <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)]">
+      {/* One shrinkable column on phones: an implicit auto column grew to the tab strip's width and pushed the page sideways. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)]">
         {sections.length > 1 && (
           <aside className="md:sticky md:top-0 md:self-start">
             <SettingsNav sections={sections} active={section.id} />
@@ -104,7 +121,27 @@ export default async function SettingsPage({
             </div>
           )}
 
-          {is("features") && features && <FeatureSettings initial={{ healthEnabled: features.health }} />}
+          {is("appearance") && appearance && (
+            <div className="space-y-6">
+              <PlacementSettings
+                prefKey="intake"
+                title="Intake"
+                description="Where Intake, with its count of receipts to review, sits. Saved for this browser only."
+                initial={appearance.intake}
+              />
+              <PlacementSettings
+                prefKey="assistant"
+                title="Assistant button"
+                description={
+                  "Where the button that opens the assistant sits. Saved for this browser only." +
+                  (appearance.assistantShown ? "" : " The assistant is currently hidden, so neither shows.")
+                }
+                initial={appearance.assistant}
+              />
+            </div>
+          )}
+
+          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health }} />}
 
           {is("mail") && mail && (
             <MailSettings
@@ -153,15 +190,18 @@ export default async function SettingsPage({
           )}
 
           {is("documents") && docs && docs[1] !== null && docs[2] !== null && (
-            <DocumentSettings
-              initial={{
-                indexingEnabled: docs[0].indexingEnabled,
-                ocrEnabled: docs[0].ocrEnabled,
-                semanticEnabled: docs[0].semanticEnabled,
-              }}
-              stats={docs[1]}
-              models={docs[2]}
-            />
+            <div className="space-y-6">
+              <DocumentSettings
+                initial={{
+                  indexingEnabled: docs[0].indexingEnabled,
+                  ocrEnabled: docs[0].ocrEnabled,
+                  semanticEnabled: docs[0].semanticEnabled,
+                }}
+                stats={docs[1]}
+                models={docs[2]}
+              />
+              {capture && <CaptureSettings initial={capture.mode} llmReady={capture.llmReady} />}
+            </div>
           )}
 
           {is("users") && <UserManagement users={users} currentUserId={session.user.id} />}

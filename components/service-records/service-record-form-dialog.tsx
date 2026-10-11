@@ -8,6 +8,8 @@ import { z } from "zod"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useDropTarget } from "@/components/drop/drop-provider"
+import { maybeShowReceiptTip } from "@/components/tips/record-receipt-tip"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
@@ -15,9 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createServiceRecord, updateServiceRecord } from "@/lib/actions/service-records"
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { meterUnitNoun } from "@/lib/maintenance-due"
+import { matchingReminder } from "@/lib/maintenance-match"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { ASSET_TYPES } from "@/lib/assets"
-import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
+import { BellRing, Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
@@ -36,6 +39,7 @@ const schema = z.object({
   mileageAtService: z.string().optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
+  scheduleId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -56,6 +60,8 @@ interface Props {
   /** People only: the provider directory and this person's conditions. */
   providerOptions?: { id: string; name: string }[]
   conditionOptions?: { id: string; name: string }[]
+  /** Active reminders on this asset (and, on a property, its equipment). A new record can complete one. */
+  reminderOptions?: { id: string; title: string; assetType: AssetType; assetId: string }[]
 }
 
 function targetKey(assetType: AssetType, assetId: string) {
@@ -73,7 +79,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES", providerOptions, conditionOptions }: Props) {
+export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES", providerOptions, conditionOptions, reminderOptions = [] }: Props) {
   const isPerson = assetType === "PERSON"
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
@@ -99,9 +105,17 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       assetId, assetType,
       date: new Date().toISOString().split("T")[0],
       title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "",
-      providerId: "", conditionId: "",
+      providerId: "", conditionId: "", scheduleId: "",
     },
   })
+
+  const targetType = form.watch("assetType")
+  const targetId = form.watch("assetId")
+  const targetReminders = reminderOptions.filter((r) => r.assetType === targetType && r.assetId === targetId)
+  // A new record whose title reads like an open reminder offers to complete it; never picked on its own.
+  const titleValue = form.watch("title")
+  const scheduleValue = form.watch("scheduleId")
+  const suggested = !record && !createdRecordId && !scheduleValue ? matchingReminder(titleValue ?? "", targetReminders) : null
 
   useEffect(() => {
     if (record) {
@@ -116,9 +130,10 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
         mileageAtService: record.mileageAtService?.toString() ?? "",
         providerId: record.providerId ?? "",
         conditionId: record.conditionId ?? "",
+        scheduleId: "",
       })
     } else {
-      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "" })
+      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", scheduleId: "" })
     }
   }, [record, open, form, assetId, assetType])
 
@@ -128,6 +143,13 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
     setStagedFiles((prev) => [...prev, ...Array.from(files)])
     if (inputRef.current) inputRef.current.value = ""
   }
+
+  // A file dropped anywhere while this is open joins the files staged above.
+  useDropTarget({
+    label: "Add to this record's files",
+    onFiles: (files) => setStagedFiles((prev) => [...prev, ...files]),
+    enabled: open,
+  })
 
   function removeStagedFile(index: number) {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index))
@@ -149,6 +171,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       category: values.category === NO_CATEGORY ? "" : values.category,
       providerId: values.providerId === NO_LINK ? "" : values.providerId,
       conditionId: values.conditionId === NO_LINK ? "" : values.conditionId,
+      // Only a new record completes a reminder; the edit path ignores it.
+      scheduleId: (record?.id ?? createdRecordId) ? "" : values.scheduleId,
     } as unknown as Parameters<typeof createServiceRecord>[0]
     const existingId = record?.id ?? createdRecordId
     const result = existingId
@@ -188,7 +212,10 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       }
     }
 
-    toast.success(record ? "Record updated." : isPerson ? "Visit added." : "Service record added.")
+    const completed = !existingId && values.scheduleId ? reminderOptions.find((r) => r.id === values.scheduleId) : undefined
+    toast.success(record ? "Record updated." : completed ? `Service record added. "${completed.title}" marked complete.` : isPerson ? "Visit added." : "Service record added.")
+    // Saved without a receipt: once, point at dropping it on the page next time.
+    maybeShowReceiptTip(stagedFiles.length > 0, { isNew: !existingId })
     router.refresh()
     handleClose()
   }
@@ -218,6 +245,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                     const [type, ...rest] = value.split(":")
                     form.setValue("assetType", type as FormValues["assetType"])
                     form.setValue("assetId", rest.join(":"))
+                    form.setValue("scheduleId", "")
                   }}
                 >
                   <FormControl>
@@ -237,6 +265,34 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               </FormItem>
             )}
 
+            {!record && targetReminders.length > 0 && (
+              <FormField control={form.control} name="scheduleId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Completes reminder</FormLabel>
+                  <Select
+                    value={field.value || NO_LINK}
+                    onValueChange={(v) => {
+                      const id = !v || v === NO_LINK ? "" : v
+                      field.onChange(id)
+                      const reminder = targetReminders.find((r) => r.id === id)
+                      if (reminder && !form.getValues("title")) form.setValue("title", reminder.title)
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>{(v: string) => targetReminders.find((r) => r.id === v)?.title ?? "None"}</SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_LINK}>None</SelectItem>
+                      {targetReminders.map((r) => <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem>
@@ -251,6 +307,21 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                   <FormLabel>Title *</FormLabel>
                   <FormControl><Input placeholder={isPerson ? "Annual physical" : "Oil Change"} {...field} /></FormControl>
                   <FormMessage />
+                  {suggested && (
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
+                      <BellRing className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span>Looks like the reminder &ldquo;{suggested.title}&rdquo;.</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => form.setValue("scheduleId", suggested.id, { shouldDirty: true })}
+                      >
+                        Mark it complete
+                      </Button>
+                    </p>
+                  )}
                 </FormItem>
               )} />
 

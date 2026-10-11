@@ -95,10 +95,46 @@ export function dueBadge(due: Due, hasSchedule: boolean) {
  */
 export function dueCandidateFilter(withinDays: number, now: Date = new Date()) {
   return {
-    isActive: true,
-    OR: [
-      { nextDueDate: { lte: new Date(now.getTime() + withinDays * 86400000) } },
-      { nextDueMileage: { not: null } },
-    ],
+    ...awakeFilter(now),
+    AND: [{
+      OR: [
+        { nextDueDate: { lte: new Date(now.getTime() + withinDays * 86400000) } },
+        { nextDueMileage: { not: null } },
+      ],
+    }],
   }
+}
+
+/** Active and not snoozed: the reminders that should be raised right now. */
+export function awakeFilter(now: Date = new Date()) {
+  return {
+    isActive: true,
+    OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
+  }
+}
+
+export function isSnoozed(s: { snoozedUntil: Date | null }, now: Date = new Date()) {
+  return s.snoozedUntil != null && new Date(s.snoozedUntil) > now
+}
+
+export const SNOOZE_OPTIONS = [
+  { value: "1d", label: "1 day" },
+  { value: "1w", label: "1 week" },
+  { value: "1m", label: "1 month" },
+] as const
+
+export type SnoozeFor = (typeof SNOOZE_OPTIONS)[number]["value"]
+
+/** When a snooze chosen at `now` ends. A month is a calendar month, clamped to its last day. */
+export function snoozeEnd(choice: SnoozeFor, now: Date = new Date()): Date {
+  const end = new Date(now)
+  if (choice === "1d") end.setDate(end.getDate() + 1)
+  else if (choice === "1w") end.setDate(end.getDate() + 7)
+  else {
+    const day = end.getDate()
+    end.setDate(1)
+    end.setMonth(end.getMonth() + 1)
+    end.setDate(Math.min(day, new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate()))
+  }
+  return end
 }

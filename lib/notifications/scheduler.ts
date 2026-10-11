@@ -1,4 +1,5 @@
 import { checkAndNotify } from "./checker"
+import { nudgeIntake } from "./intake-nudge-server"
 import { sendPendingDigests } from "./digest"
 import { pruneOldNotifications } from "./retention"
 
@@ -40,7 +41,7 @@ async function runOnce(trigger: string) {
   running = true
   const startedAt = Date.now()
   try {
-    const created = await checkAndNotify()
+    const created = (await checkAndNotify()) + (await nudgeIntake())
     // Runs every pass, not just when something was created: a digest the user
     // wasn't due for last time may be due now, and a failed send needs a retry.
     const emailed = await sendPendingDigests()

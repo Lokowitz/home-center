@@ -7,7 +7,7 @@ const INTERNAL_LINK = /\[([^\]]*)\]\((\/[^)\s]*)\)/g
 
 /** Pages that exist whatever the data; linking them needs no lookup. */
 const FIXED_PAGES = new Set([
-  "/", "/chat", "/costs", "/maintenance", "/warranties", "/records", "/insurance", "/providers", "/notifications", "/settings",
+  "/", "/chat", "/costs", "/maintenance", "/warranties", "/records", "/insurance", "/providers", "/notifications", "/settings", "/intake",
   "/assets/properties", "/assets/vehicles", "/assets/equipment", "/assets/people",
 ])
 

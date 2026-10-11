@@ -1,10 +1,8 @@
 import type { Metadata } from "next"
-import { Poppins, Open_Sans } from "next/font/google"
 import { Home, SearchX } from "lucide-react"
+import Link from "next/link"
+import { fontVariables } from "./fonts"
 import "./globals.css"
-
-const openSans = Open_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-open-sans" })
-const poppins = Poppins({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-poppins" })
 
 export const metadata: Metadata = {
   title: "Not Found — HomeCenter",
@@ -13,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function GlobalNotFound() {
   return (
-    <html lang="en" className={`${openSans.variable} ${poppins.variable} h-full antialiased`}>
+    <html lang="en" className={`${fontVariables} h-full antialiased`}>
       <body className="min-h-full bg-muted/40 text-foreground">
         <div className="min-h-svh flex items-center justify-center p-4">
           <div className="w-full max-w-sm space-y-6 text-center">
@@ -29,9 +27,9 @@ export default function GlobalNotFound() {
               <p className="text-sm text-muted-foreground mt-1">
                 The page you&apos;re looking for doesn&apos;t exist or may have been moved.
               </p>
-              <a href="/" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 transition-colors mt-5">
+              <Link href="/" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/80 transition-colors mt-5">
                 Back to Dashboard
-              </a>
+              </Link>
             </div>
           </div>
         </div>

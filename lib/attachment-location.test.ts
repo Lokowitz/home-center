@@ -3,7 +3,7 @@ import { attachmentDir } from "./attachment-location"
 
 const base = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null,
-  insurancePolicyId: null, observationId: null, medicationId: null, allergyId: null, immunizationId: null,
+  insurancePolicyId: null, observationId: null, medicationId: null, allergyId: null, immunizationId: null, assetId: null, inboxItemId: null,
 }
 
 describe("attachmentDir", () => {
@@ -30,5 +30,15 @@ describe("attachmentDir", () => {
     expect(attachmentDir({ ...base, recordType: "MEDICATION", medicationId: "m1" })).toEqual(["medication", "m1"])
     expect(attachmentDir({ ...base, recordType: "ALLERGY", allergyId: "a1" })).toEqual(["allergy", "a1"])
     expect(attachmentDir({ ...base, recordType: "IMMUNIZATION", immunizationId: "i1" })).toEqual(["immunization", "i1"])
+  })
+
+  it("locates documents filed on the asset itself", () => {
+    expect(attachmentDir({ ...base, recordType: "DOCUMENT", assetId: "v1" })).toEqual(["document", "v1"])
+    expect(attachmentDir({ ...base, recordType: "DOCUMENT", serviceRecordId: "s1" })).toBeNull()
+  })
+
+  it("locates files waiting in the capture inbox", () => {
+    expect(attachmentDir({ ...base, recordType: "INBOX", inboxItemId: "x1" })).toEqual(["inbox", "x1"])
+    expect(attachmentDir({ ...base, recordType: "INBOX", assetId: "v1" })).toBeNull()
   })
 })

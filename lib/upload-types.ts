@@ -26,6 +26,19 @@ export const UPLOAD_TYPES: Record<string, string> = {
   ".numbers": "application/x-iwork-numbers-sffnumbers",
   ".key": "application/x-iwork-keynote-sffkey",
   ".zip": "application/zip",
+  ".msg": "application/vnd.ms-outlook",
+  ".eml": "message/rfc822",
+  ".md": "text/markdown",
+  ".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+  ".odg": "application/vnd.oasis.opendocument.graphics",
+  ".epub": "application/epub+zip",
+  ".gif": "image/gif",
+  ".bmp": "image/bmp",
+  ".tif": "image/tiff",
+  ".tiff": "image/tiff",
+  ".7z": "application/x-7z-compressed",
+  ".rar": "application/vnd.rar",
+  ".gz": "application/gzip",
 }
 
 export function extensionForFilename(name: string): string | null {

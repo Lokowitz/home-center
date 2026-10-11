@@ -6,7 +6,10 @@ import { ExtractError, type Extracted } from "./types"
 
 type Row = { job: Job; result?: SaveResult; text?: string }
 
-function setup(opts: { enabled?: boolean; ocr?: boolean; outcomes?: Record<string, Extracted | Error>; semantic?: boolean } = {}) {
+function setup(opts: {
+  enabled?: boolean; ocr?: boolean; outcomes?: Record<string, Extracted | Error>; semantic?: boolean
+  processed?: (job: Job, status: SaveResult["status"]) => Promise<void>
+} = {}) {
   const settings = { indexingEnabled: opts.enabled ?? true, ocrEnabled: opts.ocr ?? true }
   const rows = new Map<string, Row>()
   const add = (id: string, over: Partial<Job> = {}) =>
@@ -118,7 +121,7 @@ function setup(opts: { enabled?: boolean; ocr?: boolean; outcomes?: Record<strin
   const semantic = opts.semantic
     ? { begin: vi.fn(async (): Promise<SemanticSession | null> => ({ key: "m@1", embed, stillActive: async () => true, end: ended })) }
     : undefined
-  const indexer = createIndexer({ store, index: async () => index, extract, idle: idleHook, log, semantic })
+  const indexer = createIndexer({ store, index: async () => index, extract, idle: idleHook, log, semantic, processed: opts.processed })
   return { settings, rows, add, chunks, replaceFails, extract, idleHook, log, indexer, vectors, embed, ended, semantic, embedCalls, index, entityVectors }
 }
 
@@ -357,5 +360,33 @@ describe("indexer", () => {
     t.indexer.enqueue("a")
     await t.indexer.idle()
     expect(t.rows.get("b")!.result?.status).toBe("DONE")
+  })
+
+  it("tells the processed hook about every saved result, after the save", async () => {
+    const seen: string[] = []
+    const t = setup({
+      outcomes: { bad: new ExtractError("Password-protected PDF"), none: { kind: "unsupported" } },
+      processed: async (job, status) => {
+        seen.push(`${job.attachmentId}:${job.recordType}:${status}:${t.rows.get(job.attachmentId)!.result?.status}`)
+      },
+    })
+    t.add("ok", { recordType: "INBOX" })
+    t.add("bad")
+    t.add("none")
+    t.add("lost", { filePath: null })
+    for (const id of ["ok", "bad", "none", "lost"]) t.indexer.enqueue(id)
+    await t.indexer.idle()
+    expect(seen).toEqual(["ok:INBOX:DONE:DONE", "bad:SERVICE:FAILED:FAILED", "none:SERVICE:UNSUPPORTED:UNSUPPORTED", "lost:SERVICE:FAILED:FAILED"])
+  })
+
+  it("logs a failing processed hook and carries on", async () => {
+    const t = setup({ processed: async () => { throw new Error("parse blew up") } })
+    t.add("a")
+    t.add("b")
+    t.indexer.enqueue("a")
+    t.indexer.enqueue("b")
+    await t.indexer.idle()
+    expect(t.rows.get("b")!.result?.status).toBe("DONE")
+    expect(t.log.error).toHaveBeenCalledTimes(2)
   })
 })

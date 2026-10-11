@@ -5,7 +5,7 @@ import { assetHref } from "@/lib/assets"
 import { loadReport } from "@/lib/report-server"
 import { loadCostRecords } from "@/lib/costs-server"
 import { cents, sum } from "@/lib/costs"
-import { scheduleDue } from "@/lib/maintenance-due"
+import { isSnoozed, scheduleDue } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import {
   daysUntil, HEALTH_WINDOWS, immunizationDue, insuranceExpiring, isSupersededImmunization, refillDue,
@@ -328,7 +328,8 @@ export const maintenanceStatusTool = defineTool({
   name: "maintenance_status",
   description:
     "Maintenance and checkup schedules with their due state (overdue, due_soon, ok), including mileage/hour-based due for vehicles. " +
-    "Use for 'what's due', 'what's overdue', 'when is the next oil change'. For a property, the equipment installed there is included.",
+    "Use for 'what's due', 'what's overdue', 'when is the next oil change'. For a property, the equipment installed there is included. " +
+    "snoozedUntil is set when someone has put a reminder off until then; paused reminders are left out.",
   schema: z.object({
     status: z.enum(["overdue", "due_soon", "all"]).optional().describe("Default all."),
     assetType: z.string().optional().describe("Only this kind: PROPERTY, VEHICLE, EQUIPMENT or PERSON."),
@@ -376,6 +377,7 @@ export const maintenanceStatusTool = defineTool({
           lastCompletedDate: dayOrNull(s.lastCompletedDate),
           intervalDays: s.intervalDays,
           intervalMeter: s.intervalMiles,
+          snoozedUntil: isSnoozed(s, ctx.now) ? dayOrNull(s.snoozedUntil) : null,
           href: assetHref(s.assetType, s.assetId),
         })
       )

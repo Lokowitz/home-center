@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -13,6 +14,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createVehicle, updateVehicle } from "@/lib/actions/vehicles"
 import { meterUnitNoun } from "@/lib/maintenance-due"
+import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 import type { Vehicle } from "@/app/generated/prisma/client"
 
 const METER_UNIT_LABELS: Record<string, string> = { MILES: "Miles", HOURS: "Hours" }
@@ -40,6 +42,7 @@ interface Props {
 }
 
 export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
+  const router = useRouter()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -71,7 +74,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
     }
   }, [vehicle, open, form])
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
     const result = vehicle
       ? await updateVehicle(vehicle.id, values as unknown as Parameters<typeof updateVehicle>[1])
       : await createVehicle(values as unknown as Parameters<typeof createVehicle>[0])
@@ -82,6 +85,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
     }
     toast.success(vehicle ? "Vehicle updated." : "Vehicle added.")
     onClose()
+    if (then === "reminders" && result && "id" in result && typeof result.id === "string") router.push(remindersHref("VEHICLE", result.id))
   }
 
   return (
@@ -92,7 +96,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((v) => onSubmit(v))} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
@@ -191,6 +195,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              {!vehicle && <AddRemindersSubmit pending={form.formState.isSubmitting} onClick={form.handleSubmit((v) => onSubmit(v, "reminders"))} />}
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Saving…" : vehicle ? "Save Changes" : "Add Vehicle"}
               </Button>

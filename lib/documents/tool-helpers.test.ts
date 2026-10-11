@@ -58,7 +58,7 @@ describe("record type rules", () => {
   it("hides exactly the five health types unless health documents are on", () => {
     expect(hiddenRecordTypes(false)).toEqual(["CONDITION", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION"])
     expect(hiddenRecordTypes(true)).toEqual([])
-    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE"])
+    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE", "DOCUMENT", "INBOX"])
   })
 
   it("accepts the loose names models use", () => {
@@ -67,6 +67,9 @@ describe("record type rules", () => {
     expect(toRecordType("insurance_policy", false)).toBe("INSURANCE")
     expect(toRecordType("vaccines", true)).toBe("IMMUNIZATION")
     expect(toRecordType("ALLERGY", true)).toBe("ALLERGY")
+    expect(toRecordType("intake", false)).toBe("INBOX")
+    expect(toRecordType("Intake items", false)).toBe("INBOX")
+    expect(toRecordType("inbox", false)).toBe("INBOX")
   })
 
   it("rejects unknown types and health types while they're hidden, listing what's allowed", () => {

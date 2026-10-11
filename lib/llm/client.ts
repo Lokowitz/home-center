@@ -36,6 +36,7 @@ function hostOf(baseUrl: string) {
 
 type JsonCompletion = {
   choices?: {
+    finish_reason?: string | null
     message?: {
       content?: string | null
       tool_calls?: { id?: string; function: { name: string; arguments?: string } }[]
@@ -120,6 +121,7 @@ export function createChatClient(config: ClientConfig, fetchImpl: typeof fetch =
           name: c.function.name,
           arguments: c.function.arguments ?? "",
         })),
+        ...(data.choices?.[0]?.finish_reason ? { finishReason: data.choices[0].finish_reason } : {}),
       }
       return result
     }

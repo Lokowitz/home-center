@@ -32,6 +32,14 @@ async function run(kind: ExtractKind, ext: string, data: Buffer, opts: { ocr: bo
       return { kind: "text", method: "TEXT", pages: await (await import("./office")).extractOffice(data, ext) }
     case "doc":
       return { kind: "text", method: "TEXT", pages: await (await import("./office")).extractDoc(data) }
+    case "eml":
+      return { kind: "text", method: "TEXT", pages: await (await import("./mail")).extractEml(data) }
+    case "msg":
+      return { kind: "text", method: "TEXT", pages: await (await import("./mail")).extractMsg(data) }
+    case "sheet":
+      return { kind: "text", method: "TEXT", pages: await (await import("./mail")).extractSheet(data) }
+    case "ppt":
+      return { kind: "text", method: "TEXT", pages: await (await import("./mail")).extractPpt(data) }
     case "text":
       return { kind: "text", method: "TEXT", pages: [decodeText(data)] }
     case "rtf":

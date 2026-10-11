@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useDropTarget } from "@/components/drop/drop-provider"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -93,6 +94,13 @@ export function EntityFormDialog({ open, onClose, title, submitLabel, successMes
     setStagedFiles((prev) => [...prev, ...Array.from(files)])
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
+
+  // A file dropped anywhere while this is open joins the files staged above.
+  useDropTarget({
+    label: "Add to this record's files",
+    onFiles: (files) => setStagedFiles((prev) => [...prev, ...files]),
+    enabled: open && !!attachmentRecordType,
+  })
 
   function removeStagedFile(index: number) {
     setStagedFiles((prev) => prev.filter((_, i) => i !== index))

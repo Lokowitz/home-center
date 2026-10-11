@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +38,7 @@ const COLUMNS: EntityColumn<MedicationRow>[] = [
       </div>
     ),
   },
+  { key: "started", label: "Started", className: "whitespace-nowrap text-muted-foreground", cell: (m) => formatDay(m.startDate) },
   { key: "for", label: "For", className: "text-muted-foreground", cell: (m) => m.condition?.name ?? "—" },
   { key: "prescriber", label: "Prescriber", className: "text-muted-foreground", cell: (m) => m.prescriber?.name ?? "—" },
   { key: "refill", label: "Next refill", className: "whitespace-nowrap", cell: (m) => <RefillCell m={m} /> },
@@ -48,7 +49,8 @@ const PAST_COLUMNS: EntityColumn<MedicationRow>[] = [
   COLUMNS[0],
   COLUMNS[1],
   { key: "ended", label: "Stopped", className: "whitespace-nowrap text-muted-foreground", cell: (m) => formatDay(m.endDate) },
-  { key: "files", label: "Files", cell: (m) => <AttachmentCount attachments={m.attachments} /> },
+  COLUMNS[2],
+  COLUMNS[COLUMNS.length - 1],
 ]
 
 function initialFor(m: MedicationRow | null): FormValues {
@@ -79,11 +81,12 @@ export function MedicationsSection({ personId, medications, providers, condition
   const [editing, setEditing] = useState<MedicationRow | null>(null)
   const [open, setOpen] = useState(false)
 
-  useEffect(() => {
-    if (!openId) return
-    const match = medications.find((m) => m.id === openId)
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? medications.find((m) => m.id === openId) : undefined
     if (match) { setEditing(match); setOpen(true) }
-  }, [openId])
+  }
 
   const now = new Date()
   const active = medications.filter((m) => isMedicationActive(m, now))

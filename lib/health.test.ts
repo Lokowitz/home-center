@@ -111,6 +111,7 @@ describe("helpers", () => {
   })
   it("labels enum values and falls back to the raw value", () => {
     expect(labelFor(RELATIONSHIPS, "SPOUSE")).toBe("Spouse")
+    expect(labelFor(RELATIONSHIPS, "PET")).toBe("Pet")
     expect(labelFor(RELATIONSHIPS, "NOPE")).toBe("NOPE")
   })
 })

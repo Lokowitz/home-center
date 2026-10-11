@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useCallback, useEffect, useState } from "react"
+import { Fragment, useCallback, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { deleteServiceRecord } from "@/lib/actions/service-records"
 import { ServiceRecordFormDialog } from "./service-record-form-dialog"
+import { AddSplitButton } from "@/components/inbox/add-split-button"
+import { emptyStateCopy } from "@/lib/intake-ui"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
 import { SortableTableHead } from "@/components/ui/sortable-table-head"
@@ -42,10 +44,12 @@ interface Props {
   /** People only: the provider directory and this person's conditions. */
   providerOptions?: { id: string; name: string }[]
   conditionOptions?: { id: string; name: string }[]
+  /** Active reminders a new record can mark complete. */
+  reminders?: { id: string; title: string; assetType: AssetType; assetId: string }[]
   openId?: string
 }
 
-export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, openId }: Props) {
+export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
   const [records, setRecords] = useState(initialRecords)
@@ -59,10 +63,13 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
     setRecords(initialRecords)
   }
 
-  useEffect(() => {
-    if (!openId) return
-    if (initialRecords.some((r) => r.id === openId)) { setEditingId(openId); setDialogOpen(true) }
-  }, [openId])
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    // "new" opens a blank form: the Records page sends people here to add one.
+    if (openId === "new") { setEditingId(null); setDialogOpen(true) }
+    else if (openId && initialRecords.some((r) => r.id === openId)) { setEditingId(openId); setDialogOpen(true) }
+  }
 
   const table = useClientTable({
     rows: records,
@@ -96,12 +103,17 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
     <>
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-muted-foreground">{records.length} {isPerson ? "visit" : "record"}{records.length !== 1 ? "s" : ""}</p>
-        <Button size="sm" onClick={() => { setEditingId(null); setDialogOpen(true) }}>{isPerson ? "Add Visit" : "Add Service Record"}</Button>
+        <AddSplitButton
+          label={isPerson ? "Add visit" : "Add record"}
+          menuLabel={isPerson ? "More ways to add a visit" : "More ways to add a record"}
+          onAdd={() => { setEditingId(null); setDialogOpen(true) }}
+          asset={{ assetType, assetId }}
+        />
       </div>
 
       {records.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {isPerson ? "No visits yet." : "No service records yet."}
+          {emptyStateCopy(isPerson ? "visits" : "service")}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">
@@ -236,6 +248,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
         meterUnit={meterUnit}
         providerOptions={providerOptions}
         conditionOptions={conditionOptions}
+        reminderOptions={reminders}
       />
     </>
   )

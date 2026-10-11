@@ -36,7 +36,8 @@ describe("extractFile — native text", () => {
     const data = docx(["Replace the furnace filter every 90 days.", "Filter size 16x25x1."])
     expect((await pages("a.docx", data)).pages).toEqual(["Replace the furnace filter every 90 days.\nFilter size 16x25x1."])
     expect((await pages("a.dotx", data)).pages).toEqual(["Replace the furnace filter every 90 days.\nFilter size 16x25x1."])
-  })
+    // The first docx parse loads the parser cold; in a full parallel run that has passed 5s.
+  }, 60_000)
 
   it("reads xlsx as one titled page per sheet", async () => {
     const data = xlsx([{ name: "Parts", rows: [["Air filter", "16x25x1"]] }, { name: "Costs", rows: [["Total", "42"]] }])

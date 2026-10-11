@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest"
-import { describeAttachment, type AttachmentOwnerRow } from "./owner"
+import { assetRecordHref, describeAttachment, type AttachmentOwnerRow } from "./owner"
+
+describe("assetRecordHref", () => {
+  it("opens the record on its tab, or the person's page where there is no tab", () => {
+    expect(assetRecordHref("SERVICE", "s1", { assetType: "VEHICLE", assetId: "v1" })).toBe("/assets/vehicles/v1?tab=service&open=s1")
+    expect(assetRecordHref("SERVICE", "s1", { assetType: "PERSON", assetId: "p1" })).toBe("/assets/people/p1?tab=visits&open=s1")
+    expect(assetRecordHref("WARRANTY", "w1", { assetType: "EQUIPMENT", assetId: "e1" })).toBe("/assets/equipment/e1?tab=warranties&open=w1")
+    expect(assetRecordHref("WARRANTY", "w1", { assetType: "PERSON", assetId: "p1" })).toBe("/assets/people/p1")
+  })
+})
 
 const none = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null, insurancePolicyId: null,
-  observationId: null, medicationId: null, allergyId: null, immunizationId: null,
+  observationId: null, medicationId: null, allergyId: null, immunizationId: null, inboxItemId: null,
   serviceRecord: null, warranty: null, maintenanceSchedule: null, healthCondition: null, observation: null,
   medication: null, allergy: null, immunization: null, insurancePolicy: null,
 }
@@ -91,5 +100,15 @@ describe("describeAttachment", () => {
     const r = describeAttachment(row({ recordType: "SERVICE", serviceRecordId: null, serviceRecord: null }))
     expect(r.fileHref).toBeNull()
     expect(r.record).toEqual({ type: "service record", title: "(record not found)", href: null })
+  })
+
+  it("links an unfiled file to the Intake page, with no asset", () => {
+    expect(describeAttachment(row({ recordType: "INBOX", inboxItemId: "x1", originalName: "receipt.jpg" }))).toEqual({
+      attachmentId: "att1",
+      fileName: "receipt.jpg",
+      fileHref: "/api/files/inbox/x1/3f2a.pdf",
+      record: { type: "intake item", title: "receipt.jpg", href: "/intake" },
+      asset: null,
+    })
   })
 })

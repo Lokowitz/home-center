@@ -22,6 +22,23 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toMatch(/passwordHash/)
   })
 
+  it("describes the read-only intake tool and where filing happens", () => {
+    for (const health of [true, false]) {
+      const p = buildSystemPrompt({ now, health })
+      expect(p).toMatch(/^- intake lists/m)
+      expect(p).toContain("[Intake](/intake)")
+      expect(p).not.toContain("(/inbox)")
+      expect(p).toMatch(/can't file/i)
+    }
+  })
+
+  it("tells the model how files get into Intake", () => {
+    for (const health of [true, false]) {
+      const p = buildSystemPrompt({ now, health })
+      expect(p).toMatch(/^- To add files to Intake, the user can drag them onto any page or use the paperclip/m)
+    }
+  })
+
   it("appends admin instructions last", () => {
     const p = buildSystemPrompt({ now, extra: "Answer in Spanish." })
     expect(p.trimEnd().endsWith("Answer in Spanish.")).toBe(true)

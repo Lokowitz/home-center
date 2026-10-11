@@ -5,6 +5,11 @@ import path from "path"
 import { resolveUploadPath } from "@/lib/upload-path"
 import { UPLOAD_TYPES } from "@/lib/upload-types"
 import { loadFeatures } from "@/lib/features-server"
+import { prisma } from "@/lib/prisma"
+
+async function isPerson(id: string | undefined): Promise<boolean> {
+  return !!id && !!(await prisma.person.findUnique({ where: { id }, select: { id: true } }))
+}
 
 export async function GET(
   request: NextRequest,
@@ -14,8 +19,8 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { path: segments } = await params
-  // People's photos go with the rest of Health.
-  if (segments[0] === "people" && !(await loadFeatures()).health) {
+  // People's photos and documents go with the rest of Health.
+  if (!(await loadFeatures()).health && (segments[0] === "people" || (segments[0] === "document" && (await isPerson(segments[1]))))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
   let filePath: string

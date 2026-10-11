@@ -24,6 +24,7 @@ export function createSseParser(onData: (data: string) => void) {
 type DeltaChunk = {
   error?: { message?: string }
   choices?: {
+    finish_reason?: string | null
     delta?: {
       content?: string | null
       tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[]
@@ -38,6 +39,7 @@ type DeltaChunk = {
  */
 export function createDeltaAccumulator(onText: (text: string) => void) {
   let content = ""
+  let finishReason: string | undefined
   const calls: { id: string; name: string; arguments: string }[] = []
 
   return {
@@ -51,6 +53,7 @@ export function createDeltaAccumulator(onText: (text: string) => void) {
         return false
       }
       if (chunk.error) throw new LlmError(chunk.error.message ?? "The LLM provider reported an error.")
+      if (chunk.choices?.[0]?.finish_reason) finishReason = chunk.choices[0].finish_reason
       const delta = chunk.choices?.[0]?.delta
       if (!delta) return false
       if (delta.content) {
@@ -74,6 +77,7 @@ export function createDeltaAccumulator(onText: (text: string) => void) {
         toolCalls: calls
           .filter((c) => c && c.name)
           .map((c, i) => ({ id: c.id || `call_${i}`, name: c.name, arguments: c.arguments })),
+        ...(finishReason ? { finishReason } : {}),
       }
     },
   }

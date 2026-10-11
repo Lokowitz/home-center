@@ -1,25 +1,26 @@
 "use client"
 
-import { Fragment, useCallback, useEffect, useState } from "react"
+import { Fragment, useCallback, useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { ChevronDown, Pencil, Trash2, CheckCircle2, AlertTriangle, Clock } from "lucide-react"
-import { deleteMaintenanceSchedule, completeMaintenanceSchedule } from "@/lib/actions/maintenance"
+import { ChevronDown, Pencil, Trash2, CheckCircle2, AlertTriangle, Clock, Pause, Play, AlarmClockOff } from "lucide-react"
+import { deleteMaintenanceSchedule, setMaintenanceScheduleActive } from "@/lib/actions/maintenance"
 import { MaintenanceFormDialog } from "./maintenance-form-dialog"
+import { CompleteDialog } from "./complete-dialog"
+import { SnoozeMenu } from "./snooze-menu"
+import { remindersHref } from "./add-reminders-submit"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
 import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import { scheduleDue, dueBadge, meterUnitShort, meterUnitNoun, type MileageIndex } from "@/lib/maintenance-due"
+import { scheduleDue, dueBadge, isSnoozed, meterUnitShort, type MileageIndex } from "@/lib/maintenance-due"
 import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 type MaintenanceScheduleWithAttachments = MaintenanceSchedule & { attachments: Attachment[] }
@@ -52,6 +53,11 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
   const mileage: MileageIndex = new Map(
     currentMileage != null ? [[s.assetId, { value: currentMileage, unit: meterUnit }] as const] : []
   )
+  // Paused and snoozed say so first: whatever the due date, they're on hold.
+  if (!s.isActive) return { label: "Paused", variant: "outline" as const, icon: Pause }
+  if (isSnoozed(s)) {
+    return { label: `Snoozed to ${new Date(s.snoozedUntil!).toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
+  }
   const due = scheduleDue(s, mileage)
   const badge = dueBadge(due, s.nextDueDate != null || s.nextDueMileage != null)
   if (!badge) return null
@@ -59,7 +65,16 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
   return { ...badge, label: due.dueSoon ? "Due soon" : badge.label, icon }
 }
 
+// When the columns don't fit (a narrow window, the detail page's side column),
+// the table scrolls inside its card; the actions stay pinned to the right edge
+// so Complete and Snooze are never the part that's scrolled out of sight. Its
+// background must be opaque (the row hover tint, mixed onto the card) or the
+// scrolled cells would show through.
+const stickyActions =
+  "sticky right-0 z-[1] bg-card shadow-[-10px_0_10px_-10px_rgb(0_0_0/0.25)] [tr:hover_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))] [tr:has([aria-expanded=true])_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]"
+
 export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, openId }: Props) {
+  const router = useRouter()
   const [schedules, setSchedules] = useState(initialSchedules)
   const [prevInitialSchedules, setPrevInitialSchedules] = useState(initialSchedules)
   const [editing, setEditing] = useState<MaintenanceScheduleWithAttachments | null>(null)
@@ -67,11 +82,12 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
   const [completing, setCompleting] = useState<MaintenanceSchedule | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!openId) return
-    const match = initialSchedules.find((s) => s.id === openId)
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? initialSchedules.find((s) => s.id === openId) : undefined
     if (match) { setEditing(match); setFormOpen(true) }
-  }, [openId])
+  }
 
   if (initialSchedules !== prevInitialSchedules) {
     setPrevInitialSchedules(initialSchedules)
@@ -105,6 +121,13 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
     toast.success("Schedule deleted.")
   }
 
+  async function handleResume(s: MaintenanceScheduleWithAttachments) {
+    const result = await setMaintenanceScheduleActive(s.id, true)
+    if (!result || result.error) { toast.error("Something went wrong."); return }
+    toast.success(`"${s.title}" resumed.`)
+    router.refresh()
+  }
+
   return (
     <>
       <div className="flex items-center justify-between mb-4">
@@ -115,6 +138,14 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
       {schedules.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           No maintenance schedules yet.
+          {assetType !== "PERSON" && (
+            <>
+              {" "}
+              <Link href={remindersHref(assetType, assetId)} className="font-medium text-foreground underline-offset-4 hover:underline">
+                Add default reminders
+              </Link>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">
@@ -129,7 +160,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                 <TableHead>Interval</TableHead>
                 <SortableTableHead column="lastCompleted" label="Last Completed" sortState={table.sortState} onToggle={table.toggleSort} />
                 <TableHead>Files</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className={`text-right ${stickyActions}`}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -140,7 +171,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                 return (
                   <Fragment key={s.id}>
                   <TableRow
-                    className="cursor-pointer"
+                    className={`cursor-pointer ${s.isActive ? "" : "text-muted-foreground"}`}
                     onClick={() => { setEditing(s); setFormOpen(true) }}
                   >
                     <TableCell className="font-medium">{s.title}</TableCell>
@@ -191,12 +222,19 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <AttachmentCount attachments={s.attachments} onClick={() => setExpandedId(expanded ? null : s.id)} />
                     </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className={`text-right ${stickyActions}`} onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="outline" size="sm" className="h-7 text-xs px-2"
                           onClick={() => setCompleting(s)}>
                           Complete
                         </Button>
+                        {s.isActive ? (
+                          <SnoozeMenu schedule={s} />
+                        ) : (
+                          <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => handleResume(s)}>
+                            <Play className="h-3.5 w-3.5" /> Resume
+                          </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Edit "${s.title}"`}
                           onClick={() => { setEditing(s); setFormOpen(true) }}>
                           <Pencil className="h-3.5 w-3.5" />
@@ -253,62 +291,11 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
       {completing && (
         <CompleteDialog
           schedule={completing}
-          assetType={assetType}
           currentMileage={currentMileage}
           meterUnit={meterUnit}
           onClose={() => setCompleting(null)}
         />
       )}
     </>
-  )
-}
-
-function CompleteDialog({ schedule, assetType, currentMileage, meterUnit, onClose }: {
-  schedule: MaintenanceSchedule
-  assetType: AssetType
-  currentMileage?: number | null
-  meterUnit: MeterUnit
-  onClose: () => void
-}) {
-  const { register, handleSubmit, formState: { isSubmitting } } = useForm({
-    defaultValues: {
-      completedDate: new Date().toISOString().split("T")[0],
-      completedMileage: currentMileage?.toString() ?? "",
-    },
-  })
-
-  async function onSubmit(values: { completedDate: string; completedMileage: string }) {
-    const result = await completeMaintenanceSchedule(schedule.id, values as Parameters<typeof completeMaintenanceSchedule>[1])
-    if (result?.error) { toast.error("Something went wrong."); return }
-    toast.success(`"${schedule.title}" marked complete.`)
-    onClose()
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Mark Complete: {schedule.title}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Completion Date</label>
-            <Input type="date" {...register("completedDate")} />
-          </div>
-          {assetType === "VEHICLE" && (
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">{meterUnitNoun(meterUnit)} at Completion</label>
-              <Input type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...register("completedMileage")} />
-            </div>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : "Mark Complete"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

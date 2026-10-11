@@ -25,11 +25,12 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 hover:bg-muted outline-none">
+      <DropdownMenuTrigger aria-label={`Account: ${name}`} className="flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-lg px-1.5 py-1.5 text-sm lg:min-h-0 lg:px-2 transition-colors duration-150 hover:bg-muted outline-none">
         <Avatar className="h-7 w-7">
           <AvatarFallback className="bg-primary/15 text-xs font-medium text-primary">{initials}</AvatarFallback>
         </Avatar>
-        <div className="text-left">
+        {/* Until there's room for the search box too, the avatar alone is the button; the name and email are in the menu. */}
+        <div className="hidden text-left lg:block">
           <div className="font-medium leading-none">{name}</div>
           <div className="text-xs text-muted-foreground leading-none mt-0.5">{email}</div>
         </div>
@@ -37,6 +38,10 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuGroup>
           <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <div className="px-2 pb-1.5 lg:hidden">
+            <div className="truncate text-sm font-medium">{name}</div>
+            <div className="truncate text-xs text-muted-foreground">{email}</div>
+          </div>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => router.push("/change-password")}>

@@ -24,6 +24,7 @@ export type AttachmentOwnerRow = AttachmentLocation & {
   allergy: ({ substance: string } & OnPerson) | null
   immunization: ({ vaccine: string } & OnPerson) | null
   insurancePolicy: { carrier: string } | null
+  assetType: AssetType | null
 }
 
 export type DocumentRef = {
@@ -62,6 +63,10 @@ function onAsset(kind: keyof typeof ASSET_TABS, recordId: string | null, title: 
     asset: { type: o.assetType, id: o.assetId },
   }
 }
+/** The page showing a service record or warranty, opened on it where its tab supports that. */
+export function assetRecordHref(kind: "SERVICE" | "WARRANTY", recordId: string, o: OnAsset): string {
+  return onAsset(kind, recordId, "", o).record.href ?? assetHref(o.assetType, o.assetId)
+}
 const onPerson = (type: string, title: string, personId: string, tab: string, openId?: string | null): Owner => ({
   record: { type, title, href: tabHref(assetHref("PERSON", personId), tab, openId) },
   asset: { type: "PERSON", id: personId },
@@ -93,6 +98,14 @@ function owner(a: AttachmentOwnerRow): Owner {
       return a.allergy ? onPerson("allergy", a.allergy.substance, a.allergy.personId, "allergies") : missing("allergy")
     case "IMMUNIZATION":
       return a.immunization ? onPerson("immunization", a.immunization.vaccine, a.immunization.personId, "immunizations", a.immunizationId) : missing("immunization")
+    case "DOCUMENT":
+      // Filed on the asset itself: the file is its own record.
+      return a.assetType && a.assetId
+        ? { record: { type: "document", title: a.originalName, href: tabHref(assetHref(a.assetType, a.assetId), "documents") }, asset: { type: a.assetType, id: a.assetId } }
+        : missing("document")
+    case "INBOX":
+      // Not filed yet: the Intake page is where it can be opened and filed.
+      return { record: { type: "intake item", title: a.originalName, href: "/intake" }, asset: null }
     case "INSURANCE":
       return a.insurancePolicy
         ? { record: { type: "insurance policy", title: a.insurancePolicy.carrier, href: "/insurance" }, asset: null }

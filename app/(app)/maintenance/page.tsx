@@ -3,12 +3,12 @@ import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { Suspense } from "react"
-import { AlertTriangle, Clock, CheckCircle2 } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle2, AlarmClockOff } from "lucide-react"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { assetHref, assetIcon } from "@/lib/assets"
 import { UrlSortHead, UrlPaginationBar } from "@/components/ui/url-table"
 import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/table-params"
-import { scheduleDue, dueBadge, meterUnitShort, type Due } from "@/lib/maintenance-due"
+import { scheduleDue, dueBadge, isSnoozed, meterUnitShort, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
@@ -30,7 +30,10 @@ const SORTABLE: SortMap<Prisma.MaintenanceScheduleOrderByWithRelationInput> = {
   status: (dir) => [{ nextDueDate: { sort: dir, nulls: "last" } }],
 }
 
-function statusOf(due: Due) {
+function statusOf(due: Due, snoozedUntil: Date | null, now: Date) {
+  if (isSnoozed({ snoozedUntil }, now)) {
+    return { label: `Snoozed to ${snoozedUntil!.toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
+  }
   const badge = dueBadge(due, true)!
   const icon = due.overdue ? AlertTriangle : due.dueSoon ? Clock : CheckCircle2
   return { ...badge, label: badge.label === "OK" ? "Active" : badge.label, icon }
@@ -66,7 +69,7 @@ export default async function MaintenancePage({
       where,
       select: {
         assetType: true, assetId: true, nextDueDate: true, nextDueMileage: true,
-        reminderDaysBefore: true, reminderMilesBefore: true,
+        reminderDaysBefore: true, reminderMilesBefore: true, snoozedUntil: true,
       },
     }),
     loadVehicleMileage(),
@@ -76,6 +79,8 @@ export default async function MaintenancePage({
   let overdue = 0
   let dueSoon = 0
   for (const row of statusRows) {
+    // Snoozed rows are listed, but someone has already put them off.
+    if (isSnoozed(row, now)) continue
     const due = scheduleDue(row, mileage, now)
     if (due.overdue) overdue++
     else if (due.dueSoon) dueSoon++
@@ -125,7 +130,7 @@ export default async function MaintenancePage({
                 {schedules.map((s) => {
                   const assetName = assets.assetName(s.assetType, s.assetId)
                   const AssetIcon = assetIcon[s.assetType]
-                  const status = statusOf(scheduleDue(s, mileage, now))
+                  const status = statusOf(scheduleDue(s, mileage, now), s.snoozedUntil, now)
                   const StatusIcon = status.icon
 
                   return (

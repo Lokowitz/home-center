@@ -56,3 +56,14 @@ export function decide(mode: NotificationRepeat, stage: Stage, cycleKey: string,
 export function cycleKeyOf(...parts: (Date | number | string | null | undefined)[]): string {
   return parts.map((p) => (p instanceof Date ? p.toISOString() : p ?? "")).join("|")
 }
+
+/**
+ * The cycle of a maintenance reminder's current due date. A snooze that has run
+ * out starts a new cycle, so it's raised again whatever the repeat setting;
+ * unsnoozed rows keep the original two-part key.
+ */
+export function maintenanceCycleKey(s: { nextDueDate: Date | null; nextDueMileage: number | null; snoozedUntil: Date | null }): string {
+  return s.snoozedUntil
+    ? cycleKeyOf(s.nextDueDate, s.nextDueMileage, s.snoozedUntil)
+    : cycleKeyOf(s.nextDueDate, s.nextDueMileage)
+}

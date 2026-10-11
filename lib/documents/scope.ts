@@ -18,6 +18,7 @@ export function healthWhere(): Prisma.AttachmentWhereInput {
       { serviceRecord: { is: { assetType: "PERSON" } } },
       { maintenanceSchedule: { is: { assetType: "PERSON" } } },
       { warranty: { is: { assetType: "PERSON" } } },
+      { recordType: "DOCUMENT", assetType: "PERSON" },
     ],
   }
 }
@@ -40,7 +41,7 @@ function scopeWhere(f: { attachmentIds: string[] | null; recordTypes: Attachment
 export const OWNER_SELECT = {
   id: true, recordType: true, filename: true, originalName: true,
   serviceRecordId: true, warrantyId: true, maintenanceScheduleId: true, healthConditionId: true, insurancePolicyId: true,
-  observationId: true, medicationId: true, allergyId: true, immunizationId: true,
+  observationId: true, medicationId: true, allergyId: true, immunizationId: true, assetId: true, assetType: true, inboxItemId: true,
   serviceRecord: { select: { title: true, assetType: true, assetId: true } },
   warranty: { select: { productName: true, assetType: true, assetId: true } },
   maintenanceSchedule: { select: { title: true, assetType: true, assetId: true } },
@@ -67,7 +68,7 @@ export async function loadDocumentRefs(ids: string[]): Promise<Map<string, Loade
 }
 
 /**
- * Files attached to an asset's records. A property includes the equipment
+ * Files on an asset and its records. A property includes the equipment
  * installed there (as the other shortcut tools do); a person includes their
  * health records and the insurance policies they're a member of.
  */
@@ -81,6 +82,7 @@ export async function attachmentIdsForAsset(type: AssetType, id: string): Promis
     { serviceRecord: { is: o } },
     { warranty: { is: o } },
     { maintenanceSchedule: { is: o } },
+    { recordType: "DOCUMENT" as const, ...o },
   ])
   if (type === "PERSON") {
     OR.push(

@@ -44,4 +44,9 @@ describe("assistant with Health off", () => {
     expect(names).not.toContain("observation_log")
     expect(chatTools({ enabled: false, includeHealth: false }).map((t) => t.name)).toContain("health_alerts")
   })
+
+  it("offers the intake tool with Health on or off", () => {
+    expect(chatTools({ enabled: false, includeHealth: false }, false).map((t) => t.name)).toContain("intake")
+    expect(chatTools({ enabled: true, includeHealth: true }).map((t) => t.name)).toContain("intake")
+  })
 })

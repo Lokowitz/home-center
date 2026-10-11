@@ -20,7 +20,8 @@ import { loadFeatures } from "@/lib/features-server"
 import type { Features } from "@/lib/features"
 import type { Hit } from "@/lib/documents/index-db"
 import {
-  bestPerKey, idsNamed, MAX_RECORD_DISTANCE, nearest, RECORD_WINDOW, searchTerms, semanticOnly, termsWhere,
+  bestPerKey, byTier, idsNamed, matchKind, MAX_RECORD_DISTANCE, mergeSemantic, nearest, rankSections, RECORD_WINDOW, searchTerms,
+  semanticOnly, termsWhere,
 } from "./query"
 import type { EntityKind } from "./entities/text"
 import type {
@@ -28,8 +29,8 @@ import type {
 } from "./types"
 
 // The search behind the header box: every kind of record by keyword, the
-// text of uploaded files by keyword, and — only when asked — the files again
-// by meaning, leaving out any file the keyword pass already returned.
+// text of uploaded files by keyword, and — unless turned off — records and
+// files by meaning, leaving out anything the keyword pass already returned.
 
 const PER_SECTION = 12
 const DOC_POOL = 60
@@ -61,6 +62,8 @@ function page<T>(rows: T[]): { items: T[]; more: boolean } {
   return { items: rows.slice(0, PER_SECTION), more: rows.length > PER_SECTION }
 }
 const TAKE = PER_SECTION + 1
+/** Rows fetched per type when searching by words, so exact matches can be ranked ahead of partial ones. */
+const KEYWORD_POOL = 60
 
 async function loadOwners() {
   const select = { id: true, name: true, imageFilename: true } as const
@@ -133,28 +136,71 @@ type Wheres = {
   observation: Prisma.ObservationWhereInput
 }
 
+/** The text fields keyword search looks in, per model; also what decides an exact match. */
+const FIELDS = {
+  property: ["name", "address", "notes"],
+  vehicle: ["name", "make", "model", "vin", "color", "notes"],
+  equipment: ["name", "manufacturer", "modelNumber", "serialNumber", "location", "notes"],
+  person: ["name", "notes"],
+  service: ["title", "description", "vendor"],
+  maintenance: ["title", "description"],
+  warranty: ["productName", "vendor", "notes"],
+  insurance: ["carrier", "planName", "policyNumber", "groupNumber", "memberId", "notes"],
+  provider: ["name", "specialty", "practice", "phone", "email", "address", "notes"],
+  condition: ["name", "notes"],
+  medication: ["name", "dosage", "frequency", "pharmacy", "notes"],
+  allergy: ["substance", "reaction", "notes"],
+  immunization: ["vaccine", "dose", "givenBy", "notes"],
+  observation: ["type", "notes", "tags"],
+} as const
+
 function keywordWheres(terms: string[], owners: Owners): Wheres {
   const onAsset = { ownerIds: (t: string) => idsNamed(owners.allNames, t), ownerClause: (ids: string[]) => ({ assetId: { in: ids } }) }
   const onPerson = { ownerIds: (t: string) => idsNamed(owners.names.PERSON, t), ownerClause: (ids: string[]) => ({ personId: { in: ids } }) }
   return {
-    property: termsWhere(terms, ["name", "address", "notes"]),
-    vehicle: termsWhere(terms, ["name", "make", "model", "vin", "color", "notes"]),
-    equipment: termsWhere(terms, ["name", "manufacturer", "modelNumber", "serialNumber", "location", "notes"]),
-    person: termsWhere(terms, ["name", "notes"]),
-    service: termsWhere(terms, ["title", "description", "vendor"], onAsset),
-    maintenance: termsWhere(terms, ["title", "description"], onAsset),
-    warranty: termsWhere(terms, ["productName", "vendor", "notes"], onAsset),
+    property: termsWhere(terms, FIELDS.property),
+    vehicle: termsWhere(terms, FIELDS.vehicle),
+    equipment: termsWhere(terms, FIELDS.equipment),
+    person: termsWhere(terms, FIELDS.person),
+    service: termsWhere(terms, FIELDS.service, onAsset),
+    maintenance: termsWhere(terms, FIELDS.maintenance, onAsset),
+    warranty: termsWhere(terms, FIELDS.warranty, onAsset),
     insurance: termsWhere(
       terms,
-      ["carrier", "planName", "policyNumber", "groupNumber", "memberId", "notes"],
+      FIELDS.insurance,
       { ownerIds: onPerson.ownerIds, ownerClause: (ids) => ({ members: { some: { id: { in: ids } } } }) }
     ),
-    provider: termsWhere(terms, ["name", "specialty", "practice", "phone", "email", "address", "notes"]),
-    condition: termsWhere(terms, ["name", "notes"], onPerson),
-    medication: termsWhere(terms, ["name", "dosage", "frequency", "pharmacy", "notes"], onPerson),
-    allergy: termsWhere(terms, ["substance", "reaction", "notes"], onPerson),
-    immunization: termsWhere(terms, ["vaccine", "dose", "givenBy", "notes"], onPerson),
-    observation: termsWhere(terms, ["type", "notes", "tags"], onPerson),
+    provider: termsWhere(terms, FIELDS.provider),
+    condition: termsWhere(terms, FIELDS.condition, onPerson),
+    medication: termsWhere(terms, FIELDS.medication, onPerson),
+    allergy: termsWhere(terms, FIELDS.allergy, onPerson),
+    immunization: termsWhere(terms, FIELDS.immunization, onPerson),
+    observation: termsWhere(terms, FIELDS.observation, onPerson),
+  }
+}
+
+/** A row's searched fields, plus any other text that can satisfy a term (its owner's name). */
+const textsOf = <T, K extends keyof T>(row: T, fields: readonly K[], ...more: (string | null | undefined)[]) =>
+  [...fields.map((f) => row[f] as unknown as string | null), ...more]
+
+/**
+ * Exact or partial match per row id, filled in by `rank` while searching by
+ * words. Empty for the meaning pass, which marks its own results.
+ */
+function matchKinds(terms: string[]) {
+  const kinds = new Map<string, "exact" | "partial">()
+  return {
+    /** Exact matches first, so partial ones don't push them past the section's limit. */
+    rank<T extends { id: string }>(rows: T[], texts: (row: T) => (string | null | undefined)[]): T[] {
+      if (!terms.length) return rows
+      for (const r of rows) kinds.set(r.id, matchKind(terms, texts(r)))
+      const tier = (r: T) => (kinds.get(r.id) === "exact" ? 0 : 1)
+      return [...rows].sort((a, b) => tier(a) - tier(b))
+    },
+    mark(sections: Section[]): Section[] {
+      if (!terms.length) return sections
+      return sections.map((s) => ({ ...s, items: s.items.map((i) => ({ ...i, matchedBy: kinds.get((i as { id: string }).id) })) }) as Section)
+    },
   }
 }
 
@@ -217,37 +263,38 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
     ids.set(kind, [...(ids.get(kind) ?? []), key.slice(at + 1)])
   }
   const where = withFeatures(idWheres(ids), features)
-  const [assets, records] = await Promise.all([searchAssets(where, now), searchRecords(where, owners, now)])
+  const [assets, records] = await Promise.all([searchAssets(where, now, []), searchRecords(where, owners, now, [])])
   const byRank = (section: Section) => (item: Section["items"][number]) => rank.get(entityKeyOf(section, item) ?? "") ?? Infinity
-  const ranked = [...assets, ...records]
+  return [...assets, ...records]
     .filter((sec) => sec.items.length > 0)
     .map((sec) => {
       const r = byRank(sec)
-      const items = [...sec.items].sort((a, b) => r(a) - r(b))
-      return { section: { ...sec, key: `semantic-${sec.key}`, items, more: false } as Section, best: r(items[0]) }
+      const items = [...sec.items].sort((a, b) => r(a) - r(b)).map((item) => ({ ...item, matchedBy: "semantic" as const }))
+      return { ...sec, items, more: false } as Section
     })
-  // The section holding the single best match comes first.
-  return ranked.sort((a, b) => a.best - b.best).map((x) => x.section)
 }
 
-async function searchAssets(where: Wheres, now: Date): Promise<Section[]> {
+/** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
+async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<Section[]> {
+  const take = terms.length ? KEYWORD_POOL : TAKE
+  const kinds = matchKinds(terms)
   const [properties, vehicles, equipment, people] = await Promise.all([
     prisma.property.findMany({
       where: where.property,
       include: { _count: { select: { equipment: true } } },
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.vehicle.findMany({
       where: where.vehicle,
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.equipment.findMany({
       where: where.equipment,
       include: { property: { select: { name: true } } },
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.person.findMany({
       where: where.person,
@@ -257,7 +304,7 @@ async function searchAssets(where: Wheres, now: Date): Promise<Section[]> {
         conditions: { where: { status: { not: "RESOLVED" } }, select: { id: true } },
       },
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
   ])
 
@@ -271,10 +318,10 @@ async function searchAssets(where: Wheres, now: Date): Promise<Section[]> {
   )
   const last = (id: string) => day(upkeep.lastService.get(id))
 
-  const p = page(properties)
-  const v = page(vehicles)
-  const e = page(equipment)
-  const pp = page(people)
+  const p = page(kinds.rank(properties, (r) => textsOf(r, FIELDS.property)))
+  const v = page(kinds.rank(vehicles, (r) => textsOf(r, FIELDS.vehicle)))
+  const e = page(kinds.rank(equipment, (r) => textsOf(r, FIELDS.equipment)))
+  const pp = page(kinds.rank(people, (r) => textsOf(r, FIELDS.person)))
 
   const propertyCards: AssetResult[] = p.items.map((r) => ({
     type: "PROPERTY", id: r.id, href: assetHref("PROPERTY", r.id), name: r.name, imageFilename: r.imageFilename,
@@ -334,16 +381,22 @@ async function searchAssets(where: Wheres, now: Date): Promise<Section[]> {
     status: upkeep.status.get(r.id) ?? null,
   }))
 
-  return [
+  return kinds.mark([
     { key: "properties", title: "Properties", layout: "assets", items: propertyCards, more: p.more },
     { key: "vehicles", title: "Vehicles", layout: "assets", items: vehicleCards, more: v.more },
     { key: "equipment", title: "Equipment", layout: "assets", items: equipmentCards, more: e.more },
     { key: "people", title: "People", layout: "assets", items: personCards, more: pp.more },
-  ]
+  ])
 }
 
-async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<Section[]> {
+/** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
+async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[]): Promise<Section[]> {
   const thumb = (id: string) => owners.thumbs.get(id) ?? null
+  const take = terms.length ? KEYWORD_POOL : TAKE
+  const kinds = matchKinds(terms)
+  // An owner's name can stand in for a term ("civic oil"), so it counts toward an exact match too.
+  const assetName = (id: string) => owners.allNames[id]
+  const personName = (id: string) => owners.names.PERSON[id]
 
   const [
     services, visits, schedules, warranties, policies, providers,
@@ -352,68 +405,68 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     prisma.serviceRecord.findMany({
       where: { AND: [where.service, { assetType: { not: "PERSON" } }] },
       orderBy: { date: "desc" },
-      take: TAKE,
+      take,
     }),
     prisma.serviceRecord.findMany({
       where: { AND: [where.service, { assetType: "PERSON" }] },
       include: { provider: { select: { name: true } }, condition: { select: { name: true } } },
       orderBy: { date: "desc" },
-      take: TAKE,
+      take,
     }),
     prisma.maintenanceSchedule.findMany({
       where: where.maintenance,
       orderBy: [{ isActive: "desc" }, { nextDueDate: "asc" }],
-      take: TAKE,
+      take,
     }),
     prisma.warranty.findMany({
       where: where.warranty,
       orderBy: { expirationDate: "desc" },
-      take: TAKE,
+      take,
     }),
     prisma.insurancePolicy.findMany({
       where: where.insurance,
       include: { members: { select: { name: true }, orderBy: { name: "asc" } } },
       orderBy: { carrier: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.provider.findMany({
       where: where.provider,
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.healthCondition.findMany({
       where: where.condition,
       include: { provider: { select: { name: true } } },
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.medication.findMany({
       where: where.medication,
       include: { prescriber: { select: { name: true } } },
       orderBy: { name: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.allergy.findMany({
       where: where.allergy,
       orderBy: { substance: "asc" },
-      take: TAKE,
+      take,
     }),
     prisma.immunization.findMany({
       where: where.immunization,
       orderBy: { dateGiven: "desc" },
-      take: TAKE,
+      take,
     }),
     prisma.observation.findMany({
       where: where.observation,
       orderBy: { date: "desc" },
-      take: TAKE,
+      take,
     }),
     prisma.vehicle.findMany({ where: { currentMileage: { not: null } }, select: { id: true, currentMileage: true, meterUnit: true } }),
   ])
   const mileageIndex: MileageIndex = new Map(mileage.map((v) => [v.id, { value: v.currentMileage!, unit: v.meterUnit }]))
   const unitOf = (assetId: string) => mileageIndex.get(assetId)?.unit ?? "MILES"
 
-  const s = page(services)
+  const s = page(kinds.rank(services, (r) => textsOf(r, FIELDS.service, assetName(r.assetId))))
   const serviceCards: RecordResult[] = s.items.map((r) => ({
     kind: "service", id: r.id, href: tabHref(r.assetType, r.assetId, "service", r.id),
     title: r.title, subtitle: clip(r.description), date: day(r.date), amount: money(r.cost),
@@ -427,7 +480,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     owner: thumb(r.assetId), people: null,
   }))
 
-  const vi = page(visits)
+  const vi = page(kinds.rank(visits, (r) => textsOf(r, FIELDS.service, assetName(r.assetId))))
   const visitCards: RecordResult[] = vi.items.map((r) => ({
     kind: "visit", id: r.id, href: tabHref("PERSON", r.assetId, "visits", r.id),
     title: r.title, subtitle: clip(r.description), date: day(r.date), amount: money(r.cost),
@@ -440,7 +493,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     owner: thumb(r.assetId), people: null,
   }))
 
-  const m = page(schedules)
+  const m = page(kinds.rank(schedules, (r) => textsOf(r, FIELDS.maintenance, assetName(r.assetId))))
   const maintenanceCards: RecordResult[] = m.items.map((r) => {
     const due = scheduleDue(r, mileageIndex, now)
     const badge = dueBadge(due, Boolean(r.nextDueDate || r.nextDueMileage))
@@ -464,7 +517,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     }
   })
 
-  const w = page(warranties)
+  const w = page(kinds.rank(warranties, (r) => textsOf(r, FIELDS.warranty, assetName(r.assetId))))
   const warrantyCards: RecordResult[] = w.items.map((r) => {
     const st = warrantyState(r.expirationDate, now, WARRANTY_WINDOW_DAYS)
     const status: Status | null = !r.expirationDate ? null
@@ -481,7 +534,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     }
   })
 
-  const ins = page(policies)
+  const ins = page(kinds.rank(policies, (r) => textsOf(r, FIELDS.insurance, ...r.members.map((x) => x.name))))
   const insuranceCards: RecordResult[] = ins.items.map((r) => {
     const expired = r.endDate != null && r.endDate.getTime() < now.getTime() - 86_400_000
     const status: Status | null = expired ? { label: "Ended", tone: "outline" }
@@ -500,7 +553,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     }
   })
 
-  const pr = page(providers)
+  const pr = page(kinds.rank(providers, (r) => textsOf(r, FIELDS.provider)))
   const providerCards: RecordResult[] = pr.items.map((r) => ({
     kind: "provider", id: r.id, href: "/providers",
     title: r.name, subtitle: [r.specialty, r.practice].filter(Boolean).join(" · ") || null,
@@ -510,14 +563,14 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
   }))
 
   const health: RecordResult[] = [
-    ...conditions.slice(0, PER_SECTION).map((r): RecordResult => ({
+    ...kinds.rank(conditions, (r) => textsOf(r, FIELDS.condition, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "condition", id: r.id, href: tabHref("PERSON", r.personId, "conditions"),
       title: r.name, subtitle: clip(r.notes), date: r.diagnosedDate ? `Diagnosed ${day(r.diagnosedDate)}` : null, amount: null,
       status: { label: labelFor(CONDITION_STATUSES, r.status), tone: r.status === "RESOLVED" ? "outline" : "secondary" },
       facts: facts([["Provider", r.provider?.name], ["Resolved", day(r.resolvedDate)]]),
       owner: thumb(r.personId), people: null,
     })),
-    ...medications.slice(0, PER_SECTION).map((r): RecordResult => ({
+    ...kinds.rank(medications, (r) => textsOf(r, FIELDS.medication, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "medication", id: r.id, href: tabHref("PERSON", r.personId, "medications", r.id),
       title: r.name, subtitle: [r.dosage, r.frequency].filter(Boolean).join(" · ") || null,
       date: r.startDate ? `Started ${day(r.startDate)}` : null, amount: null,
@@ -525,20 +578,20 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
       facts: facts([["Prescriber", r.prescriber?.name], ["Pharmacy", r.pharmacy], ["Next refill", day(r.nextRefillDate)]]),
       owner: thumb(r.personId), people: null,
     })),
-    ...allergies.slice(0, PER_SECTION).map((r): RecordResult => ({
+    ...kinds.rank(allergies, (r) => textsOf(r, FIELDS.allergy, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "allergy", id: r.id, href: tabHref("PERSON", r.personId, "allergies"),
       title: r.substance, subtitle: r.reaction, date: null, amount: null,
       status: { label: labelFor(ALLERGY_SEVERITIES, r.severity), tone: r.severity === "SEVERE" ? "destructive" : "secondary" },
       facts: facts([["Notes", clip(r.notes, 80)]]),
       owner: thumb(r.personId), people: null,
     })),
-    ...immunizations.slice(0, PER_SECTION).map((r): RecordResult => ({
+    ...kinds.rank(immunizations, (r) => textsOf(r, FIELDS.immunization, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "immunization", id: r.id, href: tabHref("PERSON", r.personId, "immunizations", r.id),
       title: r.vaccine, subtitle: clip(r.notes), date: `Given ${day(r.dateGiven)}`, amount: null, status: null,
       facts: facts([["Dose", r.dose], ["Given by", r.givenBy], ["Next due", day(r.nextDueDate)]]),
       owner: thumb(r.personId), people: null,
     })),
-    ...observations.slice(0, PER_SECTION).map((r): RecordResult => ({
+    ...kinds.rank(observations, (r) => textsOf(r, FIELDS.observation, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "observation", id: r.id, href: observationHref(r.personId, r.id),
       title: r.type, subtitle: clip(r.notes), date: [day(r.date), r.time].filter(Boolean).join(" "), amount: null,
       status: r.severity ? { label: `Severity ${r.severity}/5`, tone: r.severity >= 4 ? "destructive" : "secondary" } : null,
@@ -548,7 +601,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
   ]
   const healthMore = [conditions, medications, allergies, immunizations, observations].some((x) => x.length > PER_SECTION)
 
-  return [
+  return kinds.mark([
     { key: "service", title: "Service records", layout: "records", items: serviceCards, more: s.more },
     { key: "visits", title: "Health visits", layout: "records", items: visitCards, more: vi.more },
     { key: "maintenance", title: "Maintenance", layout: "records", items: maintenanceCards, more: m.more },
@@ -556,11 +609,13 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date): Promise<
     { key: "insurance", title: "Insurance", layout: "records", items: insuranceCards, more: ins.more },
     { key: "health", title: "Health records", layout: "records", items: health, more: healthMore },
     { key: "providers", title: "Providers", layout: "records", items: providerCards, more: pr.more },
-  ]
+  ])
 }
 
-async function toDocuments(hits: Hit[], terms: string[], matchedBy: DocumentResult["matchedBy"], owners: Owners) {
-  const groups = groupHits(hits, DOC_LIMIT + 1)
+/** Keyword files are exact or partial by the text of their matching passages. */
+async function toDocuments(hits: Hit[], terms: string[], by: "keyword" | "semantic", owners: Owners) {
+  // The whole pool, so exact files can be ranked ahead of partial ones before the limit.
+  const groups = groupHits(hits, DOC_POOL)
   const refs = await loadDocumentRefs(groups.map((g) => g.attachmentId))
   const docs = groups.flatMap((g): DocumentResult[] => {
     const ref = refs.get(g.attachmentId)
@@ -575,10 +630,11 @@ async function toDocuments(hits: Hit[], terms: string[], matchedBy: DocumentResu
       owner: ref.asset ? owners.thumbs.get(ref.asset.id) ?? null : null,
       pages: pages > 1 ? pages : null,
       passages: g.hits.slice(0, 2).map((h) => ({ page: pages > 1 ? h.page : null, text: passage(h.text, terms, 240) })),
-      matchedBy,
+      matchedBy: by === "semantic" ? "semantic" : matchKind(terms, g.hits.map((h) => h.text)),
     }]
   })
-  return { items: docs.slice(0, DOC_LIMIT), more: docs.length > DOC_LIMIT }
+  const ranked = byTier(docs)
+  return { items: ranked.slice(0, DOC_LIMIT), more: ranked.length > DOC_LIMIT }
 }
 
 export async function globalSearch(query: string, opts: { semantic: boolean }): Promise<SearchResults> {
@@ -605,13 +661,14 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
 
   const where = terms.length ? withFeatures(keywordWheres(terms, owners), features) : null
   const [assetSections, recordSections, keyword] = await Promise.all([
-    where ? searchAssets(where, now) : Promise.resolve([]),
-    where ? searchRecords(where, owners, now) : Promise.resolve([]),
+    where ? searchAssets(where, now, terms) : Promise.resolve([]),
+    where ? searchRecords(where, owners, now, terms) : Promise.resolve([]),
     keywordDocs(),
   ])
   const kwDocs = await toDocuments(keyword.hits, parsed?.terms ?? terms, "keyword", owners)
 
   let semantic: SemanticState = { state: "off" }
+  let bySemantic: Section[] = []
   if (opts.semantic) {
     const model = await semanticSearchModel().catch(() => null)
     if (!model) {
@@ -628,13 +685,11 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
         ])
         const fresh = semanticOnly(visibleHits(docHits), new Set(keyword.hits.map((h) => h.attachmentId)))
         const docs = await toDocuments(fresh, [], "semantic", owners)
-        semantic = {
-          state: "ok",
-          sections: [
-            ...records,
-            ...(docs.items.length ? [{ key: "semantic-documents", title: "Documents", layout: "documents" as const, ...docs }] : []),
-          ],
-        }
+        bySemantic = [
+          ...records,
+          ...(docs.items.length ? [{ key: "documents", title: "Documents", layout: "documents" as const, ...docs, more: false }] : []),
+        ]
+        semantic = { state: "ok", found: bySemantic.reduce((n, sec) => n + sec.items.length, 0) }
       } catch (error) {
         console.error("[search] semantic search failed:", error instanceof Error ? error.name : typeof error)
         semantic = { state: "failed" }
@@ -642,12 +697,12 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
     }
   }
 
-  const sections: Section[] = [
+  const keywordSections: Section[] = [
     ...assetSections,
     ...recordSections,
     { key: "documents", title: "Documents", layout: "documents" as const, ...kwDocs },
-  ].filter((s) => s.items.length > 0)
-  const count = (list: Section[]) => list.reduce((n, sec) => n + sec.items.length, 0)
-  const total = count(sections) + (semantic.state === "ok" ? count(semantic.sections) : 0)
+  ]
+  const sections = rankSections(mergeSemantic(keywordSections, bySemantic).filter((s) => s.items.length > 0))
+  const total = sections.reduce((n, sec) => n + sec.items.length, 0)
   return { query: q, terms: [...new Set([...terms, ...(parsed?.terms ?? [])])], sections, semantic, total }
 }

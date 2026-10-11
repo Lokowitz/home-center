@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -13,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { createProperty, updateProperty } from "@/lib/actions/properties"
 import type { Property } from "@/app/generated/prisma/client"
+import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 
 const TYPE_LABELS: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
@@ -38,6 +40,7 @@ interface Props {
 }
 
 export function PropertyFormDialog({ open, onClose, property }: Props) {
+  const router = useRouter()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -63,7 +66,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
     }
   }, [property, open, form])
 
-  async function onSubmit(values: FormValues) {
+  async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
     const result = property
       ? await updateProperty(property.id, values as unknown as Parameters<typeof updateProperty>[1])
       : await createProperty(values as unknown as Parameters<typeof createProperty>[0])
@@ -74,6 +77,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
     }
     toast.success(property ? "Property updated." : "Property added.")
     onClose()
+    if (then === "reminders" && result && "id" in result && typeof result.id === "string") router.push(remindersHref("PROPERTY", result.id))
   }
 
   return (
@@ -84,7 +88,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((v) => onSubmit(v))} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
@@ -162,6 +166,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              {!property && <AddRemindersSubmit pending={form.formState.isSubmitting} onClick={form.handleSubmit((v) => onSubmit(v, "reminders"))} />}
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? "Saving…" : property ? "Save Changes" : "Add Property"}
               </Button>

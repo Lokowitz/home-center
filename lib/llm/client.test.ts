@@ -158,6 +158,13 @@ describe("createChatClient", () => {
     })
   })
 
+  it("reports why a reply ended, streamed or not", async () => {
+    const streamed = vi.fn(async () => sseResponse([delta({ content: "{" }), JSON.stringify({ choices: [{ delta: {}, finish_reason: "length" }] }), "[DONE]"]))
+    expect((await createChatClient(config, streamed as unknown as typeof fetch)({ messages: [] }, () => {}, signal())).finishReason).toBe("length")
+    const json = vi.fn(async () => Response.json({ choices: [{ message: { content: "" }, finish_reason: "length" }] }))
+    expect((await createChatClient(config, json as unknown as typeof fetch)({ messages: [] }, () => {}, signal())).finishReason).toBe("length")
+  })
+
   it("translates HTTP errors", async () => {
     const fetchImpl = vi.fn(async () => new Response("nope", { status: 401 }))
     const chat = createChatClient(config, fetchImpl as unknown as typeof fetch)

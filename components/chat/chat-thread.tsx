@@ -2,12 +2,20 @@
 
 import Link from "next/link"
 import { useEffect, useRef, useState } from "react"
-import { ArrowUp, Loader2, RotateCcw, Square, SquarePen, TriangleAlert } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ArrowUp, Inbox, Loader2, Paperclip, RotateCcw, Square, SquarePen, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { uploadAccept } from "@/lib/inbox-form"
+import { INBOX_HREF, inboxFollowUpQuestion, inboxNoticeText } from "@/lib/llm/inbox"
+import { addFileToInbox } from "@/components/inbox/add-to-inbox"
+import { useDropZone } from "@/components/drop/drop-provider"
 import { useChat } from "./chat-provider"
 import { Markdown } from "./markdown"
+import type { ChatNotice } from "./use-chat-thread"
+
+const ACCEPT = uploadAccept()
 
 const EXAMPLES = [
   "How much did we spend on each vehicle last year?",
@@ -61,6 +69,21 @@ function Bubble({
   )
 }
 
+/** The page's own line in the transcript, e.g. after a file went to Intake. Not from the model. */
+function Notice({ notice }: { notice: ChatNotice }) {
+  return (
+    <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
+      <Inbox className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <p>
+        {notice.text}{" "}
+        <Link href={notice.href} className="text-primary underline">
+          Open Intake
+        </Link>
+      </p>
+    </div>
+  )
+}
+
 function Unavailable({ isAdmin, className }: { isAdmin: boolean; className?: string }) {
   return (
     <div className={cn("flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground", className)}>
@@ -81,14 +104,40 @@ function Unavailable({ isAdmin, className }: { isAdmin: boolean; className?: str
 
 export function ChatThread({ className }: { className?: string }) {
   const chat = useChat()
+  const router = useRouter()
   const [input, setInput] = useState("")
+  const [uploading, setUploading] = useState(0)
   const endRef = useRef<HTMLDivElement>(null)
+  const pickRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" })
-  }, [chat.messages, chat.draft, chat.discarded, chat.statusLabel, chat.error])
+  }, [chat.messages, chat.notices, chat.draft, chat.discarded, chat.statusLabel, chat.error])
+
+  // Dropped files go to Intake from here, with the same note in the conversation as the paperclip.
+  const { setElement: setDropElement, over: dropOver } = useDropZone({ label: "Add to Intake from this chat", onFiles: (files) => void attach(files) })
 
   if (!chat.available) return <Unavailable isAdmin={chat.isAdmin} className={className} />
+
+  /** Files go to Intake, not to the model: the assistant can then read what was parsed with its intake tool. */
+  async function attach(list: FileList | File[] | null) {
+    const files = list ? Array.from(list) : []
+    if (!files.length) return
+    setUploading((n) => n + files.length)
+    const landed = await Promise.all(
+      files.map(async (f) => {
+        const ok = await addFileToInbox(f, { successToast: false })
+        setUploading((n) => n - 1)
+        return ok ? f.name : null
+      })
+    )
+    const names = landed.filter((n): n is string => n !== null)
+    if (!names.length) return
+    chat.addNotice(inboxNoticeText(names), INBOX_HREF)
+    setInput((current) => current || inboxFollowUpQuestion(names))
+    // The Intake badge.
+    router.refresh()
+  }
 
   function submit(text: string = input) {
     if (!text.trim() || chat.busy) return
@@ -96,10 +145,14 @@ export function ChatThread({ className }: { className?: string }) {
     setInput("")
   }
 
-  const empty = chat.messages.length === 0 && chat.draft === null && !chat.error
+  const empty = chat.messages.length === 0 && chat.notices.length === 0 && chat.draft === null && !chat.error
+  const noticesAfter = (count: number) => chat.notices.filter((n) => n.after === count).map((n) => <Notice key={`n${n.id}`} notice={n} />)
 
   return (
-    <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
+    <div
+      ref={setDropElement}
+      className={cn("flex min-h-0 flex-1 flex-col rounded-md", dropOver && "outline-2 outline-dashed outline-primary", className)}
+    >
       <div className="flex-1 space-y-4 overflow-y-auto px-1 py-2" aria-live="polite">
         {empty && (
           <div className="space-y-2 pt-4">
@@ -118,9 +171,11 @@ export function ChatThread({ className }: { className?: string }) {
             </div>
           </div>
         )}
-        {chat.messages.map((m, i) => (
-          <Bubble key={i} role={m.role} content={m.content} discarded={m.discarded} />
-        ))}
+        {noticesAfter(0)}
+        {chat.messages.map((m, i) => [
+          <Bubble key={i} role={m.role} content={m.content} discarded={m.discarded} />,
+          ...noticesAfter(i + 1),
+        ])}
         {chat.draft || chat.discarded ? <Bubble role="assistant" content={chat.draft ?? ""} discarded={chat.discarded} pending /> : null}
         {chat.busy && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -173,10 +228,40 @@ export function ChatThread({ className }: { className?: string }) {
           aria-label="Message"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={chat.reset} disabled={chat.messages.length === 0 && !chat.busy && !chat.error}>
-            <SquarePen className="h-3.5 w-3.5" />
-            New chat
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={chat.reset}
+              disabled={chat.messages.length === 0 && chat.notices.length === 0 && !chat.busy && !chat.error}
+            >
+              <SquarePen className="h-3.5 w-3.5" />
+              New chat
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => pickRef.current?.click()}
+              disabled={uploading > 0}
+              title="Add receipts or invoices to Intake"
+            >
+              {uploading > 0 ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+              <span className="sr-only md:not-sr-only">Add to Intake</span>
+            </Button>
+            <input
+              ref={pickRef}
+              type="file"
+              multiple
+              accept={ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                void attach(e.target.files)
+                e.target.value = ""
+              }}
+            />
+          </div>
           {chat.busy ? (
             <Button type="button" size="sm" variant="outline" onClick={chat.stop}>
               <Square className="h-3.5 w-3.5" />

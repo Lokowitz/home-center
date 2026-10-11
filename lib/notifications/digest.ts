@@ -120,7 +120,7 @@ export async function sendPendingDigests(now: Date = new Date()): Promise<number
   // in a later digest if it's turned back on.
   const visible = await visibleNotificationsWhere(await loadFeatures())
   const pending = await prisma.notification.findMany({
-    where: { emailedAt: null, userId: { in: candidates.map((u) => u.id) }, ...visible },
+    where: { emailedAt: null, dismissedAt: null, userId: { in: candidates.map((u) => u.id) }, ...visible },
     orderBy: { createdAt: "asc" },
   })
   if (pending.length === 0) return 0

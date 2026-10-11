@@ -20,6 +20,10 @@ describe("personSchema", () => {
     expect(r.success).toBe(false)
     if (!r.success) expect(r.error.flatten().fieldErrors.dateOfBirth).toBeDefined()
   })
+  it("accepts a pet", () => {
+    expect(personSchema.safeParse({ name: "Rex", relationship: "PET" }).success).toBe(true)
+  })
+
   it("rejects an unknown relationship", () => {
     expect(personSchema.safeParse({ name: "A", relationship: "COUSIN" }).success).toBe(false)
   })

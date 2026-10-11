@@ -8,6 +8,8 @@ import { MAX_ATTEMPTS, OCR_EXTENSIONS } from "./limits"
 import { activeModel, embedderFor } from "./embed/server"
 import { modelKey, type EmbeddingModel } from "./embed/models"
 import { entitiesChanged } from "@/lib/search/entities/changes"
+import { chunkPages } from "./chunk"
+import { splitPages } from "./normalize"
 
 // instrumentation.ts, route handlers and server actions can each load their
 // own copy of this module, so the one indexer and index handle per process
@@ -34,6 +36,10 @@ export function documentIndexer(): Indexer {
     index: searchIndex,
     extract: async (filePath, ext, opts) => (await import("./extract")).extractFile(filePath, ext, opts),
     idle: async () => (await import("./extract/ocr")).terminateOcr(),
+    // A capture-inbox file is read for its receipt fields once its text is in.
+    processed: async (job) => {
+      if (job.recordType === "INBOX") await (await import("@/lib/capture-server")).processInboxAttachment(job.attachmentId)
+    },
     semantic: {
       async begin() {
         const m = await activeModel()
@@ -65,6 +71,34 @@ export async function semanticSearchModel(): Promise<EmbeddingModel | null> {
 
 export function enqueueDocument(id: string): void {
   documentIndexer().enqueue(id)
+}
+
+/**
+ * Files that changed owner (filed from the capture inbox): the index keeps a
+ * record type per chunk, so it's rewritten from the stored text — no second
+ * extraction or OCR. Files not read yet just go through the queue.
+ */
+export async function reindexMovedDocuments(ids: string[]): Promise<void> {
+  const { indexingEnabled } = await loadDocumentSettings()
+  if (!indexingEnabled || !ids.length) return
+  const rows = await prisma.attachmentText.findMany({
+    where: { attachmentId: { in: ids } },
+    select: { attachmentId: true, status: true, text: true, attachment: { select: { originalName: true, recordType: true } } },
+  })
+  for (const r of rows) {
+    if (r.status !== "DONE" || !r.text) {
+      enqueueDocument(r.attachmentId)
+      continue
+    }
+    try {
+      await (await searchIndex()).replace(r.attachmentId, r.attachment, chunkPages(splitPages(r.text)))
+    } catch (error) {
+      // reconcile() re-indexes DONE rows missing from the index.
+      console.error(`[documents] reindex ${r.attachmentId} failed:`, nameOf(error))
+    }
+  }
+  // New chunks need vectors.
+  documentIndexer().embedNow()
 }
 
 const DEFAULT_HOURS = 6

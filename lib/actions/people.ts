@@ -49,16 +49,18 @@ export async function deletePerson(id: string): Promise<ActionResult> {
     prisma.maintenanceSchedule.findMany({ where, select: { id: true } }),
   ])
 
-  // Visits and reminders are keyed polymorphically with no foreign key, so the
+  // Visits, reminders and documents are keyed polymorphically with no foreign key, so the
   // person's own cascade can't reach them — they go in the same transaction.
   await prisma.$transaction([
     prisma.serviceRecord.deleteMany({ where }),
     prisma.maintenanceSchedule.deleteMany({ where }),
+    prisma.attachment.deleteMany({ where: { ...where, recordType: "DOCUMENT" } }),
     prisma.person.delete({ where: { id: person.id } }),
   ])
 
   const dirs: [string, string][] = [
     ["people", person.id],
+    ["document", person.id],
     ...visits.map((v): [string, string] => ["service", v.id]),
     ...schedules.map((s): [string, string] => ["maintenance", s.id]),
     ...person.conditions.map((c): [string, string] => ["condition", c.id]),
