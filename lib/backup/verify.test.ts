@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import path from "node:path"
-import { writeFile } from "node:fs/promises"
+import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { ArchiveWriter } from "./archive"
 import { checkCompatibility, verifyArchive } from "./verify"
 import { createMigratedDb, tempDir } from "./test-support"
@@ -28,8 +28,11 @@ async function goodArchive(dir: string) {
 describe("verifyArchive", () => {
   it("accepts a good archive", async () => {
     const dir = await tempDir()
-    const r = await verifyArchive(await goodArchive(dir), { workDir: dir })
+    const work = path.join(dir, "work")
+    await mkdir(work)
+    const r = await verifyArchive(await goodArchive(dir), { workDir: work })
     expect(r.ok).toBe(true)
+    expect(await readdir(work)).toEqual([])
   })
 
   it("refuses a zip without a manifest", async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import path from "node:path"
+import { rename, rm } from "node:fs/promises"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
 import { integrityCheck, latestMigration, modelCounts, referencedFiles, vacuumInto } from "./snapshot"
 import { appMigrations } from "./paths"
@@ -31,5 +32,17 @@ describe("snapshot", () => {
     const r = await referencedFiles(db)
     expect(r.files).not.toContain("service/s1/../../evil")
     expect(r.skipped).toEqual(["service/s1/../../evil"])
+  })
+
+  it("releases the file so it can be renamed and deleted right after reading", async () => {
+    const dir = await tempDir()
+    const db = path.join(dir, "live.db")
+    await createMigratedDb(db)
+    await modelCounts(db)
+    await integrityCheck(db)
+    await rename(db, path.join(dir, "moved.db"))
+    await vacuumInto(path.join(dir, "moved.db"), db)
+    await modelCounts(db)
+    await rm(db)
   })
 })

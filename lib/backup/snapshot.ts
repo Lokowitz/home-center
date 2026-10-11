@@ -1,17 +1,44 @@
 // Engine file: relative imports and npm packages only.
 import { rm } from "node:fs/promises"
+import v8 from "node:v8"
+import { runInNewContext } from "node:vm"
 import { createClient, type Client } from "@libsql/client"
 import { attachmentDir, type AttachmentLocation } from "../attachment-location"
 import { fileUrl } from "./paths"
 
 export const openDb = (p: string): Client => createClient({ url: fileUrl(p) })
 
+let forceGc: (() => void) | undefined
+/** Finalizers of native handles run a tick after the collection, so collect a few times with ticks between. */
+async function collectGarbage(): Promise<void> {
+  if (!forceGc) {
+    v8.setFlagsFromString("--expose-gc")
+    forceGc = runInNewContext("gc") as () => void
+  }
+  for (let i = 0; i < 4; i++) {
+    forceGc()
+    await new Promise((r) => setImmediate(r))
+  }
+}
+
+/**
+ * Runs fn on a short-lived connection. On Windows, libsql's native handle keeps the .db file locked after
+ * close() until it is garbage collected, which would break a rename or delete of the file right after. So once
+ * the connection is closed and unreachable, collect it.
+ */
 async function withDb<T>(p: string, fn: (c: Client) => Promise<T>): Promise<T> {
-  const c = openDb(p)
+  const run = async () => {
+    const c = openDb(p)
+    try {
+      return await fn(c)
+    } finally {
+      c.close()
+    }
+  }
   try {
-    return await fn(c)
+    return await run()
   } finally {
-    c.close()
+    await collectGarbage()
   }
 }
 

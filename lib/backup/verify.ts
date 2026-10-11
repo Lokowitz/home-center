@@ -41,8 +41,7 @@ export async function verifyArchive(plainPath: string, opts: { workDir: string; 
         const ic = await integrityCheck(tmp)
         if (ic !== "ok") return { ok: false, error: `The backup's database failed its check: ${ic}` }
       } finally {
-        // Best effort: on Windows libsql can keep the file locked for a moment after close().
-        await rm(tmp, { force: true, maxRetries: 3, retryDelay: 100 }).catch(() => undefined)
+        await rm(tmp, { force: true })
       }
     }
     return { ok: true, manifest }
