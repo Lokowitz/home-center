@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +30,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
   const on = values.healthEnabled
 
   return (
+    <div className="space-y-6">
     <Card className="py-5">
       <CardHeader className="px-5">
         <CardTitle className="flex items-center gap-2">
@@ -56,5 +58,20 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         </p>
       </CardContent>
     </Card>
+
+    <Card className="py-5">
+      <CardHeader className="px-5">
+        <CardTitle>Install as an app</CardTitle>
+        <CardDescription>
+          Add HomeCenter to your iPhone, iPad or phone Home Screen so it opens like an app.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="px-5">
+        <Link href="/settings/install" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
+          How to install →
+        </Link>
+      </CardContent>
+    </Card>
+    </div>
   )
 }
