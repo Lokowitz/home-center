@@ -8,23 +8,39 @@ import { fileUrl } from "./paths"
 
 export const openDb = (p: string): Client => createClient({ url: fileUrl(p) })
 
-let forceGc: (() => void) | undefined
+let forceGc: (() => void) | null | undefined
+/** Best effort: null when gc can't be reached, and then we simply skip collecting. */
+function getGc(): (() => void) | null {
+  if (forceGc === undefined) {
+    try {
+      v8.setFlagsFromString("--expose-gc")
+      const gc = runInNewContext("gc")
+      forceGc = typeof gc === "function" ? (gc as () => void) : null
+    } catch {
+      forceGc = null
+    }
+  }
+  return forceGc
+}
+
 /** Finalizers of native handles run a tick after the collection, so collect a few times with ticks between. */
 async function collectGarbage(): Promise<void> {
-  if (!forceGc) {
-    v8.setFlagsFromString("--expose-gc")
-    forceGc = runInNewContext("gc") as () => void
-  }
-  for (let i = 0; i < 4; i++) {
-    forceGc()
-    await new Promise((r) => setImmediate(r))
+  const gc = getGc()
+  if (!gc) return
+  try {
+    for (let i = 0; i < 3; i++) {
+      gc()
+      await new Promise((r) => setImmediate(r))
+    }
+  } catch {
+    // never let cleanup mask the real result
   }
 }
 
 /**
  * Runs fn on a short-lived connection. On Windows, libsql's native handle keeps the .db file locked after
  * close() until it is garbage collected, which would break a rename or delete of the file right after. So once
- * the connection is closed and unreachable, collect it.
+ * the connection is closed and unreachable, collect it. Other platforms don't need this, so they skip the pauses.
  */
 async function withDb<T>(p: string, fn: (c: Client) => Promise<T>): Promise<T> {
   const run = async () => {
@@ -38,7 +54,7 @@ async function withDb<T>(p: string, fn: (c: Client) => Promise<T>): Promise<T> {
   try {
     return await run()
   } finally {
-    await collectGarbage()
+    if (process.platform === "win32") await collectGarbage()
   }
 }
 
