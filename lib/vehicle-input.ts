@@ -1,13 +1,5 @@
 import { z } from "zod"
-
-/**
- * An optional number from a form field. A blank field means "not entered" and
- * stays undefined — z.coerce.number() alone would turn "" into 0, which saved a
- * new vehicle's empty odometer as "0 mi".
- */
-function optionalNumber<T extends z.ZodTypeAny>(inner: T) {
-  return z.preprocess((v) => (v === "" || v === null || (typeof v === "string" && v.trim() === "") ? undefined : v), inner.optional())
-}
+import { optionalNumber } from "./asset-input"
 
 export const vehicleSchema = z.object({
   name: z.string().min(1, "Name is required"),
