@@ -45,6 +45,53 @@ export function completeSchedule(schedule: CompletableSchedule, completedDate: D
   }
 }
 
+/// "Skip this time": the next due date and mileage move on by whole intervals
+/// from where they were due until they're ahead again — past `now`, and past
+/// the current reading when there is one. Nothing is recorded as done.
+export function skipSchedule(schedule: CompletableSchedule, now: Date, currentReading: number | null): Pick<ScheduleCompletion, "nextDueDate" | "nextDueMileage"> {
+  let nextDueDate = schedule.nextDueDate
+  if (schedule.intervalDays && nextDueDate) {
+    const d = new Date(nextDueDate)
+    do d.setDate(d.getDate() + schedule.intervalDays)
+    while (d.getTime() <= now.getTime())
+    nextDueDate = d
+  }
+  let nextDueMileage = schedule.nextDueMileage
+  if (schedule.intervalMiles && nextDueMileage != null) {
+    const behind = currentReading != null ? Math.max(0, currentReading - nextDueMileage) : 0
+    nextDueMileage += (Math.floor(behind / schedule.intervalMiles) + 1) * schedule.intervalMiles
+  }
+  return { nextDueDate, nextDueMileage }
+}
+
+/// Skipping needs something to step: an interval with a due value on the same side.
+export function canSkip(s: Pick<CompletableSchedule, "intervalDays" | "intervalMiles" | "nextDueDate" | "nextDueMileage">): boolean {
+  return Boolean((s.intervalDays && s.nextDueDate) || (s.intervalMiles && s.nextDueMileage != null))
+}
+
+export type CompletionInput = { date: Date; mileage: number | null; vendor: string; cost: number | null; notes: string }
+
+/// The service record "Complete" logs: the reminder's title, with blanks kept
+/// empty rather than 0, and a reading only where an odometer means something.
+export function completionRecordData(
+  schedule: { assetType: AssetType; assetId: string; title: string },
+  input: CompletionInput,
+  createdById: string
+) {
+  return {
+    assetType: schedule.assetType,
+    assetId: schedule.assetId,
+    date: input.date,
+    title: schedule.title,
+    description: input.notes || null,
+    vendor: input.vendor || null,
+    cost: input.cost,
+    category: completionCategory(schedule.assetType),
+    mileageAtService: schedule.assetType === "VEHICLE" ? input.mileage : null,
+    createdById,
+  }
+}
+
 /// The service record category a completed reminder is logged under. People's
 /// records only take the medical categories, so theirs stay uncategorized.
 export function completionCategory(assetType: AssetType): "ROUTINE" | null {

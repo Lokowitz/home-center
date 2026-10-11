@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { awakeFilter, dueCandidateFilter, isSnoozed, snoozeEnd } from "./maintenance-due"
+import { awakeFilter, dueCandidateFilter, isSnoozed, scheduleDue, snoozeEnd } from "./maintenance-due"
 
 describe("snoozeEnd", () => {
   const now = new Date(2026, 9, 9, 8, 30)
@@ -33,6 +33,36 @@ describe("isSnoozed", () => {
     expect(isSnoozed({ snoozedUntil: new Date(2026, 9, 10) }, now)).toBe(true)
     expect(isSnoozed({ snoozedUntil: now }, now)).toBe(false)
     expect(isSnoozed({ snoozedUntil: new Date(2026, 9, 8) }, now)).toBe(false)
+  })
+})
+
+describe("scheduleDue", () => {
+  const now = new Date(2026, 9, 9, 12)
+  const base = { assetType: "VEHICLE" as const, assetId: "v1", nextDueDate: null, nextDueMileage: null, reminderDaysBefore: 14, reminderMilesBefore: 500 }
+  const miles = (value: number, unit: "MILES" | "HOURS" = "MILES") => new Map([["v1", { value, unit }]])
+  const none = new Map()
+
+  it("is overdue after the due date and due soon inside the reminder window", () => {
+    expect(scheduleDue({ ...base, nextDueDate: new Date(2026, 9, 1) }, none, now)).toMatchObject({ overdue: true, dueSoon: false, reason: "date" })
+    expect(scheduleDue({ ...base, nextDueDate: new Date(2026, 9, 20) }, none, now)).toMatchObject({ overdue: false, dueSoon: true, daysLeft: 11 })
+    expect(scheduleDue({ ...base, nextDueDate: new Date(2026, 11, 1) }, none, now)).toMatchObject({ overdue: false, dueSoon: false, reason: null })
+  })
+
+  it("uses the reminder's own mileage window", () => {
+    const s = { ...base, nextDueMileage: 50000, reminderMilesBefore: 1000 }
+    expect(scheduleDue(s, miles(49200), now)).toMatchObject({ dueSoon: true, milesLeft: 800, reason: "mileage", meterUnit: "MILES" })
+    expect(scheduleDue(s, miles(48000), now)).toMatchObject({ dueSoon: false, overdue: false })
+    expect(scheduleDue(s, miles(50300), now)).toMatchObject({ overdue: true, milesLeft: -300, reason: "mileage" })
+  })
+
+  it("prefers mileage as the reason when both sides trigger, and reports hours", () => {
+    const s = { ...base, nextDueDate: new Date(2026, 9, 1), nextDueMileage: 100 }
+    expect(scheduleDue(s, miles(120, "HOURS"), now)).toMatchObject({ overdue: true, reason: "mileage", meterUnit: "HOURS" })
+  })
+
+  it("ignores mileage without a reading, or on anything but a vehicle", () => {
+    expect(scheduleDue({ ...base, nextDueMileage: 100 }, none, now)).toMatchObject({ milesLeft: null, overdue: false, meterUnit: null })
+    expect(scheduleDue({ ...base, assetType: "PROPERTY", nextDueMileage: 100 }, miles(500), now)).toMatchObject({ milesLeft: null, overdue: false })
   })
 })
 

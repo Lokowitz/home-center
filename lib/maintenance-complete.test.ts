@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { completeSchedule, completionCategory } from "./maintenance-complete"
+import { canSkip, completeSchedule, completionCategory, completionRecordData, skipSchedule } from "./maintenance-complete"
 
 const base = { intervalDays: null, intervalMiles: null, nextDueDate: null, nextDueMileage: null }
 
@@ -102,5 +102,70 @@ describe("completionCategory", () => {
     expect(completionCategory("VEHICLE")).toBe("ROUTINE")
     expect(completionCategory("EQUIPMENT")).toBe("ROUTINE")
     expect(completionCategory("PERSON")).toBeNull()
+  })
+})
+
+describe("skipSchedule", () => {
+  const now = new Date(2026, 9, 9, 12)
+
+  it("moves a date one interval on from where it was due", () => {
+    const r = skipSchedule({ ...base, intervalDays: 30, nextDueDate: new Date(2026, 9, 20) }, now, null)
+    expect(r.nextDueDate).toEqual(new Date(2026, 10, 19))
+  })
+
+  it("keeps stepping until the next one is ahead, so a long-overdue reminder isn't still overdue", () => {
+    const r = skipSchedule({ ...base, intervalDays: 30, nextDueDate: new Date(2026, 6, 1) }, now, null)
+    expect(r.nextDueDate).toEqual(new Date(2026, 9, 29))
+  })
+
+  it("steps mileage past the current reading", () => {
+    expect(skipSchedule({ ...base, intervalMiles: 5000, nextDueMileage: 50000 }, now, 49000).nextDueMileage).toBe(55000)
+    expect(skipSchedule({ ...base, intervalMiles: 5000, nextDueMileage: 50000 }, now, 61000).nextDueMileage).toBe(65000)
+    expect(skipSchedule({ ...base, intervalMiles: 5000, nextDueMileage: 50000 }, now, null).nextDueMileage).toBe(55000)
+  })
+
+  it("leaves a side with no interval or no due value alone, and never touches last done", () => {
+    const due = new Date(2026, 9, 1)
+    const r = skipSchedule({ ...base, intervalMiles: 5000, nextDueMileage: 50000, nextDueDate: due, lastCompletedDate: due }, now, 49000)
+    expect(r.nextDueDate).toBe(due)
+    expect(r).not.toHaveProperty("lastCompletedDate")
+    expect(skipSchedule({ ...base, intervalDays: 30 }, now, null).nextDueDate).toBeNull()
+  })
+
+  it("does not change the dates it was given", () => {
+    const due = new Date(2026, 9, 20)
+    skipSchedule({ ...base, intervalDays: 30, nextDueDate: due }, now, null)
+    expect(due).toEqual(new Date(2026, 9, 20))
+  })
+})
+
+describe("canSkip", () => {
+  it("needs an interval with a due value on the same side", () => {
+    expect(canSkip({ ...base, intervalDays: 30, nextDueDate: new Date() })).toBe(true)
+    expect(canSkip({ ...base, intervalMiles: 5000, nextDueMileage: 100 })).toBe(true)
+    expect(canSkip({ ...base, intervalDays: 30, nextDueMileage: 100 })).toBe(false)
+    expect(canSkip({ ...base, nextDueDate: new Date() })).toBe(false)
+  })
+})
+
+describe("completionRecordData", () => {
+  const schedule = { assetType: "VEHICLE" as const, assetId: "v1", title: "Oil change" }
+  const date = new Date(2026, 9, 1)
+
+  it("logs the reminder's title with what was entered", () => {
+    expect(completionRecordData(schedule, { date, mileage: 41000, vendor: "Jiffy", cost: 59.99, notes: "Synthetic" }, "u1")).toEqual({
+      assetType: "VEHICLE", assetId: "v1", date, title: "Oil change", description: "Synthetic", vendor: "Jiffy", cost: 59.99,
+      category: "ROUTINE", mileageAtService: 41000, createdById: "u1",
+    })
+  })
+
+  it("stores blanks as empty, not zero", () => {
+    const r = completionRecordData(schedule, { date, mileage: null, vendor: "", cost: null, notes: "" }, "u1")
+    expect(r).toMatchObject({ description: null, vendor: null, cost: null, mileageAtService: null })
+  })
+
+  it("keeps a reading only on a vehicle, and leaves a person's record uncategorized", () => {
+    const r = completionRecordData({ ...schedule, assetType: "PERSON" }, { date, mileage: 5, vendor: "", cost: 0, notes: "" }, "u1")
+    expect(r).toMatchObject({ mileageAtService: null, category: null, cost: 0 })
   })
 })

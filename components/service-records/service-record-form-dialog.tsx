@@ -17,9 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createServiceRecord, updateServiceRecord } from "@/lib/actions/service-records"
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { meterUnitNoun } from "@/lib/maintenance-due"
+import { matchingReminder } from "@/lib/maintenance-match"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { ASSET_TYPES } from "@/lib/assets"
-import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
+import { BellRing, Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
@@ -111,6 +112,10 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
   const targetType = form.watch("assetType")
   const targetId = form.watch("assetId")
   const targetReminders = reminderOptions.filter((r) => r.assetType === targetType && r.assetId === targetId)
+  // A new record whose title reads like an open reminder offers to complete it; never picked on its own.
+  const titleValue = form.watch("title")
+  const scheduleValue = form.watch("scheduleId")
+  const suggested = !record && !createdRecordId && !scheduleValue ? matchingReminder(titleValue ?? "", targetReminders) : null
 
   useEffect(() => {
     if (record) {
@@ -302,6 +307,21 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                   <FormLabel>Title *</FormLabel>
                   <FormControl><Input placeholder={isPerson ? "Annual physical" : "Oil Change"} {...field} /></FormControl>
                   <FormMessage />
+                  {suggested && (
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
+                      <BellRing className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span>Looks like the reminder &ldquo;{suggested.title}&rdquo;.</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => form.setValue("scheduleId", suggested.id, { shouldDirty: true })}
+                      >
+                        Mark it complete
+                      </Button>
+                    </p>
+                  )}
                 </FormItem>
               )} />
 

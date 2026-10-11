@@ -11,13 +11,13 @@
 | Milestone | Status | Summary |
 |---|---|---|
 | **M0 Integrity and hygiene** | Mostly done | D1, D2, D3 and D4 are fixed. Still open: a cleanup for orphans created before D1, tests for the notification checker, digest and server actions (D5), the `PLANNING.md` historical notice and the README notification line. |
-| **M1 Close the loop** | Mostly done | Logging a service can complete a reminder in the same transaction, and the odometer is raised. Snooze, pause and resume exist, and so do starter plans (F4). Still open: skip, automatic "this record matches a reminder" prompt, and tests for the title matcher and the complete-with-record path. |
+| **M1 Close the loop** | Done | Logging a service can complete a reminder in the same transaction, and the odometer is raised. A matching title suggests the reminder. Snooze, skip, pause and resume are on the dashboard and the bell, and starter plans (F4) exist. Follow-up: Intake receipts don't complete reminders yet. |
 | **M2 Capture foundations** | Partial | Asset Documents tabs (F7) and camera capture on uploads (F14) are done. Not started: PWA manifest and icons (F14) and the ICS feed (F11). The F6 spike was folded into M3: fixtures and an accuracy test live in `lib/capture/`, but no written results. |
 | **M3 Capture inbox** | Done, with gaps | Intake (`/intake`, `InboxItem`), the deterministic parser with fixtures, asset suggestion, attach-to-existing, `.eml`/`.msg` support and optional Local AI reading (Settings → Receipt reading). Unverified: "keep as asset document" and keeping person-owned files away from the LLM. |
 | **M4 Portability (F15)** | Not started | No export, scheduled backup or restore script. This is now the largest gap against §4 of the one-page answer. |
 | **M5 Proactive** | Not started | F9, F5, F10, F19 and F13 have no code. |
 
-**Suggested next:** M4 (F15 export and backup), since M1 and M3 have landed. Then close the small M0 and M1 leftovers.
+**Suggested next:** M4 (F15 export and backup), since M1 and M3 have landed. Then close the small M0 leftovers.
 
 ---
 
@@ -135,9 +135,10 @@ These assume one maintainer working part-time. Durations are rough calendar esti
 
 ### M1: Close the loop (2–3 weeks)
 - F1, F2 and F3, as defined in §4.
-  - **F1 mostly done:** a service record can complete a reminder in the same transaction (`lib/service-record-server.ts`), chosen with the "Completes reminder" field, and raises the vehicle's odometer. It is linked through completion writes rather than the `ServiceRecord.maintenanceScheduleId` column §4 proposed. **Not started:** an automatic "this matches a reminder" prompt, and tests for the title matcher and the complete-with-record path.
-  - **F2 mostly done:** snooze and pause/resume (`lib/actions/maintenance.ts`). **Not started:** skip.
-  - **F3 partial:** reminder rows on the dashboard and the bell offer snooze; inline Complete from the bell is unverified.
+  - **F1 done:** a service record can complete a reminder in the same transaction (`lib/service-record-server.ts`), chosen with the "Completes reminder" field, and raises the vehicle's odometer. It is linked through completion writes rather than the `ServiceRecord.maintenanceScheduleId` column §4 proposed. A new record whose title reads like an open reminder offers "Mark it complete" (`lib/maintenance-match.ts`); it is never picked automatically. Tests cover the matcher, `scheduleDue`, and the record Complete logs (`completionRecordData`).
+  - **F2 done:** snooze, pause/resume, and "Skip this time", which moves the reminder on by whole intervals without logging it (`skipSchedule` in `lib/maintenance-complete.ts`).
+  - **F3 done:** the dashboard and the bell offer Complete, Snooze and Skip inline.
+  - **Follow-up:** a receipt filed from Intake doesn't yet complete a matching reminder.
 - **F4 starter plans:** a curated `lib/maintenance-templates.ts`, offered on asset creation and on an empty Maintenance tab.
   - **Done:** `lib/maintenance-templates.ts`, the template picker, and "Add default reminders" on an empty Maintenance tab.
 

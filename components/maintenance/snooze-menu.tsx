@@ -3,7 +3,7 @@
 import { useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { AlarmClockOff, BellRing, Pause, Play } from "lucide-react"
+import { AlarmClockOff, BellRing, Pause, Play, SkipForward } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,12 +11,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { snoozeMaintenanceSchedule, setMaintenanceScheduleActive } from "@/lib/actions/maintenance"
+import { setMaintenanceScheduleActive, skipMaintenanceSchedule, snoozeMaintenanceSchedule } from "@/lib/actions/maintenance"
+import { canSkip } from "@/lib/maintenance-complete"
 import { SNOOZE_OPTIONS, isSnoozed, type SnoozeFor } from "@/lib/maintenance-due"
 import { cn } from "@/lib/utils"
 
 interface Props {
-  schedule: { id: string; title: string; isActive: boolean; snoozedUntil: Date | null }
+  schedule: {
+    id: string
+    title: string
+    isActive: boolean
+    snoozedUntil: Date | null
+    intervalDays: number | null
+    intervalMiles: number | null
+    nextDueDate: Date | null
+    nextDueMileage: number | null
+  }
   /** Just the clock icon, for tight rows. */
   iconOnly?: boolean
   className?: string
@@ -51,12 +61,39 @@ export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, 
     // Paused reminders leave the dashboard and the bell, so say where to find them.
     pause: () =>
       run(() => setMaintenanceScheduleActive(schedule.id, false), `"${schedule.title}" paused. Resume it from its asset page.`),
+    skip: () =>
+      startTransition(async () => {
+        const result = await skipMaintenanceSchedule(schedule.id)
+        if (!result || "error" in result) { toast.error(result?.error ?? "Something went wrong."); return }
+        toast.success(`"${schedule.title}" skipped. ${nextDueText(result)}`)
+        onDone?.()
+        router.refresh()
+      }),
   }
+}
+
+/** "Next due Nov 19, 2026." / "…or at 55,000." for the skip toast. */
+function nextDueText(next: { nextDueDate: Date | null; nextDueMileage: number | null }) {
+  const parts = [
+    next.nextDueDate ? new Date(next.nextDueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null,
+    next.nextDueMileage != null ? `at ${next.nextDueMileage.toLocaleString()}` : null,
+  ].filter(Boolean)
+  return parts.length ? `Next due ${parts.join(" or ")}.` : ""
+}
+
+/** The menu entry for skipping, shared with the bell's own menu. Hidden when there's nothing to skip to. */
+export function SkipItem({ schedule, onSkip }: { schedule: Props["schedule"]; onSkip: () => void }) {
+  if (!canSkip(schedule)) return null
+  return (
+    <DropdownMenuItem onClick={onSkip}>
+      <SkipForward className="mr-2 h-4 w-4" /> Skip this time
+    </DropdownMenuItem>
+  )
 }
 
 /** Snooze a reminder for a while, wake it early, or pause it outright. */
 export function SnoozeMenu({ schedule, iconOnly = false, className }: Props) {
-  const { pending, run, snooze, pause } = useReminderActions(schedule)
+  const { pending, run, snooze, pause, skip } = useReminderActions(schedule)
   const snoozed = isSnoozed(schedule)
 
   return (
@@ -86,6 +123,7 @@ export function SnoozeMenu({ schedule, iconOnly = false, className }: Props) {
           </DropdownMenuItem>
         )}
         {schedule.isActive && <DropdownMenuSeparator />}
+        {schedule.isActive && <SkipItem schedule={schedule} onSkip={skip} />}
         {schedule.isActive ? (
           <DropdownMenuItem onClick={pause}>
             <Pause className="mr-2 h-4 w-4" /> Pause

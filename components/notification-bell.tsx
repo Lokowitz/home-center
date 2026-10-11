@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CompleteDialog } from "@/components/maintenance/complete-dialog"
-import { useReminderActions } from "@/components/maintenance/snooze-menu"
+import { SkipItem, useReminderActions } from "@/components/maintenance/snooze-menu"
 import { SNOOZE_OPTIONS } from "@/lib/maintenance-due"
 import type { NotificationReminder } from "@/lib/notification-reminders"
 import { dismissNotification, markAllNotificationsRead, markNotificationRead } from "@/lib/actions/notifications"
@@ -193,7 +193,7 @@ function BellReminderActions({ reminder, onComplete, onHandled }: {
   onComplete: () => void
   onHandled: () => void
 }) {
-  const { pending, snooze, pause } = useReminderActions(reminder.schedule, onHandled)
+  const { pending, snooze, pause, skip } = useReminderActions(reminder.schedule, onHandled)
   return (
     <div className="flex shrink-0 flex-col items-stretch gap-1">
       <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onComplete}>
@@ -214,6 +214,7 @@ function BellReminderActions({ reminder, onComplete, onHandled }: {
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
+          <SkipItem schedule={reminder.schedule} onSkip={skip} />
           <DropdownMenuItem onClick={pause}>
             <Pause className="mr-2 h-4 w-4" /> Pause
           </DropdownMenuItem>

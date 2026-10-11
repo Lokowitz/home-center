@@ -7,7 +7,7 @@ import { ASSET_TYPES, assetHref } from "@/lib/assets"
 import type { AssetType } from "@/app/generated/prisma/client"
 import { redirect } from "next/navigation"
 import { z } from "zod"
-import { completionCategory } from "@/lib/maintenance-complete"
+import { canSkip, completionRecordData, skipSchedule } from "@/lib/maintenance-complete"
 import { dismissScheduleNotifications, scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
 import { snoozeEnd, type SnoozeFor } from "@/lib/maintenance-due"
 import { firstDue, templatesFor } from "@/lib/maintenance-templates"
@@ -102,18 +102,17 @@ export async function completeMaintenanceSchedule(id: string, data: z.input<type
 
   const record = v.logService
     ? prisma.serviceRecord.create({
-        data: {
-          assetId: schedule.assetId,
-          assetType: schedule.assetType,
-          date: completedDate,
-          title: schedule.title,
-          description: v.notes || null,
-          vendor: v.vendor || null,
-          cost: v.cost === "" || v.cost === undefined ? null : Number(v.cost),
-          category: completionCategory(schedule.assetType),
-          mileageAtService: schedule.assetType === "VEHICLE" ? completedMileage : null,
-          createdById: session.user.id,
-        },
+        data: completionRecordData(
+          schedule,
+          {
+            date: completedDate,
+            mileage: completedMileage,
+            vendor: v.vendor ?? "",
+            cost: v.cost === "" || v.cost === undefined ? null : Number(v.cost),
+            notes: v.notes ?? "",
+          },
+          session.user.id
+        ),
         select: { id: true },
       })
     : null
@@ -152,6 +151,30 @@ export async function snoozeMaintenanceSchedule(id: string, snoozeFor: z.input<t
   ])
   revalidateSchedule(schedule)
   return { success: true, snoozedUntil }
+}
+
+/**
+ * "Skip this time": move the reminder on to its next due date and mileage
+ * without logging it as done. Ends any snooze and clears its due notifications.
+ */
+export async function skipMaintenanceSchedule(id: string) {
+  const session = await auth()
+  if (!session) redirect("/login")
+
+  const schedule = await prisma.maintenanceSchedule.findUnique({ where: { id } })
+  if (!schedule) return { error: "Not found" }
+  if (!canSkip(schedule)) return { error: "This reminder doesn't repeat, so there's nothing to skip to." }
+
+  const vehicle = schedule.assetType === "VEHICLE"
+    ? await prisma.vehicle.findUnique({ where: { id: schedule.assetId }, select: { currentMileage: true } })
+    : null
+  const next = skipSchedule(schedule, new Date(), vehicle?.currentMileage ?? null)
+  await prisma.$transaction([
+    prisma.maintenanceSchedule.update({ where: { id }, data: { ...next, snoozedUntil: null } }),
+    dismissScheduleNotifications(id),
+  ])
+  revalidateSchedule(schedule)
+  return { success: true, nextDueDate: next.nextDueDate, nextDueMileage: next.nextDueMileage }
 }
 
 /** Pause keeps the reminder on its asset page but stops it counting as due. */
