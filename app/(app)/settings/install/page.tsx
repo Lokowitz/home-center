@@ -9,15 +9,18 @@ export default async function InstallPage() {
   const session = await auth()
   if (!session) redirect("/login")
 
+  // Any signed-in user can open this page, but the Features tab is admin-only.
+  const backHref = session.user.role === "ADMIN" ? "/settings?tab=features" : "/"
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="space-y-2">
         <Link
-          href="/settings?tab=features"
+          href={backHref}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Back to Settings
+          {session.user.role === "ADMIN" ? "Back to Settings" : "Back to dashboard"}
         </Link>
         <h1 className="font-heading text-2xl font-semibold">Install HomeCenter as an app</h1>
         <p className="text-sm text-muted-foreground">
