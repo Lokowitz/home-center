@@ -3,6 +3,7 @@ import type { AssetType, InboxStatus } from "@/app/generated/prisma/client"
 import { loadFeatures } from "@/lib/features-server"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { EMPTY_ITEM_MAX_AGE_MS } from "@/lib/inbox"
+import { remindersInText } from "@/lib/maintenance-match"
 
 // Reads for the /intake page and the Intake badge.
 
@@ -34,8 +35,12 @@ export type InboxListItem = {
   suggestedReason: string | null
   /** The suggested asset already has a service record with this receipt's total on its day. */
   matchingRecord: boolean
+  /** Per asset ("TYPE:id"), the reminder the receipt's text reads as; filing it can offer to complete that one. */
+  reminderMatches: Record<string, string>
   attachments: InboxAttachment[]
 }
+
+type ReminderRef = { id: string; title: string; assetType: AssetType; assetId: string }
 
 /** Items whose upload never arrived (no files, over an hour old) are deleted. */
 async function removeAbandoned(now: Date): Promise<void> {
@@ -122,8 +127,11 @@ export async function loadHouseholdNames(includePeople: boolean): Promise<string
   return [...new Set([...users, ...people].map((r) => r.name.trim()).filter(Boolean))]
 }
 
-/** Every item, newest first, with its files and suggested asset. Cleans up abandoned items first. */
-export async function listInboxItems(now: Date = new Date()): Promise<InboxList> {
+/**
+ * Every item, newest first, with its files and suggested asset. Cleans up abandoned items first.
+ * With `reminders`, each item's read text is matched against them (reminderMatches).
+ */
+export async function listInboxItems(now: Date = new Date(), { reminders = [] }: { reminders?: ReminderRef[] } = {}): Promise<InboxList> {
   await removeAbandoned(now)
   const [rows, features] = await Promise.all([
     prisma.inboxItem.findMany({
@@ -132,7 +140,11 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxList>
         createdBy: { select: { name: true } },
         attachments: {
           orderBy: { uploadedAt: "asc" },
-          select: { id: true, filename: true, originalName: true, mimeType: true, sizeBytes: true, text: { select: { status: true } } },
+          select: {
+            id: true, filename: true, originalName: true, mimeType: true, sizeBytes: true,
+            // The text itself only when there are reminders to match it against.
+            text: { select: { status: true, text: reminders.length > 0 } },
+          },
         },
       },
     }),
@@ -160,6 +172,9 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxList>
       suggestedAsset: r.suggestedAssetType && r.suggestedAssetId && name ? { type: r.suggestedAssetType, id: r.suggestedAssetId, name } : null,
       suggestedReason: name ? r.suggestedReason : null,
       matchingRecord: !!name && matching.has(r.id),
+      reminderMatches: reminders.length
+        ? remindersInText(r.attachments.map((a) => a.text?.text ?? "").join("\n"), reminders)
+        : {},
       attachments: r.attachments.map((a) => ({
         id: a.id,
         originalName: a.originalName,

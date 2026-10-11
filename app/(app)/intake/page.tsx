@@ -10,19 +10,19 @@ import type { InboxAssetOption, InboxReminderOption } from "@/components/inbox/a
 export default async function IntakePage() {
   const features = await loadFeatures()
   const byName = { select: { id: true, name: true }, orderBy: { name: "asc" } } as const
-  const [{ items, householdNames }, properties, vehicles, equipment, people, schedules] = await Promise.all([
-    listInboxItems(),
+  // "Completes reminder" offers active (not paused) reminders only; each receipt's text is matched against them.
+  const schedules = await prisma.maintenanceSchedule.findMany({
+    where: { isActive: true, ...ownedWhere(features) },
+    select: { id: true, title: true, assetType: true, assetId: true },
+    orderBy: { title: "asc" },
+  })
+  const [{ items, householdNames }, properties, vehicles, equipment, people] = await Promise.all([
+    listInboxItems(new Date(), { reminders: schedules }),
     prisma.property.findMany(byName),
     prisma.vehicle.findMany({ select: { id: true, name: true, meterUnit: true }, orderBy: { name: "asc" } }),
     prisma.equipment.findMany(byName),
     // People go with the rest of Health.
     features.health ? prisma.person.findMany(byName) : Promise.resolve([]),
-    // "Completes reminder" offers active (not paused) reminders only.
-    prisma.maintenanceSchedule.findMany({
-      where: { isActive: true, ...ownedWhere(features) },
-      select: { id: true, title: true, assetType: true, assetId: true },
-      orderBy: { title: "asc" },
-    }),
   ])
 
   const assets: InboxAssetOption[] = [

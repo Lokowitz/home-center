@@ -39,3 +39,25 @@ export function matchingReminder<R extends { title: string }>(title: string, rem
   const best = scored.filter((s) => s.score === top)
   return best.length === 1 ? best[0].r : null
 }
+
+/**
+ * For a receipt's text: per asset ("TYPE:id"), the one reminder it reads as,
+ * so whichever asset it's filed under can offer its match. Assets with no
+ * clear match are left out.
+ */
+export function remindersInText<R extends { id: string; title: string; assetType: string; assetId: string }>(
+  text: string,
+  reminders: R[]
+): Record<string, string> {
+  const byAsset = new Map<string, R[]>()
+  for (const r of reminders) {
+    const key = `${r.assetType}:${r.assetId}`
+    byAsset.set(key, [...(byAsset.get(key) ?? []), r])
+  }
+  const out: Record<string, string> = {}
+  for (const [key, list] of byAsset) {
+    const hit = matchingReminder(text, list)
+    if (hit) out[key] = hit.id
+  }
+  return out
+}

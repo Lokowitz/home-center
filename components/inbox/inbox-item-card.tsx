@@ -370,6 +370,7 @@ export function InboxItemCard({
           defaults={dialog.defaults}
           assets={assets}
           reminders={reminders}
+          reminderMatches={item.reminderMatches}
           onClose={() => setDialog(null)}
         />
       )}

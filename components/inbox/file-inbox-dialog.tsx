@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AssetSelect, type InboxAssetOption, type InboxReminderOption } from "@/components/inbox/asset-select"
 import { fileInboxItem } from "@/lib/actions/inbox"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
+import { BellRing } from "lucide-react"
 import { meterUnitNoun } from "@/lib/maintenance-due"
+import { matchingReminder } from "@/lib/maintenance-match"
 import { NO_CATEGORY, fieldErrorTarget, fileFormPayload, parseAssetKey, type FileFormValues } from "@/lib/inbox-form"
 // Type only: service-record-server reaches Prisma.
 import type { ServiceRecordInput } from "@/lib/service-record-server"
@@ -40,6 +42,7 @@ export function FileInboxDialog({
   defaults,
   assets,
   reminders,
+  reminderMatches = {},
   onClose,
 }: {
   itemId: string
@@ -47,14 +50,23 @@ export function FileInboxDialog({
   defaults: FileFormValues
   assets: InboxAssetOption[]
   reminders: InboxReminderOption[]
+  /** Per asset key, the reminder the receipt's text reads as. */
+  reminderMatches?: Record<string, string>
   onClose: () => void
 }) {
   const router = useRouter()
   const form = useForm<FileFormValues>({ resolver: zodResolver(schema), defaultValues: defaults })
 
-  const asset = parseAssetKey(useWatch({ control: form.control, name: "assetKey" }))
+  const key = useWatch({ control: form.control, name: "assetKey" })
+  const asset = parseAssetKey(key)
   const chosen = asset ? assets.find((a) => a.type === asset.assetType && a.id === asset.assetId) : undefined
   const assetReminders = asset ? reminders.filter((r) => r.assetType === asset.assetType && r.assetId === asset.assetId) : []
+  // What the title says wins over what the receipt says; either is only offered, never picked.
+  const title = useWatch({ control: form.control, name: "title" })
+  const scheduleId = useWatch({ control: form.control, name: "scheduleId" })
+  const suggested = scheduleId
+    ? null
+    : matchingReminder(title ?? "", assetReminders) ?? assetReminders.find((r) => r.id === reminderMatches[key]) ?? null
   const isPerson = asset?.assetType === "PERSON"
 
   async function onSubmit(values: FileFormValues) {
@@ -126,6 +138,21 @@ export function FileInboxDialog({
                       {assetReminders.map((r) => <SelectItem key={r.id} value={r.id}>{r.title}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {suggested && (
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground" aria-live="polite">
+                      <BellRing className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span>Looks like the reminder &ldquo;{suggested.title}&rdquo;.</span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => form.setValue("scheduleId", suggested.id, { shouldDirty: true })}
+                      >
+                        Mark it complete
+                      </Button>
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

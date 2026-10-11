@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { matchingReminder } from "./maintenance-match"
+import { matchingReminder, remindersInText } from "./maintenance-match"
 
 const r = (id: string, title: string) => ({ id, title })
 const ids = (title: string, reminders: { id: string; title: string }[]) => matchingReminder(title, reminders)?.id ?? null
@@ -33,5 +33,26 @@ describe("matchingReminder", () => {
     expect(ids("", reminders)).toBeNull()
     expect(ids("   \t ", reminders)).toBeNull()
     expect(ids("Oil change", [])).toBeNull()
+  })
+})
+
+describe("remindersInText", () => {
+  const rem = (id: string, title: string, assetId: string) => ({ id, title, assetType: "VEHICLE" as const, assetId })
+  const reminders = [rem("o1", "Oil change", "v1"), rem("t1", "Tire rotation", "v1"), rem("o2", "Oil change", "v2"), rem("b2", "Brake fluid flush", "v2")]
+  const receipt = "JIFFY LUBE #1234\nFull synthetic oil change ... 59.99\nOil filter\n\tTotal 64.21\n\nThank you"
+
+  it("finds each asset's reminder the receipt reads as, keyed by asset", () => {
+    expect(remindersInText(receipt, reminders)).toEqual({ "VEHICLE:v1": "o1", "VEHICLE:v2": "o2" })
+  })
+
+  it("leaves out assets with nothing matching, or with a tie", () => {
+    expect(remindersInText("Brake fluid flush and tire rotation", reminders)).toEqual({ "VEHICLE:v1": "t1", "VEHICLE:v2": "b2" })
+    const tied = [rem("a", "Oil change", "v1"), rem("b", "Change oil", "v1")]
+    expect(remindersInText(receipt, tied)).toEqual({})
+  })
+
+  it("returns nothing for empty text or no reminders", () => {
+    expect(remindersInText("", reminders)).toEqual({})
+    expect(remindersInText(receipt, [])).toEqual({})
   })
 })
