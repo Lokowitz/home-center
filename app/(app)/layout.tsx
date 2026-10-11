@@ -2,6 +2,8 @@ import { Suspense } from "react"
 import { Coffee } from "lucide-react"
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
+import { SIDEBAR_COOKIE, readSidebarCollapsed } from "@/lib/sidebar-state"
 import { prisma } from "@/lib/prisma"
 import { Sidebar, MobileSidebarTrigger } from "@/components/sidebar"
 import { UserMenu } from "@/components/user-menu"
@@ -35,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [hrefs, reminders] = await Promise.all([resolveNotificationHrefs(notifications), loadNotificationReminders(notifications)])
   const notificationItems = notifications.map((n) => ({ ...n, href: hrefs.get(n.id) ?? "/notifications", reminder: reminders.get(n.id) }))
   const isAdmin = session.user.role === "ADMIN"
+  const sidebarCollapsed = readSidebarCollapsed((await cookies()).get(SIDEBAR_COOKIE)?.value)
   // Admins see the entry points even when it's off, so they can find the setup —
   // unless it's been explicitly hidden.
   const showAssistant = !llm.hidden && (llm.available || isAdmin)
@@ -43,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <ChatProvider userId={session.user.id} available={llm.available} isAdmin={isAdmin} model={llm.model}>
       <DropProvider healthEnabled={features.health}>
       <div className="flex h-svh overflow-hidden">
-        <Sidebar showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
+        <Sidebar showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} initialCollapsed={sidebarCollapsed} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
             <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />

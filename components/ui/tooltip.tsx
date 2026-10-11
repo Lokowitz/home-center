@@ -16,15 +16,17 @@ function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
 function TooltipContent({
   className,
   align = "center",
+  side,
   sideOffset = 6,
   children,
   ...props
 }: TooltipPrimitive.Popup.Props &
-  Pick<TooltipPrimitive.Positioner.Props, "align" | "sideOffset">) {
+  Pick<TooltipPrimitive.Positioner.Props, "align" | "side" | "sideOffset">) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
         align={align}
+        side={side}
         sideOffset={sideOffset}
         className="isolate z-50"
       >
