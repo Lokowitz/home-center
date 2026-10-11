@@ -37,7 +37,9 @@ manifest.json      formatVersion (1), kind, scope, appVersion, migration (latest
                    files: [{ path, size, sha256 }], warnings
 db/homecenter.db   VACUUM INTO snapshot                 (backup only)
 secrets.json       { mailPassword?, llmApiKey? } plain  (protected backups only)
-files/…            same relative layout as UPLOAD_DIR, only files referenced by the snapshot
+files/…            backup: same relative layout as UPLOAD_DIR, only files referenced by the
+                   snapshot. export: readable paths (<asset>/<section>/<original name>,
+                   as today's per-asset zip), since nothing restores from it
 readable/
   index.html       offline viewer (inline CSS/JS, no network)
   data.js          window.HC_DATA = {...}  (file:// blocks fetch)
@@ -82,8 +84,11 @@ The app lists and checks backups from sidecars without decrypting.
   Everything.
 - Keys and passphrases supplied for restore are used in memory only, never stored.
 - Not protected against: someone holding `/data` and `AUTH_SECRET` (they have the live data).
-- Plan task: confirm `age-encryption` (0.3.1) and zip.js stream multi-GB inputs; if not,
-  encrypt in chunks without loading the archive into memory.
+- Streaming confirmed (2026-10-11 spike, 150/300/600 MB random data): `age-encryption` 0.3.1
+  X25519 round trip at a flat ~145 MB RSS; `@zip.js/zip.js` 2.x AES-256 write/read flat
+  (fixed overhead, not size-dependent); wrong password rejected ("Invalid password").
+- **One zip library: `@zip.js/zip.js`** for every archive (plain, inner and outer). fflate has
+  no ZIP64, so archives or files over 4 GB would break; zip.js streams and supports ZIP64.
 
 ## Units (`lib/backup/`)
 | Unit | Responsibility |
@@ -97,6 +102,15 @@ The app lists and checks backups from sidecars without decrypting.
 | `store.ts` | list from sidecars, retention pruning (only valid sidecar+archive pairs), free space, same-device check |
 | `scheduler.ts` | 15-minute tick from `instrumentation.ts`; due/catch-up logic; one job at a time |
 | `jobs.ts` | `BackupRun` lifecycle, progress, alerts |
+
+Engine files (everything in `lib/backup/` not ending `-server.ts`) use only relative imports
+and npm packages, never `@/` (type-only imports excepted), because the boot-time apply script
+and the CLI run them with `tsx` inside the Docker runner, which has no `@/` app sources. The
+Dockerfile copies `lib/backup`, the two helpers they import (`lib/attachment-location.ts`,
+`lib/secret-box.ts`) and `scripts/`. A unit test enforces the import rule.
+
+The restore upload route is excluded from `proxy.ts`'s matcher (as `api/uploads` is) so
+large bodies are not capped by `proxyClientMaxBodySize`; it checks auth itself.
 
 Server actions in `lib/actions/backup.ts`; streaming routes under `app/api/backup/`
 (download, upload for restore, export). All use a new `requireAdmin()` helper
