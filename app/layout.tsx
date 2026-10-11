@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { themeNames } from "@/lib/themes";
@@ -8,7 +8,13 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "HomeCenter",
   description: "Track and manage your homes and vehicles",
+  // iOS ignores most of the manifest: these make Add to Home Screen open
+  // full-screen with the right name and icon.
+  appleWebApp: { capable: true, title: "HomeCenter", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#ffffff" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
