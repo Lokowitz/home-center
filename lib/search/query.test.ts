@@ -75,17 +75,29 @@ describe("semanticOnly", () => {
 describe("highlight", () => {
   it("marks every occurrence, longest term first", () => {
     expect(highlight("Filter: buy filters", ["filter"])).toEqual([
-      { text: "Filter", match: true },
+      { text: "Filter", match: true, joinsPrev: false, joinsNext: false },
       { text: ": buy ", match: false },
-      { text: "filter", match: true },
+      { text: "filter", match: true, joinsPrev: false, joinsNext: true },
       { text: "s", match: false },
     ])
+  })
+
+  it("says which sides of a match run into the rest of its word", () => {
+    const marks = (text: string, terms: string[]) =>
+      highlight(text, terms).filter((s) => s.match).map((s) => `${s.joinsPrev ? "<" : "|"}${s.text}${s.joinsNext ? ">" : "|"}`)
+    expect(marks("paint & carpet", ["car"])).toEqual(["|car>"])
+    expect(marks("Scar", ["car"])).toEqual(["<car|"])
+    expect(marks("Scared", ["car"])).toEqual(["<car>"])
+    expect(marks("(car)\tcar's", ["car"])).toEqual(["|car|", "|car|"])
+    expect(marks("Carrier", ["car"])).toEqual(["|Car>"])
+    expect(marks("CAR-143986", ["car"])).toEqual(["|CAR|"])
+    expect(marks("", ["car"])).toEqual([])
   })
 
   it("escapes regex characters in terms", () => {
     expect(highlight("part a.b", ["a.b"])).toEqual([
       { text: "part ", match: false },
-      { text: "a.b", match: true },
+      { text: "a.b", match: true, joinsPrev: false, joinsNext: false },
     ])
   })
 

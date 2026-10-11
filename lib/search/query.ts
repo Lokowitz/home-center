@@ -132,7 +132,13 @@ export function mergeSemantic(keyword: Section[], semantic: Section[]): Section[
   return [...merged, ...extra.values()]
 }
 
-export type Segment = { text: string; match: boolean }
+/**
+ * `joinsPrev`/`joinsNext`: a match runs straight into letters or digits on that
+ * side ("car" in "carpet"), so it mustn't be padded there or the word looks split.
+ */
+export type Segment = { text: string; match: boolean; joinsPrev?: boolean; joinsNext?: boolean }
+
+const WORD_CHAR = /[\p{L}\p{N}]/u
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
@@ -177,8 +183,9 @@ export function highlight(text: string, terms: string[]): Segment[] {
   for (const m of text.matchAll(re)) {
     const i = m.index ?? 0
     if (i > last) out.push({ text: text.slice(last, i), match: false })
-    out.push({ text: m[0], match: true })
-    last = i + m[0].length
+    const end = i + m[0].length
+    out.push({ text: m[0], match: true, joinsPrev: WORD_CHAR.test(text[i - 1] ?? ""), joinsNext: WORD_CHAR.test(text[end] ?? "") })
+    last = end
   }
   if (last < text.length) out.push({ text: text.slice(last), match: false })
   return out

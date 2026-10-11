@@ -19,7 +19,17 @@ export function Highlighted({ text, terms }: { text: string; terms: string[] }) 
     <>
       {highlight(text, terms).map((s, i) =>
         s.match ? (
-          <mark key={i} className="rounded-sm bg-primary/15 px-0.5 text-foreground">{s.text}</mark>
+          // Padded and rounded only where the match meets a space or punctuation, so "car|pet" still reads as one word.
+          <mark
+            key={i}
+            className={cn(
+              "rounded-sm bg-primary/15 px-0.5 text-foreground",
+              s.joinsPrev && "rounded-l-none pl-0",
+              s.joinsNext && "rounded-r-none pr-0"
+            )}
+          >
+            {s.text}
+          </mark>
         ) : (
           <span key={i}>{s.text}</span>
         )
