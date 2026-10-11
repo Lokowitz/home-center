@@ -1,6 +1,6 @@
 # HomeCenter: current-state assessment
 
-*Product discovery, 2026-10-09. Based on reading the code at commit `8c3561d` on `main`, plus uncommitted work in the tree at that time. Nothing was run against real household data. Paths are relative to the repo root.*
+*Product discovery, 2026-10-09. Based on reading the code at commit `8c3561d` on `main`, plus uncommitted work in the tree at that time. Nothing was run against real household data. Paths are relative to the repo root. Status notes marked "Fixed"/"Done" were added later, after checking the code on `FEAT/EnhancementsV1`.*
 
 **Evidence labels used throughout**
 - **Observed:** read in the code, with a path given.
@@ -172,8 +172,8 @@ HomeCenter is a single Next.js 16 app (`package.json`: `next 16.2.12`, React 19.
 
 | # | Finding | Evidence | Severity |
 |---|---|---|---|
-| D1 | **Deleting a property, vehicle or equipment leaves its service records, warranties and schedules orphaned**, while the confirm dialog says "This will also delete all associated records." | Confirm text at `components/vehicles/vehicle-list.tsx:63`, `components/properties/property-list.tsx:68`, `components/equipment/equipment-list.tsx:84`. The actions delete only the row and its upload folder (`lib/actions/vehicles.ts:65-75`, `properties.ts:59-69`, `equipment.ts:65-75`). People do cascade (`lib/actions/people.ts:55-56`). `/maintenance` already renders "Unknown" for orphans (`app/(app)/maintenance/page.tsx:142`). | High: data integrity, and the UI tells the user something untrue |
-| D2 | **The compose healthcheck probably never tests the database.** `/api/health` is not excluded from `proxy.ts` and is not public, so an unauthenticated `wget` is redirected to `/login`, which returns 200. | `proxy.ts:12-21,36`, `docker-compose.yml` healthcheck. *Inferred, not executed.* | Medium: a broken DB looks healthy |
+| D1 | **Fixed 2026-10-10 (`e4bb753`):** `lib/asset-delete-server.ts` `deleteAssetWithRecords` now deletes the asset's service records, warranties, schedules and documents in one transaction, plus their upload folders. A property's equipment is kept, unlinked, and the property confirm says so. *Original finding:* **Deleting a property, vehicle or equipment leaves its service records, warranties and schedules orphaned**, while the confirm dialog says "This will also delete all associated records." | Confirm text at `components/vehicles/vehicle-list.tsx:63`, `components/properties/property-list.tsx:68`, `components/equipment/equipment-list.tsx:84`. The actions delete only the row and its upload folder (`lib/actions/vehicles.ts:65-75`, `properties.ts:59-69`, `equipment.ts:65-75`). People do cascade (`lib/actions/people.ts:55-56`). `/maintenance` already renders "Unknown" for orphans (`app/(app)/maintenance/page.tsx:142`). | High: data integrity, and the UI tells the user something untrue |
+| D2 | **Fixed 2026-10-10 (`2805f9c`):** `proxy.ts` lets `/api/health` through without a session, and the route runs `SELECT 1`, answering 503 on failure. *Original finding:* **The compose healthcheck probably never tests the database.** `/api/health` is not excluded from `proxy.ts` and is not public, so an unauthenticated `wget` is redirected to `/login`, which returns 200. | `proxy.ts:12-21,36`, `docker-compose.yml` healthcheck. *Inferred, not executed.* | Medium: a broken DB looks healthy |
 | D3 | Maintenance-schedule attachments are missing from the "Download all files" zip, and so is a property's equipment. | `app/api/assets/[type]/[id]/download/route.ts:30-37` | Medium: "download all" is not all |
 | D4 | CI builds and pushes images with no tests or lint. | `.github/workflows/docker-publish.yml` | Medium: regressions ship straight to `latest` |
 | D5 | No tests for `scheduleDue`, the notification checker or digest, cost bucketing, server actions or authorization. | `vitest.config.ts`, test inventory | Medium |
@@ -200,7 +200,7 @@ HomeCenter is a single Next.js 16 app (`package.json`: `next 16.2.12`, React 19.
 | README feature table: "Records & export" | No data export exists, only file zips and print | `README.md:50` |
 | `proxy.ts` lists `/setup` as public | No `/setup` route exists | `proxy.ts:12` |
 | `NotificationType.CUSTOM` | Nothing produces it | `schema.prisma:126-133` |
-| Asset delete confirmation | See D1 | |
+| Asset delete confirmation | See D1 (fixed: the confirmation is now true) | |
 
 PLANNING.md reads as the original design. It is now historical, and contributors may be misled by it.
 
@@ -219,7 +219,7 @@ PLANNING.md reads as the original design. It is now historical, and contributors
 
 ## 8. Improve these before adding new features
 
-1. **Fix D1 (orphaned records) and D2 (healthcheck).** Integrity and honesty come first.
+1. ~~**Fix D1 (orphaned records) and D2 (healthcheck).** Integrity and honesty come first.~~ **Done 2026-10-10** (`e4bb753`, `2805f9c`). Neither fix has a regression test yet.
 2. **Close the reminder → service record loop** (§4.1), and make the existing `isActive` field real (pause), plus snooze (§4.2). This is the core job the README sells.
 3. **Make "Download all files" complete** (D3).
 4. **Add tests and lint to CI** for the due engine and the notification checker (D4, D5) before changing them.
