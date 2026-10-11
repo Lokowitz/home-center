@@ -17,6 +17,7 @@ import { inboxCount } from "@/lib/inbox-server"
 import { ChatProvider } from "@/components/chat/chat-provider"
 import { ChatDock, ChatToggle } from "@/components/chat/chat-panel"
 import { DropProvider } from "@/components/drop/drop-provider"
+import { IntakeHeaderLink } from "@/components/inbox/intake-header-link"
 import packageJson from "@/package.json"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 
@@ -46,10 +47,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <ChatProvider userId={session.user.id} available={llm.available} isAdmin={isAdmin} model={llm.model}>
       <DropProvider healthEnabled={features.health}>
       <div className="flex h-svh overflow-hidden">
-        <Sidebar showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} initialCollapsed={sidebarCollapsed} />
+        <Sidebar showAssistant={showAssistant} showHealth={features.health} initialCollapsed={sidebarCollapsed} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
-            <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} inboxCount={inbox} />
+            <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} />
             {/* On a phone search is an icon, so it sits with the other header buttons on the right. */}
             <div className="flex min-w-0 flex-1 justify-end sm:justify-center">
               <Suspense fallback={null}>
@@ -59,6 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <ThemeNavigator />
               {showAssistant && <ChatToggle />}
+              <IntakeHeaderLink count={inbox} />
               <NotificationBell notifications={notificationItems} />
               <UserMenu name={session.user.name ?? "User"} email={session.user.email ?? ""} />
             </div>

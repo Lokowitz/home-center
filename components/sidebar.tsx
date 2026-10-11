@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   LayoutDashboard, Building2, Car, Refrigerator, Wrench, ShieldCheck,
-  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, ShieldPlus, Sparkles, Inbox,
+  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, ShieldPlus, Sparkles,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react"
 
@@ -18,7 +18,6 @@ type NavItem = { href: string; label: string; icon: React.ElementType; section?:
 
 const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/intake", label: "Intake", icon: Inbox },
   { href: "/chat", label: "Assistant", icon: Sparkles },
   { href: "/assets/properties", label: "Properties", icon: Building2, section: "Home" },
   { href: "/assets/vehicles", label: "Vehicles", icon: Car },
@@ -35,11 +34,28 @@ const navItems: NavItem[] = [
 
 const bottomItems = [{ href: "/settings", label: "Settings", icon: Settings }]
 
-const countText = (n: number) => (n > 99 ? "99+" : String(n))
+/**
+ * The name beside an icon in the collapsed sidebar: shown at once on hover or
+ * keyboard focus (no delay, no animation), styled as the theme's popover.
+ */
+function NavTooltip({ label, children }: { label: string; children: React.ReactElement }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger delay={0} closeDelay={0} render={children} />
+      <TooltipContent
+        side="right"
+        sideOffset={10}
+        className="animate-none! border border-border bg-popover px-2.5 py-1.5 text-sm font-medium text-popover-foreground shadow-md"
+      >
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
 
-type LinkProps = { href: string; label: string; icon: React.ElementType; badge?: number; onClick?: () => void; collapsed?: boolean }
+type LinkProps = { href: string; label: string; icon: React.ElementType; onClick?: () => void; collapsed?: boolean }
 
-function NavLink({ href, label, icon: Icon, badge, onClick, collapsed = false }: LinkProps) {
+function NavLink({ href, label, icon: Icon, onClick, collapsed = false }: LinkProps) {
   const pathname = usePathname()
   const active = pathname === href || (href !== "/" && pathname.startsWith(href))
   const link = (
@@ -63,77 +79,42 @@ function NavLink({ href, label, icon: Icon, badge, onClick, collapsed = false }:
           active ? "opacity-100" : "opacity-0"
         )}
       />
-      <span className="relative">
-        <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
-        {/* Collapsed, the count rides on the icon's corner. */}
-        {collapsed && badge ? (
-          <span
-            aria-hidden="true"
-            className="absolute -right-2.5 -top-2 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground tabular-nums ring-2 ring-card"
-          >
-            {countText(badge)}
-          </span>
-        ) : null}
-      </span>
-      {collapsed ? (
-        <span className="sr-only">
-          {label}
-          {badge ? `, ${countText(badge)} waiting` : ""}
-        </span>
-      ) : (
-        <>
-          {label}
-          {badge ? (
-            <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold leading-5 text-primary-foreground tabular-nums">
-              {countText(badge)}
-              <span className="sr-only"> waiting</span>
-            </span>
-          ) : null}
-        </>
-      )}
+      <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.5} />
+      <span className={cn(collapsed && "sr-only")}>{label}</span>
     </Link>
   )
-  if (!collapsed) return link
-  // Icons only: the name shows beside it on hover and keyboard focus.
-  return (
-    <Tooltip>
-      <TooltipTrigger render={link} />
-      <TooltipContent side="right" sideOffset={10}>
-        {label}
-        {badge ? ` (${countText(badge)})` : ""}
-      </TooltipContent>
-    </Tooltip>
-  )
+  return collapsed ? <NavTooltip label={label}>{link}</NavTooltip> : link
 }
 
-type NavProps = { showAssistant: boolean; showHealth: boolean; inboxCount?: number }
+type NavProps = { showAssistant: boolean; showHealth: boolean }
 
 function SidebarContent({
-  onNavClick, showAssistant, showHealth, inboxCount = 0, collapsed = false, onToggle,
+  onNavClick, showAssistant, showHealth, collapsed = false, onToggle,
 }: NavProps & { onNavClick?: () => void; collapsed?: boolean; onToggle?: () => void }) {
   const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose
   const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar"
+  const toggle = onToggle && (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={toggleLabel}
+      aria-expanded={!collapsed}
+      title={collapsed ? undefined : toggleLabel}
+      className={cn(
+        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground",
+        !collapsed && "ml-auto"
+      )}
+    >
+      <ToggleIcon className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
+    </button>
+  )
   return (
     <div className={cn("flex h-full flex-col py-4", collapsed ? "px-2" : "px-3")}>
       {/* The toggle shares the logo's row (under it when collapsed), so it costs the nav no height. */}
       <div className={cn("mb-6 flex items-center gap-2", collapsed ? "flex-col" : "pl-3")}>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground text-xs font-bold">HC</div>
         <span className={cn("font-heading font-semibold tracking-tight", collapsed && "sr-only")}>HomeCenter</span>
-        {onToggle && (
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-label={toggleLabel}
-            aria-expanded={!collapsed}
-            title={toggleLabel}
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground",
-              !collapsed && "ml-auto"
-            )}
-          >
-            <ToggleIcon className="h-[18px] w-[18px]" strokeWidth={1.5} aria-hidden="true" />
-          </button>
-        )}
+        {toggle && (collapsed ? <NavTooltip label={toggleLabel}>{toggle}</NavTooltip> : toggle)}
       </div>
       <nav aria-label="Main" className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden">
         {navItems
@@ -147,7 +128,7 @@ function SidebarContent({
               ) : (
                 <p className="mt-3 px-3 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">{section}</p>
               ))}
-            <NavLink {...item} badge={item.href === "/intake" ? inboxCount : undefined} onClick={onNavClick} collapsed={collapsed} />
+            <NavLink {...item} onClick={onNavClick} collapsed={collapsed} />
           </Fragment>
         ))}
       </nav>
