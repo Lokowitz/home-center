@@ -7,6 +7,13 @@ export type Fact = { label: string; value: string }
 export type Tone = "default" | "secondary" | "destructive" | "outline"
 export type Status = { label: string; tone: Tone }
 
+/**
+ * How a result was found: every search word as a whole word ("car", "cars",
+ * "car's"), by meaning, or only inside longer words ("carpet" for "car").
+ * Results are ranked in that order.
+ */
+export type MatchKind = "exact" | "semantic" | "partial"
+
 export type AssetThumb = { type: AssetType; id: string; name: string; imageFilename: string | null; href: string }
 
 /** A property, vehicle, piece of equipment or person: a photo card. */
@@ -20,8 +27,8 @@ export type AssetResult = {
   subtitle: string | null
   facts: Fact[]
   status: Status | null
-  /** Set when found by meaning; keyword matches leave it out. */
-  matchedBy?: "keyword" | "semantic"
+  /** Left out counts as exact. */
+  matchedBy?: MatchKind
 }
 
 export type RecordKind =
@@ -44,8 +51,8 @@ export type RecordResult = {
   owner: AssetThumb | null
   /** Shown instead of an owner, e.g. an insurance policy's members. */
   people: string | null
-  /** Set when found by meaning; keyword matches leave it out. */
-  matchedBy?: "keyword" | "semantic"
+  /** Left out counts as exact. */
+  matchedBy?: MatchKind
 }
 
 export type DocumentResult = {
@@ -56,7 +63,7 @@ export type DocumentResult = {
   owner: AssetThumb | null
   pages: number | null
   passages: { page: number | null; text: string }[]
-  matchedBy: "keyword" | "semantic"
+  matchedBy: MatchKind
 }
 
 export type Section =
@@ -74,7 +81,11 @@ export type SemanticState =
 export type SearchResults = {
   query: string
   terms: string[]
-  /** Keyword matches first in each section, then anything found by meaning. */
+  /**
+   * Exact matches first in each section, then anything found by meaning, then
+   * partial matches; sections with an exact match come first, then those with
+   * a meaning match, then the rest.
+   */
   sections: Section[]
   semantic: SemanticState
   total: number

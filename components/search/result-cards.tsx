@@ -1,13 +1,13 @@
 import Link from "next/link"
 import {
-  Activity, CalendarClock, ExternalLink, FileText, Pill, ShieldCheck, Sparkles, Stethoscope, Syringe, TriangleAlert,
-  Umbrella, UserRound, Wrench, NotebookPen,
+  Activity, CalendarClock, ExternalLink, FileText, Pill, ShieldCheck, Sparkles, Stethoscope, Syringe, TextSearch,
+  TriangleAlert, Umbrella, UserRound, Wrench, NotebookPen,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { AssetImage } from "@/components/asset-image"
 import { assetLabel } from "@/lib/assets"
 import { highlight } from "@/lib/search/query"
-import type { AssetResult, AssetThumb, DocumentResult, Fact, RecordKind, RecordResult } from "@/lib/search/types"
+import type { AssetResult, AssetThumb, DocumentResult, Fact, MatchKind, RecordKind, RecordResult } from "@/lib/search/types"
 import { cn } from "@/lib/utils"
 
 // Cards for /search. Each card's title link stretches over the whole card
@@ -65,13 +65,27 @@ function OwnerChip({ owner }: { owner: AssetThumb }) {
   )
 }
 
-/** Marks a result found by meaning rather than by the search words. */
-function SemanticBadge({ className }: { className?: string }) {
-  return (
-    <Badge variant="outline" className={cn("gap-1", className)} title="Related by meaning, not by your search words">
-      <Sparkles className="h-3 w-3" /> Semantic
-    </Badge>
-  )
+/** Marks a result found by meaning, or one that only has the search words inside longer words. */
+function MatchBadge({ matchedBy, className }: { matchedBy: MatchKind | undefined; className?: string }) {
+  if (matchedBy === "semantic") {
+    return (
+      <Badge variant="outline" className={cn("gap-1", className)} title="Related by meaning, not by your search words">
+        <Sparkles className="h-3 w-3" /> Semantic
+      </Badge>
+    )
+  }
+  if (matchedBy === "partial") {
+    return (
+      <Badge
+        variant="outline"
+        className={cn("gap-1 border-dashed text-muted-foreground", className)}
+        title="Not every search word appears here as a whole word, e.g. “car” inside “carpet”"
+      >
+        <TextSearch className="h-3 w-3" /> Partial match
+      </Badge>
+    )
+  }
+  return null
 }
 
 export function AssetCard({ item, terms }: { item: AssetResult; terms: string[] }) {
@@ -89,7 +103,7 @@ export function AssetCard({ item, terms }: { item: AssetResult; terms: string[] 
           {item.badge ? <Badge variant="secondary" className="bg-background/85 backdrop-blur-sm">{item.badge}</Badge> : <span />}
           <div className="flex flex-col items-end gap-1">
             {item.status && <Badge variant={item.status.tone} className="backdrop-blur-sm">{item.status.label}</Badge>}
-            {item.matchedBy === "semantic" && <SemanticBadge className="bg-background/85 backdrop-blur-sm" />}
+            <MatchBadge matchedBy={item.matchedBy} className="bg-background/85 backdrop-blur-sm" />
           </div>
         </div>
       </div>
@@ -145,7 +159,7 @@ export function RecordCard({ item, terms }: { item: RecordResult; terms: string[
         <div className="flex shrink-0 flex-col items-end gap-1">
           {item.amount && <span className="text-sm font-semibold tabular-nums">{item.amount}</span>}
           {item.status && <Badge variant={item.status.tone}>{item.status.label}</Badge>}
-          {item.matchedBy === "semantic" && <SemanticBadge />}
+          <MatchBadge matchedBy={item.matchedBy} />
         </div>
       </div>
       {item.subtitle && (
@@ -192,7 +206,7 @@ export function DocumentCard({ item, terms }: { item: DocumentResult; terms: str
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-          {item.matchedBy === "semantic" && <SemanticBadge />}
+          <MatchBadge matchedBy={item.matchedBy} />
           {item.fileHref && (
             <a
               href={item.fileHref}

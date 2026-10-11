@@ -1,5 +1,5 @@
 import type { Hit } from "@/lib/documents/index-db"
-import type { Section } from "./types"
+import type { MatchKind, Section } from "./types"
 
 // Pure pieces of the global search: turning the box's text into terms,
 // building the "every term matches somewhere" filter for each record type,
@@ -135,6 +135,37 @@ export function mergeSemantic(keyword: Section[], semantic: Section[]): Section[
 export type Segment = { text: string; match: boolean }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+
+/** The term as a whole word (or phrase), allowing a plural or possessive ending. */
+const wholeWord = (term: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}])${term.split(/\s+/).map(escapeRe).join("\\s+")}(?:s|es|['’]s)?(?![\\p{L}\\p{N}])`, "iu")
+
+/**
+ * Keyword search matches text anywhere ("car" finds "carpet"); this says
+ * whether every term also appears as a whole word in one of `texts`.
+ */
+export function matchKind(terms: string[], texts: (string | null | undefined)[]): "exact" | "partial" {
+  const present = texts.filter((t): t is string => !!t)
+  return terms.every((term) => present.some((t) => wholeWord(term).test(t))) ? "exact" : "partial"
+}
+
+const TIER: Record<MatchKind, number> = { exact: 0, semantic: 1, partial: 2 }
+const tierOf = (item: Section["items"][number]) => TIER[item.matchedBy ?? "exact"]
+
+/** Items in tier order, keeping their order within a tier. */
+export function byTier<T extends Section["items"][number]>(items: T[]): T[] {
+  return [...items].sort((a, b) => tierOf(a) - tierOf(b))
+}
+
+/**
+ * Exact matches first, then meaning, then partial, within each section; and
+ * sections by their best item the same way. Ties keep their order.
+ */
+export function rankSections(sections: Section[]): Section[] {
+  const ranked = sections.map((s) => ({ ...s, items: byTier(s.items as Section["items"][number][]) }) as Section)
+  const best = (s: Section) => Math.min(...s.items.map(tierOf))
+  return ranked.sort((a, b) => best(a) - best(b))
+}
 
 /** Splits text so the terms (and words starting with them) can be marked. */
 export function highlight(text: string, terms: string[]): Segment[] {
