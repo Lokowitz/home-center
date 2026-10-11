@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation"
 import { useEffect, useRef } from "react"
 import { Maximize2, MessageSquare, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { isWide, useChat } from "./chat-provider"
 import { ChatThread } from "./chat-thread"
 
-/** Header button that opens and closes the docked assistant. */
+/** Header button that opens and closes the docked assistant (Settings → Appearance → Top bar). */
 export function ChatToggle() {
   const chat = useChat()
   const pathname = usePathname()
@@ -20,6 +21,7 @@ export function ChatToggle() {
       type="button"
       onClick={() => chat.setPanelOpen(!chat.panelOpen)}
       aria-pressed={chat.panelOpen}
+      title="Assistant"
       className={cn(
         "relative inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-muted",
         chat.panelOpen && "bg-muted text-foreground"
@@ -29,6 +31,45 @@ export function ChatToggle() {
       {chat.busy && <span className="absolute right-1 top-1 h-2 w-2 animate-pulse rounded-full bg-primary" />}
       <span className="sr-only">{chat.panelOpen ? "Close assistant" : "Open assistant"}</span>
     </button>
+  )
+}
+
+/**
+ * Round button floating in the bottom-right corner, above the footer, that
+ * opens the docked assistant. Hidden while the dock is open (the dock takes
+ * that corner and has its own close button) and on the full chat page.
+ */
+export function ChatLauncher() {
+  const chat = useChat()
+  const pathname = usePathname()
+  if (pathname === "/chat" || chat.panelOpen) return null
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={() => chat.setPanelOpen(true)}
+            aria-label="Open assistant"
+            className="fixed right-5 bottom-14 z-30 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-1 ring-primary/20 transition-all duration-150 hover:scale-105 hover:bg-primary/90 hover:shadow-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/50 motion-reduce:hover:scale-100"
+          >
+            <MessageSquare className="h-5 w-5" aria-hidden="true" />
+            {/* An answer is still being written while the dock is closed. */}
+            {chat.busy && (
+              <span className="absolute top-0.5 right-0.5 h-3 w-3 animate-pulse rounded-full bg-primary-foreground ring-2 ring-primary" />
+            )}
+          </button>
+        }
+      />
+      <TooltipContent
+        side="left"
+        sideOffset={10}
+        className="border border-border bg-popover px-2.5 py-1.5 text-sm font-medium text-popover-foreground shadow-md"
+      >
+        Assistant
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

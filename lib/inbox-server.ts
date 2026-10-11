@@ -4,7 +4,7 @@ import { loadFeatures } from "@/lib/features-server"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { EMPTY_ITEM_MAX_AGE_MS } from "@/lib/inbox"
 
-// Reads for the /intake page and the header badge.
+// Reads for the /intake page and the Intake badge.
 
 export type InboxAttachment = {
   id: string
@@ -173,7 +173,7 @@ export async function listInboxItems(now: Date = new Date()): Promise<InboxList>
   return { items, householdNames }
 }
 
-/** For the sidebar badge: items with at least one file. */
+/** For the Intake badge (header or side menu): items with at least one file. */
 export async function inboxCount(): Promise<number> {
   return prisma.inboxItem.count({ where: { attachments: { some: {} } } })
 }

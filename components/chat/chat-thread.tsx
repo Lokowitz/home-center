@@ -135,7 +135,7 @@ export function ChatThread({ className }: { className?: string }) {
     if (!names.length) return
     chat.addNotice(inboxNoticeText(names), INBOX_HREF)
     setInput((current) => current || inboxFollowUpQuestion(names))
-    // The header's Intake badge.
+    // The Intake badge.
     router.refresh()
   }
 

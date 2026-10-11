@@ -9,7 +9,10 @@ import { MailSettings } from "@/components/settings/mail-settings"
 import { LlmSettings } from "@/components/settings/llm-settings"
 import { loadMailConfig, SETTINGS_ID } from "@/lib/notifications/mail-config"
 import { isMailConfigured } from "@/lib/notifications/mailer"
-import { loadLlmConfig } from "@/lib/llm/config"
+import { loadLlmConfig, loadLlmStatus } from "@/lib/llm/config"
+import { cookies } from "next/headers"
+import { PLACEMENTS, readPlacement } from "@/lib/placement"
+import { PlacementSettings } from "@/components/settings/placement-settings"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DocumentSettings } from "@/components/settings/document-settings"
 import { CaptureSettings } from "@/components/settings/capture-settings"
@@ -39,7 +42,7 @@ export default async function SettingsPage({
   // gating the whole page on ADMIN would leave ordinary users unable to turn
   // their own mail off. resolveSection keeps the admin-only sections from
   // non-admins, and only the open section's data is loaded.
-  const [me, users, recipients, mail, storedMail, llm, docs, features, capture] = await Promise.all([
+  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
@@ -62,6 +65,14 @@ export default async function SettingsPage({
     is("features") || is("assistant") ? loadFeatures() : Promise.resolve(null),
     is("documents")
       ? Promise.all([loadCaptureParser(), loadLlmConfig()]).then(([mode, c]) => ({ mode, llmReady: isLlmReady(c) }))
+      : Promise.resolve(null),
+    is("appearance")
+      ? Promise.all([loadLlmStatus(), cookies()]).then(([s, jar]) => ({
+          assistant: readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value),
+          intake: readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value),
+          // Same rule as the layout.
+          assistantShown: !s.hidden && (s.available || isAdmin),
+        }))
       : Promise.resolve(null),
   ])
   // A signed-in session whose user row is gone — the demo seeder wipes users,
@@ -110,7 +121,27 @@ export default async function SettingsPage({
             </div>
           )}
 
-          {is("features") && features && <FeatureSettings initial={{ healthEnabled: features.health }} />}
+          {is("appearance") && appearance && (
+            <div className="space-y-6">
+              <PlacementSettings
+                prefKey="intake"
+                title="Intake"
+                description="Where Intake, with its count of receipts to review, sits. Saved for this browser only."
+                initial={appearance.intake}
+              />
+              <PlacementSettings
+                prefKey="assistant"
+                title="Assistant button"
+                description={
+                  "Where the button that opens the assistant sits. Saved for this browser only." +
+                  (appearance.assistantShown ? "" : " The assistant is currently hidden, so neither shows.")
+                }
+                initial={appearance.assistant}
+              />
+            </div>
+          )}
+
+          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health }} />}
 
           {is("mail") && mail && (
             <MailSettings

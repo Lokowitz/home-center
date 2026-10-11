@@ -96,7 +96,7 @@ export function DropProvider({ healthEnabled, children }: { healthEnabled: boole
       const count = landed.filter(Boolean).length
       if (count) {
         toast.success(intakeAddedMessage(count), { action: { label: "View", onClick: () => router.push("/intake") } })
-        // The header's Intake badge and the Intake page, if that's where this is.
+        // The Intake badge and the Intake page, if that's where this is.
         router.refresh()
       }
     },

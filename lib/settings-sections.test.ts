@@ -3,8 +3,8 @@ import { resolveSection, settingsHref, visibleSections } from "./settings-sectio
 
 describe("settings sections", () => {
   it("shows only personal settings to non-admins", () => {
-    expect(visibleSections(false).map((s) => s.id)).toEqual(["notifications"])
-    expect(visibleSections(true).map((s) => s.id)).toEqual(["notifications", "features", "mail", "assistant", "documents", "users"])
+    expect(visibleSections(false).map((s) => s.id)).toEqual(["notifications", "appearance"])
+    expect(visibleSections(true).map((s) => s.id)).toEqual(["notifications", "appearance", "features", "mail", "assistant", "documents", "users"])
   })
 
   it("opens the requested section, falling back to the first", () => {
@@ -16,6 +16,7 @@ describe("settings sections", () => {
 
   it("never opens an admin section for a non-admin", () => {
     expect(resolveSection("users", false).id).toBe("notifications")
+    expect(resolveSection("appearance", false).id).toBe("appearance")
   })
 
   it("builds links", () => {
