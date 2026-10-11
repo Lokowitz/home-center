@@ -4,6 +4,23 @@
 
 ---
 
+## Progress as of 2026-10-11
+
+*Checked against the code on `FEAT/EnhancementsV1`. The milestones in §5 carry the same status inline. "Done", "Partial" and "Not started" describe the code, not user validation.*
+
+| Milestone | Status | Summary |
+|---|---|---|
+| **M0 Integrity and hygiene** | Mostly done | D1, D2, D3 and D4 are fixed. Still open: a cleanup for orphans created before D1, tests for the notification checker, digest and server actions (D5), the `PLANNING.md` historical notice and the README notification line. |
+| **M1 Close the loop** | Mostly done | Logging a service can complete a reminder in the same transaction, and the odometer is raised. Snooze, pause and resume exist, and so do starter plans (F4). Still open: skip, automatic "this record matches a reminder" prompt, and tests for the title matcher and the complete-with-record path. |
+| **M2 Capture foundations** | Partial | Asset Documents tabs (F7) and camera capture on uploads (F14) are done. Not started: PWA manifest and icons (F14) and the ICS feed (F11). The F6 spike was folded into M3: fixtures and an accuracy test live in `lib/capture/`, but no written results. |
+| **M3 Capture inbox** | Done, with gaps | Intake (`/intake`, `InboxItem`), the deterministic parser with fixtures, asset suggestion, attach-to-existing, `.eml`/`.msg` support and optional Local AI reading (Settings → Receipt reading). Unverified: "keep as asset document" and keeping person-owned files away from the LLM. |
+| **M4 Portability (F15)** | Not started | No export, scheduled backup or restore script. This is now the largest gap against §4 of the one-page answer. |
+| **M5 Proactive** | Not started | F9, F5, F10, F19 and F13 have no code. |
+
+**Suggested next:** M4 (F15 export and backup), since M1 and M3 have landed. Then close the small M0 and M1 leftovers.
+
+---
+
 ## The answer in one page
 
 1. **Single strongest opportunity.** **Document-first capture (F6):** snap or drop a receipt or invoice, and HomeCenter proposes the record, asset, date, amount and vendor for one-tap confirmation.
@@ -105,23 +122,40 @@ These assume one maintainer working part-time. Durations are rough calendar esti
 
 ### M0: Integrity and hygiene (about 1 week). **Do this first, whatever else is decided.**
 - **D1:** asset deletes must handle their service records, warranties, schedules and attachments. Either cascade them, matching the confirm text, or change the text and offer to reassign. Add a one-off cleanup for existing orphans.
+  - **Done** (`e4bb753`): `lib/asset-delete-server.ts` cascades in one transaction. **Not started:** the cleanup for orphans left by earlier deletes.
 - **D2:** make `/api/health` public in `proxy.ts` so the healthcheck actually probes the database. Add a `HEALTHCHECK` to the Dockerfile.
+  - **Done** (`2805f9c`): public route runs `SELECT 1`; `Dockerfile` and `docker-compose.yml` both check it. No regression test.
 - **D3:** "Download all files" includes maintenance attachments and a property's equipment.
+  - **Done:** `lib/asset-files-server.ts`.
 - **D4 and D5:** CI runs `npm run lint` and `npm test` before publishing the image. Add tests for `scheduleDue` and `lib/notifications/checker.ts` decisions.
+  - **D4 done:** `.github/workflows/docker-publish.yml` runs typecheck, lint and tests before `build-and-push`.
+  - **D5 partial:** snooze and due filters (`lib/maintenance-due.test.ts`) and cost bucketing (`lib/costs.test.ts`) are tested. The checker, digest and server actions are not.
 - Mark `PLANNING.md` as historical, and fix the README's notification-interval line (see the discrepancy table in the current-state assessment).
+  - **Not started.**
 
 ### M1: Close the loop (2–3 weeks)
 - F1, F2 and F3, as defined in §4.
+  - **F1 mostly done:** a service record can complete a reminder in the same transaction (`lib/service-record-server.ts`), chosen with the "Completes reminder" field, and raises the vehicle's odometer. It is linked through completion writes rather than the `ServiceRecord.maintenanceScheduleId` column §4 proposed. **Not started:** an automatic "this matches a reminder" prompt, and tests for the title matcher and the complete-with-record path.
+  - **F2 mostly done:** snooze and pause/resume (`lib/actions/maintenance.ts`). **Not started:** skip.
+  - **F3 partial:** reminder rows on the dashboard and the bell offer snooze; inline Complete from the bell is unverified.
 - **F4 starter plans:** a curated `lib/maintenance-templates.ts`, offered on asset creation and on an empty Maintenance tab.
+  - **Done:** `lib/maintenance-templates.ts`, the template picker, and "Add default reminders" on an empty Maintenance tab.
 
 ### M2: Capture foundations and bridges (2 weeks), plus the F6 spike in parallel
 - **F14:** manifest, icons, `accept`/`capture` on file inputs, a mobile "+" quick-action sheet, and the service-dialog overflow fix.
+  - **Partial:** `accept` and `capture="environment"` on the Intake inputs, and an Add split button. **Not started:** manifest and icons. The service-dialog overflow fix is unverified.
 - **F7:** asset-level documents, the Documents tab, and health gating for person-owned files.
+  - **Done:** a Documents tab on every asset page (`e4bb753`). Health gating at file level is unverified.
 - **F11:** ICS feed with a per-user revocable token. Asset items only by default.
+  - **Not started.**
 - **F6 spike (about 1 week, offline, no UI):** run the existing extractor plus a prototype deterministic parser on 30–50 real receipts. Record accuracy for date, total, vendor and asset match, with and without an optional LLM pass on a local 7–8B model.
   - **Go/no-go gate:** date and total correct in at least 70% of cases deterministically, *or* in at least 85% with the LLM pass on a model most users can run.
+  - **Status:** M3 went ahead. Fixtures and an accuracy test are in `lib/capture/` (`accuracy.test.ts`), and the design is in `docs/superpowers/specs/2026-10-10-capture-inbox-design.md`. The spike's measured numbers were never written up.
 
 ### M3: Capture inbox (4–6 weeks; only if the spike passes)
+
+**Status: done, with gaps.** Shipped as **Intake** (`/intake`, `InboxItem` in the schema, `5d45439`): the deterministic parser with fixture tests (`lib/capture/parse.ts`), asset suggestion by identifier and then by meaning (`lib/capture/match.ts`, `semantic.ts`, `f4540a2`), attach-to-existing (`93411d3`), `.eml`/`.msg` support, and optional Local AI reading (`lib/capture/llm-parse.ts`) chosen under Settings → Receipt reading. Unverified: "keep as asset document" and keeping person-owned files away from the LLM.
+
 - An unfiled-document state, with an indexer `reconcile()` exemption.
 - The deterministic parser module with fixture tests.
 - Asset suggestion: identifier match, then `entity_vec`.
@@ -131,11 +165,17 @@ These assume one maintainer working part-time. Durations are rough calendar esti
 - **If the spike fails:** ship the Inbox *without* auto-fill (file-first, manual fields, asset suggestion only), then move M4 earlier.
 
 ### M4: Portability (2–3 weeks)
+
+**Status: not started.** No export, `VACUUM INTO` backup or `scripts/restore.ts` exists.
+
 - F15 export: JSON with `formatVersion`, CSVs, a readable file tree, and a static `index.html` viewer.
 - Scheduled `VACUUM INTO` backups with retention and a stale-backup warning.
 - A `scripts/restore.ts` CLI with a dry run.
 
 ### M5: Proactive, data-dependent (later; choose by feedback)
+
+**Status: not started.**
+
 - F9 renewals (implemented as a `Renewal` entity whose "Mark renewed" writes a costed record; **no ledger**).
 - F5 odometer log and projection.
 - F10 repair-or-replace signals.
