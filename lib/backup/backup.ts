@@ -6,7 +6,7 @@ import { ArchiveWriter, hashFile } from "./archive"
 import { archiveName, DB_ENTRY, FILES_PREFIX, FORMAT_VERSION, SECRETS_ENTRY, SIDECAR_VERSION, type Sidecar } from "./format"
 import { safeJoin } from "./paths"
 import { latestMigration, modelCounts, referencedFiles, vacuumInto } from "./snapshot"
-import { uniqueName, writeSidecar } from "./store"
+import { sidecarPath, uniqueName, writeSidecar } from "./store"
 import { verifyArchive } from "./verify"
 
 export type ProtectionConfig =
@@ -97,7 +97,9 @@ export async function createBackup(input: BackupInput): Promise<BackupOutcome> {
   } catch (e) {
     await writer?.abort()
     await rm(finalPath + ".partial", { force: true })
-    if (mode !== "none") await rm(finalPath, { force: true })
+    // uniqueName guaranteed finalPath did not exist before this run, so anything there is ours.
+    await rm(finalPath, { force: true })
+    await rm(sidecarPath(finalPath), { force: true })
     throw e
   } finally {
     await rm(snap, { force: true })
