@@ -690,6 +690,84 @@ model FeatureSettings {
   updatedAt     DateTime @updatedAt
 }
 
+// ─── Backup ──────────────────────────────────────────────────────────────────
+
+enum BackupSchedule {
+  OFF
+  DAILY
+  WEEKLY
+}
+
+enum BackupProtection {
+  NONE
+  KEY
+  PASSWORD
+}
+
+enum BackupRunKind {
+  BACKUP
+  EXPORT
+  RESTORE
+}
+
+enum BackupRunTrigger {
+  MANUAL
+  SCHEDULE
+  CLI
+}
+
+enum BackupRunStatus {
+  RUNNING
+  OK
+  WARN
+  FAILED
+  INTERRUPTED
+}
+
+/// Single row (id is always "singleton"). No row = defaults (schedule off, no protection).
+model BackupSettings {
+  id              String           @id @default("singleton")
+  schedule        BackupSchedule   @default(OFF)
+  /// "HH:mm", server local time (TZ).
+  time            String           @default("03:00")
+  /// 0 = Sunday … 6 = Saturday; WEEKLY only.
+  weekday         Int              @default(0)
+  /// null = <data dir>/backups.
+  folder          String?
+  keep            Int              @default(14)
+  protection      BackupProtection @default(NONE)
+  /// age X25519 recipient (age1…). The private key never reaches the server.
+  publicKey       String?
+  keyFingerprint  String?
+  /// Password-zip passphrase, AES-256-GCM via lib/secret-box.ts.
+  passphraseEnc   String?
+  /// When the schedule was last turned on; staleness counts from here until the first backup.
+  enabledAt       DateTime?
+  hintDismissedAt DateTime?
+  updatedAt       DateTime         @updatedAt
+}
+
+/// One backup, export or restore job: progress while running, history after.
+model BackupRun {
+  id            String           @id @default(cuid())
+  kind          BackupRunKind
+  trigger       BackupRunTrigger
+  status        BackupRunStatus  @default(RUNNING)
+  startedAt     DateTime         @default(now())
+  finishedAt    DateTime?
+  file          String?
+  size          Int?
+  protection    BackupProtection @default(NONE)
+  progressDone  Int              @default(0)
+  progressTotal Int              @default(0)
+  /// JSON array of strings.
+  warnings      String           @default("[]")
+  error         String?
+  createdById   String?
+
+  @@index([kind, startedAt])
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 model Notification {

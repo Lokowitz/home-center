@@ -14,4 +14,7 @@ export async function register() {
 
   const { startDocumentIndexer } = await import("@/lib/documents/indexer-server")
   startDocumentIndexer()
+
+  const { startBackupScheduler } = await import("@/lib/backup/scheduler-server")
+  startBackupScheduler()
 }
