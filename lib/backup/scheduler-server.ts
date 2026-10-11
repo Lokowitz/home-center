@@ -26,10 +26,12 @@ async function tick(now = new Date()) {
   }
 }
 
-let started = false
+// Same per-process guard as the job lock: every loaded copy of this module shares it.
+const g = globalThis as unknown as { __hcBackupScheduler?: boolean }
+
 export function startBackupScheduler() {
-  if (started) return
-  started = true
+  if (g.__hcBackupScheduler) return
+  g.__hcBackupScheduler = true
   const run = () => void tick().catch((e) => console.error("[backup] scheduler tick failed:", e))
   setTimeout(() => {
     void markInterruptedRuns().catch((e) => console.error("[backup] interrupted-run check failed:", e)).finally(run)
