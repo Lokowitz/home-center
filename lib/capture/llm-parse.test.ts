@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest"
 import type { ChatFn, ChatRequest, ChatResult } from "@/lib/llm/types"
 import { LlmError } from "@/lib/llm/errors"
-import { MAX_TEXT_CHARS, PROMPT, RECEIPT_MAX_TOKENS, llmFailureDetail, parseLlmReply, readReceiptByLlm, receiptChatOptions } from "./llm-parse"
+import {
+  MAX_TEXT_CHARS, PROMPT, RECEIPT_MAX_TOKENS, fillFromBasic, llmFailureDetail, parseLlmReply, readReceiptByLlm, receiptChatOptions,
+} from "./llm-parse"
+
+describe("fillFromBasic", () => {
+  const basic = { date: "2025-03-14", total: 45, vendor: "Oakridge Heating" }
+  it("keeps every field the model answered", () => {
+    expect(fillFromBasic({ date: "2025-03-15", total: 46, vendor: "Oakridge" }, basic)).toEqual({ date: "2025-03-15", total: 46, vendor: "Oakridge" })
+  })
+  it("fills only the fields the model left empty", () => {
+    expect(fillFromBasic({ date: null, total: 46, vendor: null }, basic)).toEqual({ date: "2025-03-14", total: 46, vendor: "Oakridge Heating" })
+  })
+  it("keeps the model's 0 total: that's an answer, not a gap", () => {
+    expect(fillFromBasic({ date: null, total: 0, vendor: null }, basic).total).toBe(0)
+  })
+  it("stays empty when neither has it", () => {
+    expect(fillFromBasic({ date: null, total: null, vendor: null }, { date: null, total: null, vendor: null })).toEqual({ date: null, total: null, vendor: null })
+  })
+})
+
+describe("PROMPT", () => {
+  it("asks for the date things happened, not a print date or date of birth", () => {
+    expect(PROMPT).toMatch(/visit or test/)
+    expect(PROMPT).toMatch(/date of birth/)
+  })
+})
 
 describe("parseLlmReply", () => {
   it("reads a plain JSON reply", () => {

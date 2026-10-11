@@ -33,6 +33,22 @@ describe("parseReceipt date", () => {
     expect(p("Shop\n01/02/2026 x 03/04/2026 y 03/04/2026").date).toBe("2026-03-04")
   })
   it("returns null with no date", () => expect(p("Shop\nno dates here").date).toBeNull())
+  it("never takes a date of birth, even right after a 'Date' label", () => {
+    expect(p("Clinic\nPatient: A. Person\nDate of Birth: 2009-12-29\nVisit 03/14/2025").date).toBe("2025-03-14")
+    expect(p("Clinic\nDOB: 01/02/1980\nSeen 03/14/2025").date).toBe("2025-03-14")
+    expect(p("Clinic\nBirth date 01/02/1980\n03/14/2025").date).toBe("2025-03-14")
+  })
+  it("reads collection, procedure and visit dates as labelled", () => {
+    expect(p("Lab\n10/20/23, 7:10 AM\nCollected on 10/18/2023 11:52 AM\n10/20/23, 7:10 AM").date).toBe("2023-10-18")
+    expect(p("Lab\nResult 10/9/26\nCollection Date: 10/8/26").date).toBe("2026-10-08")
+    expect(p("Clinic\nPrinted 5/29/24\nProcedure Date: 5/28/2024").date).toBe("2024-05-28")
+    expect(p("Clinic\nDate of Visit: 7/7/2022\n7/9/22").date).toBe("2022-07-07")
+  })
+  it("treats a browser print stamp ('10/20/23, 7:10 AM') as a print date", () => {
+    expect(p("Shop\n10/20/23, 7:10 AM\nSold 10/18/2023\n10/20/23, 7:10 AM").date).toBe("2023-10-18")
+    // ...unless that's the only date there is.
+    expect(p("Shop\n10/20/23, 7:10 AM").date).toBe("2023-10-20")
+  })
 })
 
 describe("parseReceipt total", () => {
@@ -73,7 +89,7 @@ describe("parseReceipt vendor", () => {
     expect(p("Monday, March 3, 2025 10:42 AM\n10/04/2026 3:47 PM\nAshgrove Bakery").vendor).toBe("Ashgrove Bakery")
   })
   it("skips phone numbers, URLs, emails and mostly-digit lines", () => {
-    const t = "(555) 201-7740\nTel: 555-201-7741\nwww.example-shop.test\nhttps://pay.example.test/inv\nbilling@example.test\n4471 2290 1183 AB\nPage 2 of 3\nQuarry Hill Electric"
+    const t = "(555) 201-7740\nTel: 555-201-7741\nwww.quarryhillelectric.test\nhttps://pay.quarryhillelectric.test/inv\nbilling@quarryhillelectric.test\n4471 2290 1183 AB\nPage 2 of 3\nQuarry Hill Electric"
     expect(p(t).vendor).toBe("Quarry Hill Electric")
   })
   it("trims leading and trailing OCR punctuation instead of rejecting the line", () => {
@@ -86,6 +102,54 @@ describe("parseReceipt vendor", () => {
     // Names that start like a month or weekday are not date lines.
     expect(p("Sunoco 4471\nPump 3").vendor).toBe("Sunoco 4471")
     expect(p("Mayfair Cleaners #12").vendor).toBe("Mayfair Cleaners #12")
+  })
+  it("skips the household's own names and greetings", () => {
+    const names = ["Pat Example", "Robin Example"]
+    expect(parseReceipt("PAT EXAMPLE\n12 Elm St\nOakridge Heating", today, { householdNames: names }).vendor).toBe("Oakridge Heating")
+    expect(parseReceipt("Pat & Robin Example\nOakridge Heating", today, { householdNames: names }).vendor).toBe("Oakridge Heating")
+    expect(p("Hi PAT,\nThanks for your order\nOakridge Heating").vendor).toBe("Oakridge Heating")
+  })
+  it("skips labels, document titles, table headers and money lines", () => {
+    expect(p("RECIPIENT\nESTIMATE\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("Name: Pat Example | DOB: 1/1/80\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("Issued date:Tue Jul 8, 2025\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("Order Summary\nOrder Total: $701.88\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("Item Description Quantity Price Amount\nTrip Fee 1.00 100.00 $100.00\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("WARNING\nInspection Report\nOakridge Heating").vendor).toBe("Oakridge Heating")
+  })
+  it("skips street-address lines but keeps a name that starts with a number", () => {
+    expect(p("1535 Baker Rd PO Box 278\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("PO Box 12\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("7-Star Car Wash\n100 Main St").vendor).toBe("7-Star Car Wash")
+  })
+  it("skips city/state/ZIP, country and bare 'date' heading lines", () => {
+    expect(p("Dexter, MI 48130\nUnited States\nDue date\nESTIMATE DATE\nOakridge Heating").vendor).toBe("Oakridge Heating")
+    expect(p("DEXTER, MI 48130-8620\nUSA\nOakridge Heating").vendor).toBe("Oakridge Heating")
+  })
+  it("takes an email's sender name", () => {
+    const names = ["Pat Example"]
+    const t = "Pat Example <pat@mail.test>\nHere's your receipt\nOakridge Parts <orders@em.oakridgeparts.test> Fri, Jul 24, 2026\nItem list"
+    expect(parseReceipt(t, today, { householdNames: names }).vendor).toBe("Oakridge Parts")
+  })
+  it("falls back to the shop's email or web domain when no line names it", () => {
+    const t = "12 Elm St\nDexter, MI 48130\ninfo@oakridgemechanical.test\nBILL TO\nPAT EXAMPLE\nTERMS Cash On Delivery"
+    expect(parseReceipt(t, today, { householdNames: ["Pat Example"] }).vendor).toBe("oakridgemechanical.test")
+    // Free mail is the customer's, not the shop's.
+    expect(p("12 Elm St\npat@gmail.com\nTERMS Net 30").vendor).toBe("TERMS Net 30")
+  })
+  it("prefers the line that matches the shop's domain over the domain itself", () => {
+    expect(p("Thanks for visiting\nAce Hardware\nwww.acehardware.test").vendor).toBe("Ace Hardware")
+  })
+  it("skips OCR letter soup", () => {
+    expect(p("g ro u p @@@3 h 1 tt4 t5 b 8 9 5 4 k n jj9 x v\nOakridge Heating").vendor).toBe("Oakridge Heating")
+  })
+  it("prefers a line that names a business over an earlier plain line", () => {
+    expect(p("Thank you for choosing us\nWe appreciate it\nOakridge Mechanical LLC\n12 Elm St").vendor).toBe("Oakridge Mechanical LLC")
+    expect(p("Quarry Hill\nquarry hill electric co").vendor).toBe("quarry hill electric co")
+    // Trade words alone don't count: item lines are full of them.
+    expect(p("Belmont Tire\nChecked electrical connections\nService Details").vendor).toBe("Belmont Tire")
+    // ...nor a line that comes after a bill-to label: that's the customer.
+    expect(p("Ace Hardware\nBill To:\nExample Services LLC").vendor).toBe("Ace Hardware")
   })
 })
 

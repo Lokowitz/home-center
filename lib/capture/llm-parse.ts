@@ -8,9 +8,9 @@ import type { ParsedReceipt } from "./parse"
 
 export const PROMPT = `You read one household document (receipt, invoice, estimate or similar).
 Reply with JSON only: {"date": "YYYY-MM-DD" or null, "total": number or null, "vendor": string or null}
-date: the invoice/service/purchase date (not a due date or print date).
+date: the date the purchase, service, visit or test happened (not a due date, print date or date of birth).
 total: the final amount charged (grand total incl. tax; negative for a refund). null if the document shows no charge.
-vendor: the business that issued it.`
+vendor: the business, clinic or provider that issued it.`
 
 export const MAX_TEXT_CHARS = 12000
 const MAX_VENDOR_CHARS = 80
@@ -63,6 +63,15 @@ export function parseLlmReply(reply: string): ParsedReceipt | null {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null
   const o = obj as Record<string, unknown>
   return { date: validDate(o.date), total: validTotal(o.total), vendor: validVendor(o.vendor) }
+}
+
+/**
+ * The model's answer, with any field it left empty taken from the built-in
+ * parser. A model often answers null where the parser has a fair guess (a lab
+ * report's date), and an empty field helps no one.
+ */
+export function fillFromBasic(llm: ParsedReceipt, basic: ParsedReceipt): ParsedReceipt {
+  return { date: llm.date ?? basic.date, total: llm.total ?? basic.total, vendor: llm.vendor ?? basic.vendor }
 }
 
 /**

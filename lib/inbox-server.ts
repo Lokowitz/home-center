@@ -113,7 +113,8 @@ export type InboxList = {
 }
 
 /** Account names, plus people's names only while Health is on. */
-async function loadHouseholdNames(includePeople: boolean): Promise<string[]> {
+/** Names of the household's users, and its people while Health is on. */
+export async function loadHouseholdNames(includePeople: boolean): Promise<string[]> {
   const [users, people] = await Promise.all([
     prisma.user.findMany({ select: { name: true } }),
     includePeople ? prisma.person.findMany({ select: { name: true } }) : Promise.resolve([]),

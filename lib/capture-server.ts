@@ -5,13 +5,14 @@ import { createChatClient } from "@/lib/llm/client"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DOCUMENT_SETTINGS_ID, loadDocumentSettings } from "@/lib/documents/settings"
 import { parseReceipt, type ParsedReceipt } from "@/lib/capture/parse"
-import { llmFailureDetail, readReceiptByLlm, receiptChatOptions, type LlmReceiptRead } from "@/lib/capture/llm-parse"
+import { fillFromBasic, llmFailureDetail, readReceiptByLlm, receiptChatOptions, type LlmReceiptRead } from "@/lib/capture/llm-parse"
 import { buildIdentifiers, matchAsset, type AssetMatch, type CandidateAsset } from "@/lib/capture/match"
 import { RECORD_KINDS, semanticQueryText, suggestByMeaning, toAssetHits, type OwnerRef } from "@/lib/capture/semantic"
 import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
 import { embedderFor } from "@/lib/documents/embed/server"
 import { chooseParser, fallbackLogLine, inboxText, keptUserAsset, llmSkipNote, parsedFields, type ParseNote, type ParserChoice } from "@/lib/inbox"
 import type { CaptureParser } from "@/app/generated/prisma/client"
+import { loadHouseholdNames } from "@/lib/inbox-server"
 
 // Reads a capture-inbox item once its files have been extracted: the receipt
 // fields (per the "Receipt reading" setting) and the asset it's probably for.
@@ -107,14 +108,15 @@ async function readWithLlm(text: string): Promise<LlmReceiptRead | { note: "llm-
  * LLM isn't used or can't answer. Every such fallback is logged in one line
  * and comes back as a note for the card. Never logs receipt text.
  */
-async function readReceipt(text: string, choice: ParserChoice, skipped: ParseNote | null): Promise<ReceiptRead> {
+async function readReceipt(text: string, choice: ParserChoice, skipped: ParseNote | null, householdNames: string[]): Promise<ReceiptRead> {
   if (choice === "none" || !text.trim()) return { parsed: null, method: null, note: null }
+  const basic = () => parseReceipt(text, new Date(), { householdNames })
   let note = skipped
   let detail: string | undefined
   if (choice === "llm") {
     try {
       const read = await readWithLlm(text)
-      if ("parsed" in read) return { parsed: read.parsed, method: "llm", note: null }
+      if ("parsed" in read) return { parsed: fillFromBasic(read.parsed, basic()), method: "llm", note: null }
       note = read.note
       detail = read.detail
     } catch (error) {
@@ -124,7 +126,7 @@ async function readReceipt(text: string, choice: ParserChoice, skipped: ParseNot
     }
   }
   if (note) console.error(fallbackLogLine(note, detail))
-  return { parsed: parseReceipt(text), method: "basic", note }
+  return { parsed: basic(), method: "basic", note }
 }
 
 /**
@@ -165,6 +167,8 @@ export async function processInboxItem(itemId: string): Promise<void> {
   }
 
   const [mode, features, llm] = await Promise.all([loadCaptureParser(), loadFeatures(), loadLlmConfig()])
+  // The customer's name heads many receipts; the reader skips it for the shop's.
+  const householdNames = await loadHouseholdNames(features.health)
   // Matching is local (identifiers, then the local embedding model), so it runs
   // first: a person's file then never reaches the LLM unless allowed.
   let match: AssetMatch | null = userAsset
@@ -178,7 +182,7 @@ export async function processInboxItem(itemId: string): Promise<void> {
     suggestedAssetType: match?.assetType ?? null,
     healthDocumentsEnabled: features.health && llm.healthDocumentsEnabled,
   }
-  const { parsed, method, note } = await readReceipt(read.text, chooseParser(parserInput), llmSkipNote(parserInput))
+  const { parsed, method, note } = await readReceipt(read.text, chooseParser(parserInput), llmSkipNote(parserInput), householdNames)
 
   await prisma.inboxItem.updateMany({
     where: { id: itemId },
