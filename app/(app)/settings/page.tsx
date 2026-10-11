@@ -88,7 +88,8 @@ export default async function SettingsPage({
         <p className="mt-0.5 text-sm text-muted-foreground">{section.description}</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)]">
+      {/* One shrinkable column on phones: an implicit auto column grew to the tab strip's width and pushed the page sideways. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[12.5rem_minmax(0,1fr)]">
         {sections.length > 1 && (
           <aside className="md:sticky md:top-0 md:self-start">
             <SettingsNav sections={sections} active={section.id} />

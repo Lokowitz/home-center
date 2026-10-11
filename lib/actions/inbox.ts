@@ -20,6 +20,9 @@ import { assetRecordHref } from "@/lib/documents/owner"
 import { processInboxItem } from "@/lib/capture-server"
 import { reindexMovedDocuments, searchIndex } from "@/lib/documents/indexer-server"
 import { DOCUMENT_SETTINGS_ID } from "@/lib/documents/settings"
+import { loadLlmConfig } from "@/lib/llm/config"
+import { isLlmReady } from "@/lib/llm/settings-schema"
+import { captureParserAllowed } from "@/lib/capture-options"
 import {
   newServiceRecordWrites, prepareNewServiceRecord, revalidateNewServiceRecord,
   type ServiceRecordFieldErrors, type ServiceRecordInput,
@@ -270,6 +273,9 @@ export async function setCaptureParser(mode: CaptureParser): Promise<{ success: 
   await requireAdmin()
   const parsed = parserSchema.safeParse(mode)
   if (!parsed.success) return { error: "Invalid input." }
+  if (!captureParserAllowed(parsed.data, isLlmReady(await loadLlmConfig()))) {
+    return { error: "Set up the assistant's model under Assistant first." }
+  }
   await prisma.documentSettings.upsert({
     where: { id: DOCUMENT_SETTINGS_ID },
     create: { id: DOCUMENT_SETTINGS_ID, captureParser: parsed.data },
