@@ -1,6 +1,3 @@
-npm run dev
-
-
 <div align="center">
 
 # HomeCenter
@@ -38,6 +35,17 @@ Short walkthroughs recorded on the demo data. Click one to play it.
 <td width="33%" valign="top"><a href="docs/screenshots/demos/health-summary.gif"><img src="docs/screenshots/demos/posters/health-summary-play.jpg" alt="Health summary demo"></a><br><b>Health summary</b> <sub>0:32</sub><br><sub>Medications, shots and a printable summary</sub></td>
 </tr>
 </table>
+
+## New in 2.0
+
+These arrived after the demos and screenshots above were recorded.
+
+- **Intake:** drop receipts, photos, PDFs or forwarded emails (`.eml`, `.msg`) anywhere in the app. HomeCenter reads the date, vendor and total, suggests which asset they belong to, and lets you file them as a new service record or attach them to an existing one. Filing a receipt also offers to complete the matching reminder, and a nudge appears when files sit unfiled for more than a week.
+- **Receipt reading with local AI** *(optional)*: under **Settings → Receipt reading**, use the built-in parser or a local model for harder receipts. If the model can't read a file, Intake says so instead of quietly falling back.
+- **More reminder controls:** **Skip this time** moves a reminder to its next interval without logging a service, and **Add default reminders** fills an empty Maintenance tab with a starter plan.
+- **Themes:** twelve themes, light and dark, picked from the top bar or stepped through with its arrows.
+- **Layout your way:** collapse the sidebar to icons, and choose per device where the assistant button and Intake sit (**Settings → Appearance**).
+- **Sharper search:** exact matches come first, then results by meaning, then partial matches.
 
 ## Features
 
