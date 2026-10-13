@@ -6,7 +6,7 @@ import type { Client, Row } from "@libsql/client"
 import { attachmentDir, type AttachmentLocation } from "../attachment-location"
 import type { ExportScope } from "./format"
 import { safeJoin } from "./paths"
-import { openDb } from "./snapshot"
+import { openDb, releaseDbHandles } from "./snapshot"
 
 export type FileRef = { name: string; path: string; size: number; mimeType: string }
 type AssetType = "property" | "vehicle" | "equipment" | "person"
@@ -42,13 +42,14 @@ function iso(v: unknown): string | null {
 }
 const str = (v: unknown) => (v === null || v === undefined ? null : String(v))
 const num = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v))
+// Only a syntactic anchor so safeJoin can judge a relative path; nothing is read from it.
 const SAFE_ROOT = path.resolve("uploads")
 const TYPE: Record<string, AssetType> = { PROPERTY: "property", VEHICLE: "vehicle", EQUIPMENT: "equipment", PERSON: "person" }
 
 export const rawPlacement: Place = ({ rel }) => `files/${rel}`
 
 const TYPE_DIR: Record<AssetType, string> = { property: "Properties", vehicle: "Vehicles", equipment: "Equipment", person: "People" }
-const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i  // Windows treats "nul.txt" as the device too
+const RESERVED = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])([\s.]|$)/i  // Windows treats "nul.txt", "con .txt" and "con  " as the device too
 const EXTENSION = /\.[A-Za-z0-9]{1,16}$/
 const SEGMENT_BYTES = 120
 
@@ -207,6 +208,7 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
     }
   } finally {
     c.close()
+    await releaseDbHandles() // Windows keeps the snapshot locked until the handle is collected; callers delete it next
   }
 }
 
