@@ -34,4 +34,23 @@ describe("boot decision after the apply step", () => {
     for (const d of dirs) expect(text).toContain(d)
     expect(text).toContain("will not start")
   })
+
+  const blocking = { ...base, status: "failed" as const, error: "rolling back also failed", rolledBack: false, recoveryDirs: ["/data/restore/failed-x-previous"] }
+
+  it("keeps stopping every boot while an unacknowledged blocking result sits there with nothing pending", () => {
+    const out = bootOutcome({ applied: false }, blocking, "/data/restore")
+    expect(out.exitCode).toBe(1)
+    const text = out.lines.join("\n")
+    expect(text).toContain("/data/restore/failed-x-previous")
+    expect(text).toContain("npm run restore -- --ack")
+    expect(text).toContain("/data/restore/result.json")
+  })
+
+  it("continues once the blocking result is acknowledged", () => {
+    expect(bootOutcome({ applied: false }, { ...blocking, acknowledgedAt: "2026-02-02T00:00:00.000Z" }).exitCode).toBe(0)
+  })
+
+  it("continues when the stored failure was cleanly rolled back", () => {
+    expect(bootOutcome({ applied: false }, { ...blocking, rolledBack: true, recoveryDirs: [] }).exitCode).toBe(0)
+  })
 })

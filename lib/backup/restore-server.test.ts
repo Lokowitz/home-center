@@ -76,6 +76,13 @@ describe("finalizeRestore", () => {
     expect(alert.raise).toHaveBeenCalledWith(expect.any(String), "Restore didn't finish", expect.stringContaining("Nothing was changed"))
   })
 
+  it("does not finalize a failure that displaced data until it is acknowledged", async () => {
+    await writeFile(path.join(dir, "result.json"), JSON.stringify({ ...result, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"] }))
+    await finalizeRestore()
+    expect(alert.raise).not.toHaveBeenCalled()
+    expect(JSON.parse(await readFile(path.join(dir, "result.json"), "utf8")).finalized).toBe(false)
+  })
+
   it("does nothing when no restore happened", async () => {
     await writeFile(path.join(dir, "result.json"), JSON.stringify({ ...result, finalized: true }))
     await finalizeRestore()

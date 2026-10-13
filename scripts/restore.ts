@@ -1,14 +1,20 @@
+// npm run restore -- --ack   (after dealing with the data of a failed restore, lets HomeCenter start again)
 // npm run restore -- <file> [--dry-run] [--key kit.txt | --passphrase-env VAR] [--yes]
 // For when the app won't start. Stop HomeCenter first.
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { createInterface } from "node:readline/promises"
 import { appMigrations, dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "../lib/backup/paths"
-import { applyPending, cancelRestore, dryRun, stage } from "../lib/backup/restore"
+import { acknowledgeBlocking, applyPending, cancelRestore, dryRun, stage } from "../lib/backup/restore"
 import { unlockArgs } from "../lib/backup/protect"
 
 async function main() {
   const args = process.argv.slice(2)
+  if (args[0] === "--ack") {
+    const done = await acknowledgeBlocking(restoreDir())
+    console.log(done ? `Acknowledged the failed restore. HomeCenter can start now. Data it left in: ${done.recoveryDirs.join(", ") || "(none listed)"}` : "Nothing to acknowledge: no failed restore is blocking startup.")
+    return
+  }
   const file = args[0]
   if (!file || file.startsWith("--")) throw new Error("Usage: npm run restore -- <file> [--dry-run] [--key kit.txt | --passphrase-env VAR] [--yes]")
   const paths = { dbPath: dbPathFromUrl(process.env.DATABASE_URL), uploadDir: uploadDir(), restoreDir: restoreDir(), searchIndexPath: searchIndexFile() }

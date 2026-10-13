@@ -26,6 +26,8 @@ export type RestoreResult = {
   rolledBack: boolean
   /** Absolute paths holding data the household may need after a failed apply. This engine never deletes them. */
   recoveryDirs: string[]
+  /** Set by `npm run restore -- --ack` once the household has dealt with recoveryDirs; until then a not-rolled-back failure blocks boot. */
+  acknowledgedAt?: string
 }
 
 const exists = (p: string) => stat(p).then(() => true, () => false)
@@ -216,6 +218,18 @@ export async function readResult(restoreDir: string): Promise<RestoreResult | nu
 export async function markFinalized(restoreDir: string): Promise<void> {
   const r = await readResult(restoreDir)
   if (r) await writeResult(restoreDir, { ...r, finalized: true })
+}
+
+/** A failed apply that left data displaced and has not been acknowledged yet. */
+export const isBlocking = (r: RestoreResult | null): boolean => !!r && r.status === "failed" && !r.rolledBack && !r.acknowledgedAt
+
+/** Returns the result that was acknowledged, or null when nothing was blocking. */
+export async function acknowledgeBlocking(restoreDir: string, now = new Date()): Promise<RestoreResult | null> {
+  const r = await readResult(restoreDir)
+  if (!r || !isBlocking(r)) return null
+  const next = { ...r, acknowledgedAt: now.toISOString() }
+  await writeResult(restoreDir, next)
+  return next
 }
 
 export async function prunePre(restoreDir: string, now: Date, days = 7): Promise<number> {

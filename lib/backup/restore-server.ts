@@ -3,7 +3,7 @@ import path from "node:path"
 import { prisma } from "@/lib/prisma"
 import { SETTINGS_ID } from "@/lib/notifications/mail-config"
 import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "./paths"
-import { markFinalized, prunePre, readResult, type RestorePaths } from "./restore"
+import { isBlocking, markFinalized, prunePre, readResult, type RestorePaths } from "./restore"
 import { raiseBackupAlert } from "./alerts-server"
 
 export const restorePaths = (): RestorePaths => ({
@@ -33,7 +33,8 @@ async function reWrapSecrets(dir: string): Promise<void> {
 export async function finalizeRestore(now = new Date()): Promise<void> {
   const dir = restoreDir()
   const result = await readResult(dir)
-  if (result && !result.finalized) {
+  // A failed restore that displaced data is not finalized: the app reports it from result.json until it is acknowledged.
+  if (result && !result.finalized && !isBlocking(result)) {
     if (result.status === "ok") {
       await reWrapSecrets(dir)
       // Everyone signs in again, with the accounts in the restored data. A repeat after a crash only signs them out once more.
