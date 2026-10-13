@@ -11,18 +11,22 @@ export type RawSettings = {
 
 const DEFAULTS: RawSettings = { folder: null, keep: 14, protection: "NONE", publicKey: null, keyFingerprint: null, passphraseEnc: null }
 
+/** Only a missing table counts as "no settings yet"; any other failure must not silently turn protection off. */
+const isMissingTable = (e: unknown) => /no such table/i.test(e instanceof Error ? e.message : String(e))
+
 export async function readRawSettings(dbPath: string): Promise<RawSettings> {
   const c = openDb(dbPath)
   try {
     const r = await c.execute(`SELECT folder, keep, protection, publicKey, keyFingerprint, passphraseEnc FROM "BackupSettings" WHERE id = 'singleton'`)
     const row = r.rows[0]
-    if (!row) return DEFAULTS
+    if (!row) return { ...DEFAULTS }
     return {
       folder: (row.folder as string | null) || null, keep: Number(row.keep), protection: row.protection as RawSettings["protection"],
       publicKey: row.publicKey as string | null, keyFingerprint: row.keyFingerprint as string | null, passphraseEnc: row.passphraseEnc as string | null,
     }
-  } catch {
-    return DEFAULTS // older schema without the table
+  } catch (e) {
+    if (isMissingTable(e)) return { ...DEFAULTS } // older schema without the table
+    throw e
   } finally {
     c.close()
   }
@@ -39,11 +43,16 @@ export function rawProtection(s: RawSettings): ProtectionConfig {
   return { mode: "none" }
 }
 
+const emptyIfMissing = (e: unknown) => {
+  if (isMissingTable(e)) return { rows: [] }
+  throw e
+}
+
 export async function readRawSecrets(dbPath: string): Promise<Secrets> {
   const c = openDb(dbPath)
   try {
-    const mail = await c.execute(`SELECT passwordEnc FROM "MailSettings" WHERE id = 'singleton'`).catch(() => ({ rows: [] }))
-    const llm = await c.execute(`SELECT apiKeyEnc FROM "LlmSettings" WHERE id = 'singleton'`).catch(() => ({ rows: [] }))
+    const mail = await c.execute(`SELECT passwordEnc FROM "MailSettings" WHERE id = 'singleton'`).catch(emptyIfMissing)
+    const llm = await c.execute(`SELECT apiKeyEnc FROM "LlmSettings" WHERE id = 'singleton'`).catch(emptyIfMissing)
     const m = mail.rows[0]?.passwordEnc as string | undefined
     const k = llm.rows[0]?.apiKeyEnc as string | undefined
     return { mailPassword: m ? decrypt(m) : null, llmApiKey: k ? decrypt(k) : null }

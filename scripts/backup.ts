@@ -10,6 +10,7 @@ import { pruneBackups } from "../lib/backup/store"
 async function main() {
   const args = process.argv.slice(2)
   const i = args.indexOf("--folder")
+  if (i >= 0 && (!args[i + 1] || args[i + 1].startsWith("--"))) throw new Error("--folder needs a path. Usage: npm run backup [-- --folder /path]")
   const dbPath = dbPathFromUrl(process.env.DATABASE_URL)
   const s = await readRawSettings(dbPath)
   const folder = i >= 0 ? path.resolve(args[i + 1]) : s.folder || defaultBackupFolder()
@@ -19,9 +20,9 @@ async function main() {
     dbPath, uploadDir: uploadDir(), folder, workDir: workDir(), appVersion: version, protection,
     secrets: protection.mode === "none" ? null : await readRawSecrets(dbPath),
     createFolder: i < 0 && !s.folder,
-    onProgress: (d, t) => process.stdout.write(`\rFiles ${d}/${t}`),
+    onProgress: process.stdout.isTTY ? (d, t) => process.stdout.write(`\rFiles ${d}/${t}`) : undefined,
   })
-  process.stdout.write("\n")
+  if (process.stdout.isTTY) process.stdout.write("\n")
   const pruned = await pruneBackups(folder, s.keep)
   console.log(`Backup written: ${out.path}`)
   for (const w of out.warnings) console.warn(`Warning: ${w}`)
