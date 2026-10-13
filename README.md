@@ -6,6 +6,8 @@
 
 Service history, costs and reminders for your homes, vehicles, equipment and family health. Every receipt and manual is searchable, and it all runs in one Docker container.
 
+**[More details at home-center.dazzos.com](https://home-center.dazzos.com/)**
+
 **[Install in 5 minutes](#get-started)** · [Features](#features) · [AI assistant](#ask-your-house-a-question) · [Demos](#see-it-in-action) · [FAQ](#faq) · [Updating](#updating)
 
 ![MIT licence](https://img.shields.io/badge/licence-MIT-blue) ![Self-hosted](https://img.shields.io/badge/self--hosted-Docker-2496ED) ![amd64 and arm64](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-555) ![No cloud](https://img.shields.io/badge/cloud-none-success)
