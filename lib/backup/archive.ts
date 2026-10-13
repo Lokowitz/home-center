@@ -85,6 +85,13 @@ export class ArchiveWriter {
     return { path: this.finalPath, manifest }
   }
 
+  /** For wrappers (the outer password zip): no manifest, just close and rename. */
+  async closeWithoutManifest(): Promise<void> {
+    await this.zip.close()
+    this.closed = true
+    await rename(this.partialPath, this.finalPath)
+  }
+
   async abort(): Promise<void> {
     if (!this.closed) {
       try {
