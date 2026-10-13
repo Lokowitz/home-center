@@ -5,6 +5,9 @@ import { readdir, rm } from "node:fs/promises"
 import { createBackup } from "./backup"
 import { ArchiveReader } from "./archive"
 import { readSidecar } from "./store"
+import { generateX25519Identity, identityToRecipient } from "age-encryption"
+import { fingerprintOf, unprotectFile } from "./protect"
+import { verifyArchive } from "./verify"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
 
 async function setup() {
@@ -54,5 +57,50 @@ describe("createBackup", () => {
     const seen: [number, number][] = []
     await createBackup({ ...s, appVersion: "t", protection: { mode: "none" }, onProgress: (d, t) => seen.push([d, t]) })
     expect(seen.at(-1)).toEqual([SAMPLE_FILES.length, SAMPLE_FILES.length])
+  })
+})
+
+describe("protected backups", () => {
+  it("key: hides everything, carries secrets, and verifies after unlocking", async () => {
+    const s = await setup()
+    const id = await generateX25519Identity()
+    const recipient = await identityToRecipient(id)
+    const fingerprint = await fingerprintOf(recipient)
+    const out = await createBackup({ ...s, appVersion: "t", protection: { mode: "key", recipient, fingerprint }, secrets: { mailPassword: "smtp-pw", llmApiKey: null } })
+    expect(out.file).toMatch(/\.hcbackup\.age$/)
+    expect(out.sidecar).toMatchObject({ protection: "key", keyFingerprint: fingerprint })
+    expect(JSON.stringify(out.sidecar)).not.toContain("smtp-pw")
+    const plainPath = path.join(s.dir, "unlocked.hcbackup")
+    expect(await unprotectFile(out.path, plainPath, { key: id })).toEqual({ ok: true })
+    const v = await verifyArchive(plainPath, { workDir: s.workDir })
+    expect(v).toMatchObject({ ok: true, manifest: { hasSecrets: true, protection: "key" } })
+    const r = await ArchiveReader.open(plainPath)
+    expect(JSON.parse(await r.readText("secrets.json"))).toEqual({ mailPassword: "smtp-pw", llmApiKey: null })
+    await r.close()
+    expect(await readdir(s.workDir)).toEqual([]) // no plaintext left behind
+  })
+
+  it("password: opens with the password only", async () => {
+    const s = await setup()
+    const out = await createBackup({ ...s, appVersion: "t", protection: { mode: "password", password: "abcdef" } })
+    expect(out.file).toMatch(/\.hcbackup\.zip$/)
+    expect(await unprotectFile(out.path, path.join(s.dir, "x"), { password: "abcdeg" })).toMatchObject({ ok: false })
+    expect(await unprotectFile(out.path, path.join(s.dir, "x"), { password: "abcdef" })).toEqual({ ok: true })
+    expect(await readdir(s.workDir)).toEqual([])
+  })
+
+  it("a failed protection step leaves no backup, sidecar or plaintext", async () => {
+    const s = await setup()
+    await expect(createBackup({ ...s, appVersion: "t", protection: { mode: "password", password: "abc" } })).rejects.toThrow("at least 6")
+    expect(await readdir(s.workDir)).toEqual([])
+    expect(await readdir(s.folder)).toEqual([])
+  })
+
+  it("an unprotected backup never contains secrets", async () => {
+    const s = await setup()
+    const out = await createBackup({ ...s, appVersion: "t", protection: { mode: "none" }, secrets: { mailPassword: "smtp-pw", llmApiKey: "k" } })
+    const r = await ArchiveReader.open(out.path)
+    expect(r.entries()).not.toContain("secrets.json")
+    await r.close()
   })
 })

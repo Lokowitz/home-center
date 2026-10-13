@@ -2,7 +2,8 @@
 // Recovery key = age X25519 (the server only ever holds the public half).
 // Password = an AES-256 zip holding one inner archive, so file names stay hidden.
 import { createReadStream, createWriteStream } from "node:fs"
-import { open, rm } from "node:fs/promises"
+import { open, readFile, rm } from "node:fs/promises"
+import path from "node:path"
 import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { Decrypter, Encrypter } from "age-encryption"
@@ -131,5 +132,17 @@ export async function unprotectFile(src: string, destPlain: string, secret: Unlo
     if (kind === "key" && /no identity matched/i.test(msg)) return { ok: false, error: WRONG_KEY, needs: "key" }
     if (kind === "password" && /invalid password|invalid signature|hmac/i.test(msg)) return { ok: false, error: WRONG_PASSWORD, needs: "password" }
     return { ok: false, error: failureText(e) }
+  }
+}
+
+/** CLI: --key <kit file> or --passphrase-env <VAR> (never a password on the command line, where it lands in shell history). */
+export async function unlockArgs(args: string[]): Promise<UnlockSecret> {
+  const k = args.indexOf("--key")
+  const p = args.indexOf("--passphrase-env")
+  if (k >= 0 && !args[k + 1]) throw new Error("--key needs the path of your recovery kit file.")
+  if (p >= 0 && !args[p + 1]) throw new Error("--passphrase-env needs the name of an environment variable.")
+  return {
+    key: k >= 0 ? await readFile(path.resolve(args[k + 1]), "utf8") : undefined,
+    password: p >= 0 ? process.env[args[p + 1]] : undefined,
   }
 }

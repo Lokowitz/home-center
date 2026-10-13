@@ -5,6 +5,7 @@ import { mkdir, rm, stat } from "node:fs/promises"
 import { ArchiveWriter, hashFile } from "./archive"
 import { archiveName, DB_ENTRY, FILES_PREFIX, FORMAT_VERSION, SECRETS_ENTRY, SIDECAR_VERSION, type Sidecar } from "./format"
 import { safeJoin } from "./paths"
+import { protectFile } from "./protect"
 import { latestMigration, modelCounts, referencedFiles, vacuumInto } from "./snapshot"
 import { sidecarPath, uniqueName, writeSidecar } from "./store"
 import { verifyArchive } from "./verify"
@@ -84,7 +85,7 @@ export async function createBackup(input: BackupInput): Promise<BackupOutcome> {
     const v = await verifyArchive(plainPath, { workDir: input.workDir })
     if (!v.ok) throw new Error(`The new backup failed verification: ${v.error}`)
 
-    if (mode !== "none") await protectInto(plainPath, finalPath, input.protection, file)
+    if (mode !== "none") await protectFile(plainPath, finalPath, input.protection, file)
 
     const { size, sha256 } = await hashFile(finalPath)
     const sidecar: Sidecar = {
@@ -105,10 +106,4 @@ export async function createBackup(input: BackupInput): Promise<BackupOutcome> {
     await rm(snap, { force: true })
     if (mode !== "none") await rm(plainPath, { force: true })
   }
-}
-
-/** Replaced in Task 10 with protect.ts. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- stub signature, implemented in a later task
-async function protectInto(_plain: string, _dest: string, _p: ProtectionConfig, _file: string): Promise<void> {
-  throw new Error("Protected backups arrive in a later task.")
 }
