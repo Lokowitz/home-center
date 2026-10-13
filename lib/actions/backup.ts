@@ -171,8 +171,11 @@ export async function restoreConfirm(input: { word: string }): Promise<{ ok: tru
   return stageOrCancel(() => stage({ paths: restorePaths() }), "Couldn't prepare the restore.")
 }
 
-export async function restoreRestart(): Promise<{ restarting: boolean }> {
+export async function restoreRestart(): Promise<{ restarting: boolean; reason?: "busy" | "nothing-staged" }> {
   await requireAdmin()
+  // Exiting mid-backup would leave a partial archive, and with nothing staged a restart would only interrupt everyone.
+  if (isJobRunning()) return { restarting: false, reason: "busy" }
+  if (!(await hasPending(restorePaths().restoreDir))) return { restarting: false, reason: "nothing-staged" }
   return restartToFinish()
 }
 

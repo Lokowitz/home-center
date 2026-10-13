@@ -13,7 +13,10 @@ import { hasPending } from "@/lib/backup/restore"
 // Excluded from proxy.ts so a multi-GB body isn't buffered or truncated; auth is checked here.
 // The body streams straight to disk. The client never names the file: the id is made here.
 export async function POST(request: NextRequest) {
-  if (!(await adminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const session = await adminSession()
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // The proxy's forced password change doesn't run for this route, so it is repeated here.
+  if (session.user.mustResetPassword) return NextResponse.json({ error: "Change your password first." }, { status: 403 })
   if (!request.body) return NextResponse.json({ error: "No file" }, { status: 400 })
   if (isJobRunning()) return NextResponse.json({ error: "Wait for the running backup or export to finish." }, { status: 409 })
   const root = restoreDir()

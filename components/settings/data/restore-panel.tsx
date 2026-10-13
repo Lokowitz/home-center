@@ -63,7 +63,9 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
   }
 
   async function restart() {
-    const { restarting } = await restoreRestart()
+    const { restarting, reason } = await restoreRestart()
+    if (reason === "busy") return void toast.error("A backup or export is running. Try again when it has finished.")
+    if (reason === "nothing-staged") return void toast.error("There's no restore waiting, so there's nothing to restart for.")
     if (!restarting) return void toast.info(MANUAL_RESTART, { duration: Infinity })
     await waitForRestart()
   }
@@ -137,7 +139,7 @@ function ResultNotice({ result }: { result: RestoreResult }) {
           {result.recoveryDirs.map((d) => <li key={d} className="break-all font-mono text-xs">{d}</li>)}
         </ul>
       )}
-      <p>Move the data back into place, or ask whoever runs this server to. Another restore is refused until you do.</p>
+      <p>Move the data back into place, or ask whoever runs this server to.</p>
     </div>
   )
 }
