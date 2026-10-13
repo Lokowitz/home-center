@@ -115,20 +115,32 @@ async function refuseIfKept(staging: string) {
 }
 
 /** Renames a dir holding displaced data out of the pre-* and staging names; if even that fails, marks it so nothing deletes it. */
-async function preserve(dir: string, restoreDir: string, label: string, stampText: string, rename: typeof fsRename): Promise<string> {
+async function preserve(
+  dir: string, restoreDir: string, label: string, stampText: string,
+  ops: { rename: typeof fsRename; writeMarker: (file: string) => Promise<void> },
+): Promise<{ dir: string; protected: boolean }> {
   const target = path.join(restoreDir, `failed-${stampText}-${label}`)
   try {
-    await rename(dir, target)
-    return target
+    await ops.rename(dir, target)
+    return { dir: target, protected: true }
   } catch {
-    await writeFile(path.join(dir, KEEP), "{}").catch(() => undefined)
-    return dir
+    try {
+      await ops.writeMarker(path.join(dir, KEEP))
+      return { dir, protected: true }
+    } catch {
+      return { dir, protected: false }
+    }
   }
 }
 
 export async function stage(i: { paths: RestorePaths; now?: Date }): Promise<void> {
   const d = dirs(i.paths.restoreDir)
-  await refuseIfKept(d.staging)
+  try {
+    await refuseIfKept(d.staging)
+  } catch (e) {
+    await rm(d.work, { recursive: true, force: true }).catch(() => undefined) // no unlocked archive left lying around
+    throw e
+  }
   const info = JSON.parse(await readFile(path.join(d.work, "dryrun.json"), "utf8")) as { archive: string; createdAt: string }
   await rm(d.staging, { recursive: true, force: true })
   await mkdir(path.join(d.staging, "uploads"), { recursive: true })
@@ -163,11 +175,13 @@ export async function stage(i: { paths: RestorePaths; now?: Date }): Promise<voi
 }
 
 export async function latestPre(restoreDir: string): Promise<{ dir: string; createdAt: string } | null> {
-  const names = (await readdir(restoreDir).catch(() => [] as string[])).filter((n) => n.startsWith("pre-")).sort()
+  const names: string[] = []
+  for (const n of (await readdir(restoreDir).catch(() => [] as string[])).filter((n) => n.startsWith("pre-")).sort()) {
+    if (!(await isKept(path.join(restoreDir, n)))) names.push(n)
+  }
   const last = names.at(-1)
   if (!last) return null
   const dir = path.join(restoreDir, last)
-  if (await isKept(dir)) return null
   const meta = await readFile(path.join(dir, "pre.json"), "utf8").then((t) => JSON.parse(t) as { createdAt: string }, () => null)
   return meta ? { dir, createdAt: meta.createdAt } : null
 }
@@ -218,11 +232,12 @@ export async function applyPending(
   paths: RestorePaths,
   now = new Date(),
   // rollbackRename undoes moves and preserves recovery dirs; tests inject failures there separately from the forward moves.
-  fsOps: { rename: typeof fsRename; rollbackRename?: typeof fsRename } = { rename: fsRename },
+  fsOps: { rename: typeof fsRename; rollbackRename?: typeof fsRename; writeMarker?: (file: string) => Promise<void> } = { rename: fsRename },
 ): Promise<{ applied: false } | { applied: true; result: RestoreResult }> {
   const d = dirs(paths.restoreDir)
   if (!(await exists(d.pending))) return { applied: false }
   const rb = fsOps.rollbackRename ?? fsRename
+  const keepOps = { rename: rb, writeMarker: fsOps.writeMarker ?? ((file: string) => writeFile(file, "{}")) }
   const stampText = safeStamp(now)
   const base = { backupCreatedAt: null as string | null, appliedAt: now.toISOString(), source: "backup" as "backup" | "undo", finalized: false }
   const finish = async (result: RestoreResult) => {
@@ -235,6 +250,11 @@ export async function applyPending(
   try {
     meta = JSON.parse(await readFile(d.pending, "utf8"))
     if (meta.source !== "backup" && meta.source !== "undo") throw new Error("unknown source")
+    if (meta.undoOf !== undefined) {
+      // It becomes a rename target, so it must be a pre-* dir directly inside the restore dir.
+      const u = path.resolve(meta.undoOf)
+      if (path.dirname(u) !== path.resolve(paths.restoreDir) || !path.basename(u).startsWith("pre-")) throw new Error("bad undoOf")
+    }
   } catch {
     return finish({ ...base, status: "failed", error: "The pending restore file is unreadable, so nothing was changed.", rolledBack: true, recoveryDirs: [] })
   }
@@ -249,11 +269,13 @@ export async function applyPending(
   }
   const suffixes = ["", "-wal", "-shm", "-journal"]
   let stagedSecrets = false
+  let preCreated = false
 
   try {
     if (!(await exists(path.join(d.staging, "homecenter.db")))) throw new Error("The staged backup has no database.")
     await releaseDbHandles() // a client opened earlier in this process must not hold the files we are about to rename
-    await mkdir(pre, { recursive: true })
+    await mkdir(pre) // not recursive: if a dir with this name exists it is someone's undo point, so fail instead of mixing into it
+    preCreated = true
     await writeFile(path.join(pre, "pre.json"), JSON.stringify({ createdAt: now.toISOString() }))
     for (const suffix of suffixes) {
       if (await exists(paths.dbPath + suffix)) await move(paths.dbPath + suffix, path.join(pre, "homecenter.db" + suffix))
@@ -276,26 +298,34 @@ export async function applyPending(
     }
     const recoveryDirs: string[] = []
     let note = ""
+    const protect = async (dir: string, label: string) => {
+      const p = await preserve(dir, paths.restoreDir, label, stampText, keepOps)
+      recoveryDirs.push(p.dir)
+      return p.protected ? p.dir : `${p.dir} (could not protect it: nothing may be deleting it, but nothing marks it either)`
+    }
     if (rolledBack) {
-      await rm(pre, { recursive: true, force: true })
+      // pre is ours to delete only if it holds nothing but the marker file we wrote.
+      if (preCreated) {
+        const left = await readdir(pre).catch(() => ["?"])
+        if (left.length === 1 && left[0] === "pre.json") await rm(pre, { recursive: true, force: true })
+        else note = ` (leftover data was kept in ${await protect(pre, "previous")})`
+      }
       if (meta.undoOf && (await exists(d.staging))) {
         // A failed undo hands its snapshot back so it can be used again; if that fails the snapshot is kept where it is.
         try {
           await rb(d.staging, meta.undoOf)
         } catch {
-          const kept = await preserve(d.staging, paths.restoreDir, "undo-snapshot", stampText, rb)
-          recoveryDirs.push(kept)
-          note = ` (the earlier state you wanted to go back to was kept in ${kept})`
+          note += ` (the earlier state you wanted to go back to was kept in ${await protect(d.staging, "undo-snapshot")})`
         }
       } else {
         await rm(d.staging, { recursive: true, force: true })
       }
     } else {
       // Some moves couldn't be undone, so both dirs may hold the only copy of some data.
-      for (const [dir, label] of [[pre, "previous"], [d.staging, "staged"]] as const) {
-        if (await exists(dir)) recoveryDirs.push(await preserve(dir, paths.restoreDir, label, stampText, rb))
-      }
-      note = ` (rolling back also failed; data the household needs is in ${recoveryDirs.join(" and ")})`
+      const where: string[] = []
+      if (preCreated) where.push(await protect(pre, "previous"))
+      if (await exists(d.staging)) where.push(await protect(d.staging, "staged"))
+      note = ` (rolling back also failed; data the household needs is in ${where.join(" and ")})`
     }
     return finish({ ...base, status: "failed", error: (e instanceof Error ? e.message : String(e)) + note, rolledBack, recoveryDirs })
   }

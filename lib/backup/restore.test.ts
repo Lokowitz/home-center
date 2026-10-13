@@ -300,7 +300,10 @@ describe("restore failure handling", () => {
     const staging = path.join(w2.paths.restoreDir, "staging")
     expect(existsSync(path.join(staging, "homecenter.db"))).toBe(true)
     expect(existsSync(path.join(staging, "keep.json"))).toBe(true)
-    await expect(stageUndo({ paths: w2.paths })).rejects.toThrow()
+    // another valid undo point exists, so only the marked staging can be what stops the undo
+    await mkdir(path.join(w2.paths.restoreDir, "pre-9999"), { recursive: true })
+    await writeFile(path.join(w2.paths.restoreDir, "pre-9999", "pre.json"), JSON.stringify({ createdAt: new Date().toISOString() }))
+    await expect(stageUndo({ paths: w2.paths })).rejects.toThrow(/failed restore/)
     expect(existsSync(path.join(staging, "homecenter.db"))).toBe(true)
   })
 
@@ -336,5 +339,79 @@ describe("restore failure handling", () => {
     await stageUndo({ paths: w.paths })
     await applyPending(w.paths, later())
     expect(existsSync(path.join(w.paths.restoreDir, "secrets.enc.json"))).toBe(false)
+  })
+
+  it("a marked newest pre-* doesn't hide an older valid undo point", async () => {
+    const w = await world()
+    for (const [n, kept] of [["pre-a", false], ["pre-b", true]] as const) {
+      const dir = path.join(w.paths.restoreDir, n)
+      await mkdir(dir, { recursive: true })
+      await writeFile(path.join(dir, "pre.json"), JSON.stringify({ createdAt: "2026-01-01T00:00:00.000Z" }))
+      if (kept) await writeFile(path.join(dir, "keep.json"), "{}")
+    }
+    expect((await latestPre(w.paths.restoreDir))?.dir).toBe(path.join(w.paths.restoreDir, "pre-a"))
+  })
+
+  it("says so when displaced data could be neither renamed nor marked", async () => {
+    const w = await world()
+    await stageFresh(w)
+    const noMarker = async () => {
+      throw new Error("read-only")
+    }
+    const r = await applyPending(w.paths, new Date(), { rename: failAt4(), rollbackRename: always, writeMarker: noMarker })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: false } })
+    if (!r.applied) return
+    expect(r.result.error).toContain("could not protect")
+    expect(r.result.recoveryDirs).toHaveLength(2)
+    for (const dir of r.result.recoveryDirs) expect(existsSync(dir)).toBe(true)
+  })
+
+  it("never writes into an existing pre-* dir with the same name", async () => {
+    const w = await world()
+    await stageFresh(w)
+    const now = new Date()
+    const clash = path.join(w.paths.restoreDir, `pre-${now.toISOString().replace(/[:.]/g, "-")}`)
+    await mkdir(clash, { recursive: true })
+    await writeFile(path.join(clash, "pre.json"), JSON.stringify({ createdAt: "2026-01-01T00:00:00.000Z" }))
+    await writeFile(path.join(clash, "marker.txt"), "an older undo point")
+    const before = await fingerprint(w.paths)
+    expect(await applyPending(w.paths, now)).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    expect(await readFile(path.join(clash, "marker.txt"), "utf8")).toBe("an older undo point")
+    expect(await fingerprint(w.paths)).toBe(before)
+  })
+
+  it("stage refusing because of kept data also removes the unlocked dry-run archive", async () => {
+    const w = await world("password")
+    await dryRun({ archivePath: w.backup.path, secret: w.secret, paths: w.paths, known: await appMigrations() })
+    expect(existsSync(path.join(w.paths.restoreDir, "work", "archive.hcbackup"))).toBe(true)
+    await mkdir(path.join(w.paths.restoreDir, "staging"), { recursive: true })
+    await writeFile(path.join(w.paths.restoreDir, "staging", "keep.json"), "{}")
+    await expect(stage({ paths: w.paths })).rejects.toThrow(/failed restore/)
+    expect(existsSync(path.join(w.paths.restoreDir, "work"))).toBe(false)
+  })
+
+  it("a clean rollback keeps a pre dir that holds more than pre.json", async () => {
+    const w = await world()
+    await stageFresh(w)
+    // claims success without moving anything back, but really renames to failed-*
+    const noop = (async (a: string, b: string) => {
+      if (path.basename(b).startsWith("failed-")) await rename(a, b)
+    }) as typeof rename
+    const r = await applyPending(w.paths, new Date(), { rename: failAt4(), rollbackRename: noop })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    if (!r.applied) return
+    expect(r.result.recoveryDirs).toHaveLength(1)
+    expect(path.basename(r.result.recoveryDirs[0])).toMatch(/^failed-/)
+    expect(existsSync(path.join(r.result.recoveryDirs[0], "homecenter.db"))).toBe(true)
+  })
+
+  it("rejects an undoOf outside the restore dir without touching anything", async () => {
+    const w = await world()
+    await mkdir(path.join(w.paths.restoreDir, "staging"), { recursive: true })
+    await writeFile(path.join(w.paths.restoreDir, "pending.json"), JSON.stringify({ backupCreatedAt: null, source: "undo", undoOf: path.join(w.paths.restoreDir, "..", "elsewhere") }))
+    const before = await fingerprint(w.paths)
+    expect(await applyPending(w.paths)).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    expect(await fingerprint(w.paths)).toBe(before)
+    expect(existsSync(path.join(w.paths.restoreDir, "staging"))).toBe(true)
   })
 })
