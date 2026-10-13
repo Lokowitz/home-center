@@ -37,6 +37,11 @@ async function collectGarbage(): Promise<void> {
   }
 }
 
+/** Win32 only, best effort: lets a closed client's native handle go so its .db file can be renamed or deleted. */
+export async function releaseDbHandles(): Promise<void> {
+  if (process.platform === "win32") await collectGarbage()
+}
+
 /**
  * Runs fn on a short-lived connection. On Windows, libsql's native handle keeps the .db file locked after
  * close() until it is garbage collected, which would break a rename or delete of the file right after. So once
@@ -54,7 +59,7 @@ async function withDb<T>(p: string, fn: (c: Client) => Promise<T>): Promise<T> {
   try {
     return await run()
   } finally {
-    if (process.platform === "win32") await collectGarbage()
+    await releaseDbHandles()
   }
 }
 
