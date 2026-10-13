@@ -404,7 +404,11 @@ Your question and the records needed to answer it go to the AI provider you conf
 
 ### How do I back it up?
 
-Back up the data folder. It holds the database, uploaded files and downloaded models. Copy it while the container is stopped, or use your NAS's snapshots. Keep your `AUTH_SECRET` as well, because the saved mail password and API key can't be decrypted without it.
+Settings → Data. **Back up now** makes a verified backup; a daily or weekly **schedule** keeps the newest 14 (configurable). Point the folder at a different disk or NAS share (mount it in `docker-compose.yml`, e.g. `/backups`), because a backup on the same disk as your data doesn't survive that disk failing.
+
+Each backup is one file holding the database and every uploaded file. Protection is optional: none, a **recovery key** (the server can't open its own backups), or a **password zip** (opens in 7-Zip, WinRAR or Keka). From the command line: `npm run backup` and `npm run backup:verify -- <file>`.
+
+Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password and AI key. Protected backups carry them.
 
 ### Will it run on my NAS?
 

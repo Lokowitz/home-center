@@ -6,6 +6,8 @@ services:
     volumes:
       # Persists the SQLite database + uploaded files outside the container.
       - /volume1/docker/homecenter:/data
+      # Optional: a second disk or NAS share for backups (Settings → Data → Folder: /backups).
+      # - /volume2/backups/homecenter:/backups
     environment:
       # Where the SQLite file lives inside the container. Leave as-is.
       DATABASE_URL: "file:/data/homecenter.db"

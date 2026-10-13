@@ -63,6 +63,11 @@ RUN ARCH=$([ "$TARGETARCH" = "arm64" ] && echo arm64 || echo x64) \
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 COPY --from=builder /app/package.json ./package.json
+# Backup/restore engine for the boot-time restore step and the CLI (run with tsx).
+COPY --from=builder /app/lib/backup ./lib/backup
+COPY --from=builder /app/lib/attachment-location.ts ./lib/attachment-location.ts
+COPY --from=builder /app/lib/secret-box.ts ./lib/secret-box.ts
+COPY --from=builder /app/scripts ./scripts
 # Embedding worker (plain ESM, not bundled by Next) and the built-in model
 COPY --from=builder /app/workers ./workers
 COPY --from=builder /app/models/builtin ./models/builtin
@@ -73,6 +78,8 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 ENV UPLOAD_DIR=/data/uploads
 ENV MODELS_DIR=/data/models
+# Lets "Restart to finish" exit the process; compose's restart policy brings it back.
+ENV HOMECENTER_SUPERVISED=1
 # Probes the database through /api/health (left public in proxy.ts).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1
