@@ -7,10 +7,12 @@ import { BackupStatus } from "./backup-status"
 import { BackupSchedule } from "./backup-schedule"
 import { BackupProtection } from "./backup-protection"
 import { BackupList } from "./backup-list"
+import { RestorePanel, type RestoreSource } from "./restore-panel"
 
 /** Settings → Data. Holds the overview and polls it while a job runs. */
 export function DataSettings({ initial }: { initial: BackupOverview }) {
   const [data, setData] = useState(initial)
+  const [restoreSource, setRestoreSource] = useState<RestoreSource | null>(null)
   const refresh = useCallback(async () => setData(await getBackupOverview()), [])
 
   useEffect(() => {
@@ -24,7 +26,8 @@ export function DataSettings({ initial }: { initial: BackupOverview }) {
       <BackupStatus data={data} onStarted={refresh} />
       <BackupSchedule data={data} onSaved={refresh} />
       <BackupProtection data={data} onSaved={refresh} />
-      <BackupList data={data} onChanged={refresh} />
+      <BackupList data={data} onChanged={refresh} onRestore={(b) => setRestoreSource({ file: b.file })} />
+      <RestorePanel data={data} source={restoreSource} setSource={setRestoreSource} onChanged={refresh} />
     </div>
   )
 }

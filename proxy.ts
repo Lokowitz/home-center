@@ -33,10 +33,10 @@ export default auth((req) => {
 
 // manifest.webmanifest and icons/ are fetched by the browser without a session
 // (install prompts, Home Screen icons), so a login redirect would break them.
-// The two upload routes are left out: proxy buffers every request body it sees
+// The upload routes (files, and backup restore) are left out: proxy buffers every request body it sees
 // (10 MB by default, truncating anything longer), which broke uploads between
-// that and MAX_UPLOAD_BYTES. Both routes check the session themselves and
-// refuse an oversized body from its headers before reading it.
+// that and MAX_UPLOAD_BYTES. api/backup/upload takes multi-GB backups and
+// streams them to disk. Each route checks the session itself.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|public/|api/uploads$|api/assets/[^/]+/[^/]+/image$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|public/|api/uploads$|api/backup/upload$|api/assets/[^/]+/[^/]+/image$).*)"],
 }

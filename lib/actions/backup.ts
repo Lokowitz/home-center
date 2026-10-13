@@ -2,6 +2,7 @@
 
 import path from "node:path"
 import { revalidatePath } from "next/cache"
+import { mkdir } from "node:fs/promises"
 import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth-guard"
@@ -11,7 +12,10 @@ import { BACKUP_SETTINGS_ID, backupFolder, loadBackupSettings } from "@/lib/back
 import { deleteBackup, folderStatus, listBackups } from "@/lib/backup/store"
 import { hashFile } from "@/lib/backup/archive"
 import { verifyArchive } from "@/lib/backup/verify"
-import { dataDir, workDir } from "@/lib/backup/paths"
+import { appMigrations, dataDir, workDir } from "@/lib/backup/paths"
+import { cancelRestore, dryRun, hasPending, stage, stageUndo, type DryRun } from "@/lib/backup/restore"
+import { restartToFinish, restorePaths } from "@/lib/backup/restore-server"
+import { isJobRunning } from "@/lib/backup/jobs-server"
 import { fingerprintOf, passwordProblem } from "@/lib/backup/protect-shared"
 import { encrypt } from "@/lib/secret-box"
 
@@ -120,4 +124,64 @@ export async function setProtectionPassword(input: { password: string }): Saved 
   })
   revalidatePath("/settings")
   return { ok: true }
+}
+
+const UPLOAD_ID = /^[0-9a-f-]{36}$/
+const BUSY = "Wait for the running backup or export to finish."
+const WAITING = "A restore is already waiting for a restart."
+
+/** Checks a backup without changing anything. Keys and passwords are used here only; they are never stored or logged. */
+export async function restoreDryRun(input: { source: { upload: string } | { file: string }; key?: string; password?: string }): Promise<DryRun> {
+  await requireAdmin()
+  if (isJobRunning()) return { ok: false, error: BUSY }
+  const paths = restorePaths()
+  if (await hasPending(paths.restoreDir)) return { ok: false, error: WAITING }
+  let archivePath: string
+  if ("upload" in input.source) {
+    if (!UPLOAD_ID.test(String(input.source.upload))) return { ok: false, error: "Upload not found." }
+    archivePath = path.join(paths.restoreDir, "incoming", `${input.source.upload}.upload`)
+  } else {
+    // Only a file that listBackups finds in the backup folder; the client's string is never joined to a path.
+    const file = input.source.file
+    const b = (await listBackups(backupFolder(await loadBackupSettings()))).find((x) => x.file === file)
+    if (!b) return { ok: false, error: "That backup isn't in the backup folder any more." }
+    archivePath = b.path
+  }
+  await mkdir(paths.restoreDir, { recursive: true })
+  return dryRun({ archivePath, secret: { key: input.key || undefined, password: input.password || undefined }, paths, known: await appMigrations() })
+}
+
+/** Stages the checked backup. A stage error removes the unlocked work archive and is shown as is. */
+async function stageOrCancel(run: () => Promise<void>, fallback: string): Promise<{ ok: true } | { error: string }> {
+  const paths = restorePaths()
+  if (isJobRunning()) return { error: BUSY }
+  if (await hasPending(paths.restoreDir)) return { error: WAITING }
+  try {
+    await run()
+  } catch (e) {
+    await cancelRestore(paths.restoreDir).catch(() => undefined)
+    return { error: e instanceof Error ? e.message : fallback }
+  }
+  return { ok: true }
+}
+
+export async function restoreConfirm(input: { word: string }): Promise<{ ok: true } | { error: string }> {
+  await requireAdmin()
+  if (String(input.word ?? "").trim() !== "RESTORE") return { error: "Type RESTORE to confirm." }
+  return stageOrCancel(() => stage({ paths: restorePaths() }), "Couldn't prepare the restore.")
+}
+
+export async function restoreRestart(): Promise<{ restarting: boolean }> {
+  await requireAdmin()
+  return restartToFinish()
+}
+
+export async function restoreUndo(): Promise<{ ok: true } | { error: string }> {
+  await requireAdmin()
+  return stageOrCancel(() => stageUndo({ paths: restorePaths() }), "Couldn't prepare the undo.")
+}
+
+export async function restoreCancel(): Promise<void> {
+  await requireAdmin()
+  await cancelRestore(restorePaths().restoreDir)
 }

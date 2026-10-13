@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { loadFeatures } from "@/lib/features-server"
-import { dataDir } from "./paths"
+import { dataDir, restoreDir } from "./paths"
+import { hasPending, latestPre, readResult, type RestoreResult } from "./restore"
 import { folderStatus, listBackups, type FolderStatus } from "./store"
 import { backupFolder, loadBackupSettings } from "./settings-server"
 import { isStale, nextSlot } from "./schedule"
@@ -9,7 +10,7 @@ import type { Protection } from "./format"
 
 export type BackupRow = { file: string; createdAt: string; size: number; protection: Protection; keyFingerprint: string | null; warningCount: number; kind: "backup" | "export" }
 
-export type RestoreState = null // widened in Task 13
+export type RestoreState = { result: RestoreResult | null; undoAvailableUntil: string | null; pending: boolean }
 
 export type BackupOverview = {
   settings: {
@@ -29,12 +30,15 @@ export type BackupOverview = {
 export async function loadBackupOverview(now = new Date()): Promise<BackupOverview> {
   const s = await loadBackupSettings()
   const folder = backupFolder(s)
-  const [status, stored, running, last, features] = await Promise.all([
+  const [status, stored, running, last, features, result, pre, pending] = await Promise.all([
     folderStatus(folder, dataDir()),
     listBackups(folder),
     prisma.backupRun.findFirst({ where: { status: "RUNNING" }, orderBy: { startedAt: "desc" } }),
     prisma.backupRun.findFirst({ where: { kind: "BACKUP", status: { not: "RUNNING" } }, orderBy: { startedAt: "desc" } }),
     loadFeatures(),
+    readResult(restoreDir()),
+    latestPre(restoreDir()),
+    hasPending(restoreDir()),
   ])
   const backups = stored.filter((b) => b.kind === "backup")
   const newestAt = backups[0] ? new Date(backups[0].createdAt) : null
@@ -51,6 +55,10 @@ export async function loadBackupOverview(now = new Date()): Promise<BackupOvervi
     nextRunAt: nextSlot(s, now)?.toISOString() ?? null,
     tone: statusTone({ newestAt, lastStatus: last?.status ?? null, stale }),
     healthEnabled: features.health,
-    restore: null,
+    restore: {
+      result,
+      undoAvailableUntil: pre ? new Date(new Date(pre.createdAt).getTime() + 7 * 86_400_000).toISOString() : null,
+      pending,
+    },
   }
 }
