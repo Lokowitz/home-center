@@ -57,8 +57,7 @@ describe("boot decision after the apply step", () => {
 
 describe("boot message and crash handling", () => {
   it("the blocked message names both ways out, with a Docker command that runs as the app user", () => {
-    const text = bootOutcome({ applied: false }, { ...base, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"] }, "/data/restore").lines.join("
-")
+    const text = bootOutcome({ applied: false }, { ...base, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"] }, "/data/restore").lines.join("\n")
     expect(text).toContain("npm run restore -- --ack")
     expect(text).toContain("docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- --ack")
     expect(text).toContain("Delete /data/restore/result.json")
@@ -68,8 +67,7 @@ describe("boot message and crash handling", () => {
   it("a crash with pending.json still there stops boot and names the restore folder", () => {
     const out = crashOutcome(new Error("EPERM"), true, "/data/restore")
     expect(out.exitCode).toBe(1)
-    expect(out.lines.join("
-")).toContain("/data/restore")
+    expect(out.lines.join("\n")).toContain("/data/restore")
   })
 
   it("a crash with nothing pending lets boot continue", () => {
