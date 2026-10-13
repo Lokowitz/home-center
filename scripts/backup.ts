@@ -3,6 +3,7 @@
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { createBackup } from "../lib/backup/backup"
+import { backupReadable } from "../lib/backup/viewer"
 import { dbPathFromUrl, defaultBackupFolder, uploadDir, workDir } from "../lib/backup/paths"
 import { rawProtection, readRawSecrets, readRawSettings } from "../lib/backup/raw-settings"
 import { pruneBackups } from "../lib/backup/store"
@@ -19,6 +20,7 @@ async function main() {
   const out = await createBackup({
     dbPath, uploadDir: uploadDir(), folder, workDir: workDir(), appVersion: version, protection,
     secrets: protection.mode === "none" ? null : await readRawSecrets(dbPath),
+    readable: backupReadable,
     createFolder: i < 0 && !s.folder,
     onProgress: process.stdout.isTTY ? (d, t) => process.stdout.write(`\rFiles ${d}/${t}`) : undefined,
   })

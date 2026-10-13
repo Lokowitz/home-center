@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { uploadDir, dbPathFromUrl, workDir } from "./paths"
 import { createBackup } from "./backup"
+import { backupReadable } from "./viewer"
 import { cleanupPartials, pruneBackups } from "./store"
 import { appVersion, backupFolder, loadBackupSettings, loadSecrets, protectionConfig } from "./settings-server"
 import { raiseBackupAlert, resolveBackupAlerts } from "./alerts-server"
@@ -60,6 +61,7 @@ export async function runBackupJob(runId: string): Promise<void> {
       appVersion: await appVersion(),
       protection,
       secrets: protection.mode === "none" ? null : await loadSecrets(),
+      readable: backupReadable,
       // The default folder may be created; a configured one (NAS share) must already exist.
       createFolder: !settings.folder,
       onProgress: (done, total) => {
