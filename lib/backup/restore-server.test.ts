@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs"
 import path from "node:path"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { tempDir } from "./test-support"
 
 const db = vi.hoisted(() => ({
@@ -24,6 +24,11 @@ const result = { status: "ok", error: null, backupCreatedAt: "2026-01-02T03:04:0
 
 describe("finalizeRestore", () => {
   let dir: string
+  const savedUrl = process.env.DATABASE_URL
+  afterEach(() => {
+    if (savedUrl === undefined) delete process.env.DATABASE_URL
+    else process.env.DATABASE_URL = savedUrl
+  })
   beforeEach(async () => {
     vi.clearAllMocks()
     const root = await tempDir("hc-final-")

@@ -4,8 +4,8 @@
 // stops boot (exit 1) is a failed apply that could not be rolled back, on every boot until
 // `npm run restore -- --ack`.
 import "dotenv/config"
-import { applyPending, readResult } from "../lib/backup/restore"
-import { bootOutcome } from "../lib/backup/restore-boot"
+import { applyPending, hasPending, readResult } from "../lib/backup/restore"
+import { bootOutcome, crashOutcome } from "../lib/backup/restore-boot"
 import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "../lib/backup/paths"
 
 async function main(): Promise<number> {
@@ -21,8 +21,10 @@ async function main(): Promise<number> {
 
 main().then(
   (code) => process.exit(code),
-  (e) => {
-    console.error("[restore] apply step crashed:", e)
-    process.exit(0)
+  async (e) => {
+    const dir = (() => { try { return restoreDir() } catch { return "(unknown restore folder)" } })()
+    const out = crashOutcome(e, await hasPending(dir).catch(() => true), dir)
+    for (const l of out.lines) console.error(l)
+    process.exit(out.exitCode)
   },
 )

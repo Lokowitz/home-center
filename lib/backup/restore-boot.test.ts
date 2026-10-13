@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { bootOutcome } from "./restore-boot"
+import { appIsRunning, bootOutcome, crashOutcome } from "./restore-boot"
 import type { RestoreResult } from "./restore"
 
 const base: RestoreResult = { status: "ok", error: null, backupCreatedAt: "2026-01-02T03:04:05.000Z", appliedAt: "2026-02-01T00:00:00.000Z", source: "backup", finalized: false, rolledBack: true, recoveryDirs: [] }
@@ -52,5 +52,34 @@ describe("boot decision after the apply step", () => {
 
   it("continues when the stored failure was cleanly rolled back", () => {
     expect(bootOutcome({ applied: false }, { ...blocking, rolledBack: true, recoveryDirs: [] }).exitCode).toBe(0)
+  })
+})
+
+describe("boot message and crash handling", () => {
+  it("the blocked message names both ways out, with a Docker command that runs as the app user", () => {
+    const text = bootOutcome({ applied: false }, { ...base, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"] }, "/data/restore").lines.join("
+")
+    expect(text).toContain("npm run restore -- --ack")
+    expect(text).toContain("docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- --ack")
+    expect(text).toContain("Delete /data/restore/result.json")
+    expect(text).toContain("<your data folder>/restore/result.json")
+  })
+
+  it("a crash with pending.json still there stops boot and names the restore folder", () => {
+    const out = crashOutcome(new Error("EPERM"), true, "/data/restore")
+    expect(out.exitCode).toBe(1)
+    expect(out.lines.join("
+")).toContain("/data/restore")
+  })
+
+  it("a crash with nothing pending lets boot continue", () => {
+    expect(crashOutcome(new Error("x"), false, "/d").exitCode).toBe(0)
+  })
+
+  it("detects a running app through an injected probe", async () => {
+    const seen: string[] = []
+    expect(await appIsRunning("4999", async (u) => void seen.push(u))).toBe(true)
+    expect(seen).toEqual(["http://127.0.0.1:4999/api/health"])
+    expect(await appIsRunning("4999", async () => { throw new Error("ECONNREFUSED") })).toBe(false)
   })
 })

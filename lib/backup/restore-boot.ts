@@ -26,8 +26,9 @@ export function bootOutcome(
         ...r.recoveryDirs.map((d) => `[restore]   ${d}`),
         "[restore] To start again, do ONE of these:",
         "[restore]   1. Move the data back where it belongs, then run: npm run restore -- --ack",
-        "[restore]      (in Docker: docker exec <container> npm run restore -- --ack)",
-        `[restore]   2. Delete ${restoreDir}/result.json`,
+        "[restore]      (in Docker the container keeps restarting, so use a fresh one as the app user:",
+        "[restore]       docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- --ack)",
+        `[restore]   2. Delete ${restoreDir}/result.json (in Docker that is <your data folder>/restore/result.json on the host, the folder mounted at /data)`,
       ],
     }
   }
@@ -36,4 +37,28 @@ export function bootOutcome(
     return { exitCode: 0, stderr: false, lines: [`[restore] ${r.source === "undo" ? "went back to the earlier state" : `applied backup from ${r.backupCreatedAt}`}`] }
   }
   return { exitCode: 0, stderr: true, lines: [`[restore] failed and rolled back, nothing was changed: ${r.error}`] }
+}
+
+/** Exit decision when the apply step itself crashed. A crash with pending.json still there may have left data half moved, so boot must not go on to create an empty database. */
+export function crashOutcome(error: unknown, stillPending: boolean, restoreDir: string): { exitCode: 0 | 1; lines: string[] } {
+  const lines = [`[restore] apply step crashed: ${error instanceof Error ? error.message : String(error)}`]
+  if (!stillPending) return { exitCode: 0, lines }
+  return {
+    exitCode: 1,
+    lines: [
+      ...lines,
+      "[restore] A restore was in progress, so HomeCenter will not start and will not create an empty database.",
+      `[restore] Look in ${restoreDir} (folders named pre-*, staging, failed-*) and keep everything there. Ask for help before deleting anything.`,
+    ],
+  }
+}
+
+/** True when something answers HomeCenter's health URL, so the CLI should not swap data under a running app. */
+export async function appIsRunning(port: string, probe: (url: string, init: { signal: AbortSignal }) => Promise<unknown> = fetch): Promise<boolean> {
+  try {
+    await probe(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(1500) })
+    return true
+  } catch {
+    return false
+  }
 }

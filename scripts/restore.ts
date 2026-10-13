@@ -1,10 +1,14 @@
 // npm run restore -- --ack   (after dealing with the data of a failed restore, lets HomeCenter start again)
 // npm run restore -- <file> [--dry-run] [--key kit.txt | --passphrase-env VAR] [--yes]
-// For when the app won't start. Stop HomeCenter first.
+// For when the app won't start. Stop HomeCenter first (refuses if it answers on PORT, unless --force).
+// In Docker run it in a fresh container as the app user (the running one may be restarting in a loop):
+//   docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- --ack
+//   docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- /data/backups/<file> --yes
 import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { createInterface } from "node:readline/promises"
 import { appMigrations, dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "../lib/backup/paths"
+import { appIsRunning } from "../lib/backup/restore-boot"
 import { acknowledgeBlocking, applyPending, cancelRestore, dryRun, stage } from "../lib/backup/restore"
 import { unlockArgs } from "../lib/backup/protect"
 
@@ -31,10 +35,21 @@ async function main() {
     console.log("Dry run only: nothing changed.")
     return
   }
+  if (!args.includes("--force") && (await appIsRunning(process.env.PORT || "3000"))) {
+    await cancelRestore(paths.restoreDir)
+    throw new Error("HomeCenter looks like it is running. Stop it first, then run this again (or add --force if that is not HomeCenter).")
+  }
   if (!args.includes("--yes")) {
+    if (!process.stdin.isTTY) {
+      await cancelRestore(paths.restoreDir)
+      throw new Error("This needs --yes when it is not run from a terminal.")
+    }
     console.log("\nThis REPLACES everything in this HomeCenter. Stop HomeCenter before continuing.")
     const rl = createInterface({ input: process.stdin, output: process.stdout })
-    const answer = await rl.question("Type RESTORE to continue: ")
+    const answer = await Promise.race([
+      rl.question("Type RESTORE to continue: "),
+      new Promise<string>((resolve) => rl.once("close", () => resolve(""))),
+    ])
     rl.close()
     if (answer.trim() !== "RESTORE") {
       await cancelRestore(paths.restoreDir)

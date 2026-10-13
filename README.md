@@ -410,6 +410,8 @@ Each backup is one file holding the database and every uploaded file. Protection
 
 Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password and AI key. Protected backups carry them.
 
+**Restoring** is done in the app (Settings → Data), or from the command line when the app won't start: stop HomeCenter, then `npm run restore -- <file>` (`--dry-run` to only look). The data is swapped in by the next start, which also runs the database upgrade; in Docker that is the container restarting. With `npm start` outside Docker the swap happens on start, but `npm start` does not run `prisma migrate deploy`, so run `npx prisma migrate deploy` afterwards if the backup came from an older version. In Docker, `docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- /data/backups/<file> --yes` runs it in a fresh container.
+
 ### Will it run on my NAS?
 
 Images are built for amd64 and arm64, so it runs on Synology, Unraid and other Docker hosts, including 64-bit ARM boards such as a Raspberry Pi.
