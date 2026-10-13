@@ -1,0 +1,28 @@
+export function recoveryKitText(i: { identity: string; recipient: string; fingerprint: string; created: Date }): string {
+  return [
+    "HomeCenter backup recovery key",
+    "================================",
+    "",
+    `Created:     ${i.created.toLocaleString()}`,
+    `Fingerprint: ${i.fingerprint}`,
+    "",
+    "Keep this file somewhere safe and separate from your server: a password manager,",
+    "a USB stick in a drawer, or printed. Anyone with it can open backups made with",
+    "this key. Without it, those backups can't be opened by anyone, including you.",
+    "",
+    "Your recovery key:",
+    "",
+    i.identity,
+    "",
+    "Public half (stored on the server, safe to share):",
+    i.recipient,
+    "",
+    "To restore in HomeCenter: Settings > Data > Restore, choose the backup, then",
+    "choose this file (or paste the key) when asked.",
+    "",
+    "To open a backup without HomeCenter, install age (https://age-encryption.org) and run:",
+    "  age -d -i homecenter-recovery-key.txt homecenter-YYYY-MM-DD-HHmm.hcbackup.age > backup.zip",
+    "backup.zip then opens in any zip tool; readable/index.html shows everything.",
+    "",
+  ].join("\n")
+}

@@ -8,27 +8,15 @@ import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { Decrypter, Encrypter } from "age-encryption"
 import { ArchiveReader, ArchiveWriter } from "./archive"
-import { innerName, MANIFEST_ENTRY, MIN_PASSWORD, type Protection } from "./format"
+import { innerName, MANIFEST_ENTRY, type Protection } from "./format"
+import { parseIdentity, passwordProblem } from "./protect-shared"
 import type { ProtectionConfig } from "./backup"
 
 const AGE_MAGIC = "age-encryption.org/v1"
 
 export type UnlockSecret = { key?: string; password?: string }
 
-export function passwordProblem(pw: string): string | null {
-  return pw.length < MIN_PASSWORD ? `Use at least ${MIN_PASSWORD} characters.` : null
-}
-
-export function parseIdentity(text: string): string | null {
-  return /AGE-SECRET-KEY-1[0-9A-Z]+/i.exec(text)?.[0].toUpperCase() ?? null
-}
-
-/** Short, readable id of a recipient so a backup can say which kit opens it. */
-export async function fingerprintOf(recipient: string): Promise<string> {
-  const d = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(recipient)))
-  const hex = [...d.slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("")
-  return hex.match(/.{4}/g)!.join("-")
-}
+export { passwordProblem, parseIdentity, fingerprintOf } from "./protect-shared"
 
 export async function protectFile(plainPath: string, destPath: string, cfg: ProtectionConfig, destName: string): Promise<void> {
   try {

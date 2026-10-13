@@ -12,6 +12,8 @@ import { deleteBackup, folderStatus, listBackups } from "@/lib/backup/store"
 import { hashFile } from "@/lib/backup/archive"
 import { verifyArchive } from "@/lib/backup/verify"
 import { dataDir, workDir } from "@/lib/backup/paths"
+import { fingerprintOf, passwordProblem } from "@/lib/backup/protect-shared"
+import { encrypt } from "@/lib/secret-box"
 
 export async function getBackupOverview(): Promise<BackupOverview> {
   await requireAdmin()
@@ -79,4 +81,43 @@ export async function dismissBackupHint(): Promise<void> {
   await loadBackupSettings() // upserts the singleton row so the update below can't miss it
   await prisma.backupSettings.update({ where: { id: BACKUP_SETTINGS_ID }, data: { hintDismissedAt: new Date() } })
   revalidatePath("/settings")
+}
+
+type Saved = Promise<{ ok: true } | { error: string }>
+
+export async function setProtectionNone(): Saved {
+  await requireAdmin()
+  await loadBackupSettings() // upserts the singleton row so the update below can't miss it
+  await prisma.backupSettings.update({ where: { id: BACKUP_SETTINGS_ID }, data: { protection: "NONE", passphraseEnc: null } })
+  revalidatePath("/settings")
+  return { ok: true }
+}
+
+export async function setProtectionKey(input: { publicKey: string; fingerprint: string }): Saved {
+  await requireAdmin()
+  const key = String(input.publicKey ?? "").trim()
+  if (!/^age1[0-9a-z]{20,}$/.test(key)) return { error: "That isn't a recovery key's public half." }
+  // Recomputed here: the client's fingerprint is only trusted if it matches.
+  if ((await fingerprintOf(key)) !== input.fingerprint) return { error: "The key and its fingerprint don't match." }
+  await loadBackupSettings()
+  await prisma.backupSettings.update({
+    where: { id: BACKUP_SETTINGS_ID },
+    data: { protection: "KEY", publicKey: key, keyFingerprint: input.fingerprint, passphraseEnc: null },
+  })
+  revalidatePath("/settings")
+  return { ok: true }
+}
+
+export async function setProtectionPassword(input: { password: string }): Saved {
+  await requireAdmin()
+  const password = String(input.password ?? "")
+  const problem = passwordProblem(password)
+  if (problem) return { error: problem }
+  await loadBackupSettings()
+  await prisma.backupSettings.update({
+    where: { id: BACKUP_SETTINGS_ID },
+    data: { protection: "PASSWORD", passphraseEnc: encrypt(password) },
+  })
+  revalidatePath("/settings")
+  return { ok: true }
 }
