@@ -1,11 +1,14 @@
 import { describe, expect, it, beforeAll, vi } from "vitest"
 import path from "node:path"
 import { existsSync } from "node:fs"
-import { readFile, rename, writeFile } from "node:fs/promises"
+import { createHash } from "node:crypto"
+import { mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises"
 import { generateX25519Identity, identityToRecipient } from "age-encryption"
+import { ArchiveWriter } from "./archive"
 import { createBackup } from "./backup"
+import { DB_ENTRY, FORMAT_VERSION } from "./format"
 import { appMigrations } from "./paths"
-import { applyPending, dryRun, latestPre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
+import { applyPending, dryRun, latestPre, prunePre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
 import { modelCounts, openDb, releaseDbHandles } from "./snapshot"
 import { fingerprintOf } from "./protect"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
@@ -56,6 +59,28 @@ async function world(protection: "none" | "key" | "password" = "none") {
   return { backup, paths, secret }
 }
 
+/** Hash of the live DB bytes plus every upload (path and content). */
+async function fingerprint(paths: RestorePaths): Promise<string> {
+  const h = createHash("sha256")
+  h.update(await readFile(paths.dbPath))
+  const walk = async (dir: string, rel: string) => {
+    for (const e of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (e.isDirectory()) await walk(path.join(dir, e.name), rel + e.name + "/")
+      else h.update(rel + e.name).update(await readFile(path.join(dir, e.name)))
+    }
+  }
+  await walk(paths.uploadDir, "")
+  return h.digest("hex")
+}
+
+const failAt4 = () => {
+  let calls = 0
+  return (async (a: string, b: string) => {
+    if (++calls === 4) throw new Error("disk went away")
+    await rename(a, b)
+  }) as typeof rename
+}
+
 describe("restore", () => {
   it.each(["none", "key", "password"] as const)("round-trips a %s backup into another household", async (protection) => {
     const { backup, paths, secret } = await world(protection)
@@ -93,15 +118,13 @@ describe("restore", () => {
     const { backup, paths } = await world()
     await dryRun({ archivePath: backup.path, secret: {}, paths, known: await appMigrations() })
     await stage({ paths })
-    let calls = 0
-    const flaky = async (a: string, b: string) => {
-      if (++calls === 4) throw new Error("disk went away")
-      await rename(a, b)
-    }
-    const r = await applyPending(paths, new Date(), { rename: flaky as typeof rename })
-    expect(r).toMatchObject({ applied: true, result: { status: "failed", error: "disk went away" } })
+    const before = await fingerprint(paths)
+    const r = await applyPending(paths, new Date(), { rename: failAt4() })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", error: "disk went away", rolledBack: true, recoveryDirs: [] } })
+    expect(await fingerprint(paths)).toBe(before) // byte for byte the original
     expect((await modelCounts(paths.dbPath)).User).toBe(1) // the original household
     expect(existsSync(path.join(paths.uploadDir, "service/zz/old.pdf"))).toBe(true)
+    for (const f of SAMPLE_FILES) expect(existsSync(path.join(paths.uploadDir, ...f.split("/")))).toBe(false)
     expect(await readResult(paths.restoreDir)).toMatchObject({ status: "failed" })
     expect(await applyPending(paths)).toEqual({ applied: false }) // nothing left pending
   })
@@ -147,11 +170,17 @@ describe("restore", () => {
 })
 
 describe("restore hardening", () => {
-  it("returns ok:false instead of throwing when the database isn't openable", async () => {
+  it("returns ok:false instead of throwing for a valid archive holding a corrupt database", async () => {
     const { paths } = await world()
-    const junk = path.join(paths.restoreDir, "..", "junk.hcbackup")
-    await writeFile(junk, "not a zip at all")
-    expect(await dryRun({ archivePath: junk, secret: {}, paths, known: await appMigrations() })).toMatchObject({ ok: false })
+    const dir = await tempDir("hc-bad-")
+    const known = await appMigrations()
+    const w = await ArchiveWriter.create(path.join(dir, "bad.hcbackup"))
+    await w.addBytes(DB_ENTRY, "this is not a sqlite database at all, just text padding".repeat(40))
+    const { path: archive } = await w.finish({
+      formatVersion: FORMAT_VERSION, kind: "backup", scope: null, appVersion: "t", migration: known.at(-1)!,
+      createdAt: new Date().toISOString(), protection: "none", counts: {}, warnings: [], hasReadable: false, hasSecrets: false,
+    })
+    expect(await dryRun({ archivePath: archive, secret: {}, paths, known })).toMatchObject({ ok: false })
     expect(existsSync(path.join(paths.restoreDir, "work"))).toBe(false)
   })
 
@@ -170,16 +199,142 @@ describe("restore hardening", () => {
     await stage({ paths })
     await applyPending(paths)
     await stageUndo({ paths })
-    let calls = 0
-    const flaky = async (a: string, b: string) => {
-      if (++calls === 4) throw new Error("boom")
-      await rename(a, b)
-    }
-    expect(await applyPending(paths, new Date(), { rename: flaky as typeof rename })).toMatchObject({ result: { status: "failed" } })
+    expect(await applyPending(paths, new Date(Date.now() + 1000), { rename: failAt4() })).toMatchObject({ result: { status: "failed" } })
     expect((await modelCounts(paths.dbPath)).ServiceRecord).toBe(2) // still the restored household
     expect(await latestPre(paths.restoreDir)).not.toBeNull()
     await stageUndo({ paths })
     await applyPending(paths)
     expect(existsSync(path.join(paths.uploadDir, "service/zz/old.pdf"))).toBe(true)
+  })
+})
+
+describe("restore failure handling", () => {
+  const stageFresh = async (w: Awaited<ReturnType<typeof world>>) => {
+    await dryRun({ archivePath: w.backup.path, secret: {}, paths: w.paths, known: await appMigrations() })
+    await stage({ paths: w.paths })
+  }
+  const later = () => new Date(Date.now() + 1000)
+  const always = (async () => {
+    throw new Error("rollback refused")
+  }) as unknown as typeof rename
+  /** Rollback moves fail, but renaming a dir to failed-* works. */
+  const onlyPreserve = (async (a: string, b: string) => {
+    if (!path.basename(b).startsWith("failed-")) throw new Error("rollback refused")
+    await rename(a, b)
+  }) as typeof rename
+
+  it("a failed rollback renames displaced data to failed-* and later work never deletes it", async () => {
+    const w = await world()
+    await stageFresh(w)
+    const r = await applyPending(w.paths, new Date(), { rename: failAt4(), rollbackRename: onlyPreserve })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: false } })
+    if (!r.applied) return
+    expect(r.result.recoveryDirs).toHaveLength(2)
+    for (const dir of r.result.recoveryDirs) {
+      expect(path.basename(dir)).toMatch(/^failed-/)
+      expect(existsSync(dir)).toBe(true)
+      expect(r.result.error).toContain(dir)
+    }
+    expect((await readdir(w.paths.restoreDir)).filter((n) => n.startsWith("pre-"))).toEqual([])
+    expect(existsSync(path.join(r.result.recoveryDirs[0], "homecenter.db"))).toBe(true) // the previous household's database
+
+    await stageFresh(w) // a later restore is staged ...
+    await prunePre(w.paths.restoreDir, new Date("2100-01-01"))
+    for (const dir of r.result.recoveryDirs) expect(existsSync(dir)).toBe(true)
+  })
+
+  it("when even renaming fails, the dirs are marked and stage, prune and undo leave them alone", async () => {
+    const w = await world()
+    await stageFresh(w)
+    const r = await applyPending(w.paths, new Date(), { rename: failAt4(), rollbackRename: always })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: false } })
+    if (!r.applied) return
+    expect(r.result.recoveryDirs).toHaveLength(2)
+    for (const dir of r.result.recoveryDirs) expect(existsSync(path.join(dir, "keep.json"))).toBe(true)
+    expect(await latestPre(w.paths.restoreDir)).toBeNull()
+    expect(await prunePre(w.paths.restoreDir, new Date("2100-01-01"))).toBe(0)
+    await expect(stage({ paths: w.paths })).rejects.toThrow(/failed restore/)
+    for (const dir of r.result.recoveryDirs) expect(existsSync(dir)).toBe(true)
+  })
+
+  it("a failed undo whose rollback also fails keeps both dirs", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    await stageUndo({ paths: w.paths })
+    const r = await applyPending(w.paths, later(), { rename: failAt4(), rollbackRename: onlyPreserve })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: false, source: "undo" } })
+    if (!r.applied) return
+    expect(r.result.recoveryDirs).toHaveLength(2)
+    for (const dir of r.result.recoveryDirs) expect(existsSync(dir)).toBe(true)
+    expect(existsSync(path.join(w.paths.restoreDir, "staging"))).toBe(false)
+  })
+
+  it("a failed undo that can't hand its snapshot back keeps it (renamed, or marked in place)", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    await stageUndo({ paths: w.paths })
+    // only the final staging -> pre-* hand-back fails; the other rollback moves and the preserve rename work
+    const noHandBack = (async (a: string, b: string) => {
+      if (path.basename(a) === "staging" && path.basename(b).startsWith("pre-")) throw new Error("refused")
+      await rename(a, b)
+    }) as typeof rename
+    const r = await applyPending(w.paths, later(), { rename: failAt4(), rollbackRename: noHandBack })
+    expect(r).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    if (!r.applied) return
+    expect(r.result.recoveryDirs).toHaveLength(1)
+    expect(existsSync(path.join(r.result.recoveryDirs[0], "homecenter.db"))).toBe(true)
+
+    // second case: staging can't be renamed at all, so it stays in place with a marker
+    const w2 = await world()
+    await stageFresh(w2)
+    await applyPending(w2.paths)
+    await stageUndo({ paths: w2.paths })
+    const noStagingRename = (async (a: string, b: string) => {
+      if (path.basename(a) === "staging") throw new Error("refused")
+      await rename(a, b)
+    }) as typeof rename
+    const r2 = await applyPending(w2.paths, later(), { rename: failAt4(), rollbackRename: noStagingRename })
+    expect(r2).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    const staging = path.join(w2.paths.restoreDir, "staging")
+    expect(existsSync(path.join(staging, "homecenter.db"))).toBe(true)
+    expect(existsSync(path.join(staging, "keep.json"))).toBe(true)
+    await expect(stageUndo({ paths: w2.paths })).rejects.toThrow()
+    expect(existsSync(path.join(staging, "homecenter.db"))).toBe(true)
+  })
+
+  it("a malformed pending.json is recorded as a failure that changed nothing", async () => {
+    const w = await world()
+    await mkdir(w.paths.restoreDir, { recursive: true })
+    await writeFile(path.join(w.paths.restoreDir, "pending.json"), "{nope")
+    const before = await fingerprint(w.paths)
+    expect(await applyPending(w.paths)).toMatchObject({ applied: true, result: { status: "failed", rolledBack: true } })
+    expect(await fingerprint(w.paths)).toBe(before)
+    expect(existsSync(path.join(w.paths.restoreDir, "pending.json"))).toBe(false)
+    expect(await applyPending(w.paths)).toEqual({ applied: false })
+  })
+
+  it("a staged or rolled-back restore keeps the existing undo point", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    const undoPoint = await latestPre(w.paths.restoreDir)
+    expect(undoPoint).not.toBeNull()
+    await stageFresh(w) // staged, never applied
+    expect((await latestPre(w.paths.restoreDir))?.dir).toBe(undoPoint!.dir)
+    await applyPending(w.paths, later(), { rename: failAt4() }) // rolled back
+    expect((await latestPre(w.paths.restoreDir))?.dir).toBe(undoPoint!.dir)
+  })
+
+  it("an old carried-secrets file is removed when the applied source carries none", async () => {
+    const w = await world("password")
+    await dryRun({ archivePath: w.backup.path, secret: w.secret, paths: w.paths, known: await appMigrations() })
+    await stage({ paths: w.paths })
+    await applyPending(w.paths)
+    expect(existsSync(path.join(w.paths.restoreDir, "secrets.enc.json"))).toBe(true)
+    await stageUndo({ paths: w.paths })
+    await applyPending(w.paths, later())
+    expect(existsSync(path.join(w.paths.restoreDir, "secrets.enc.json"))).toBe(false)
   })
 })
