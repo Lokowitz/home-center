@@ -19,7 +19,7 @@ export function passwordProblem(pw: string): string | null {
 }
 
 export function parseIdentity(text: string): string | null {
-  return /AGE-SECRET-KEY-1[0-9A-Z]+/.exec(text)?.[0] ?? null
+  return /AGE-SECRET-KEY-1[0-9A-Z]+/i.exec(text)?.[0].toUpperCase() ?? null
 }
 
 /** Short, readable id of a recipient so a backup can say which kit opens it. */
@@ -72,32 +72,51 @@ export async function detectProtection(p: string): Promise<Protection | "unknown
   if (head[0] !== 0x50 || head[1] !== 0x4b) return "unknown" // not "PK"
   try {
     const r = await ArchiveReader.open(p)
-    const names = r.entries()
-    await r.close()
-    if (names.includes(MANIFEST_ENTRY)) return "none"
-    if (names.length === 1 && /\.(hcbackup|zip)$/.test(names[0])) return "password"
+    try {
+      const names = r.entries()
+      if (names.includes(MANIFEST_ENTRY)) return "none"
+      if (names.length === 1 && /\.(hcbackup|zip)$/.test(names[0]) && r.isEncrypted(names[0])) return "password"
+    } finally {
+      await r.close()
+    }
   } catch {
-    // an encrypted zip whose directory can't be read without the password
-    return "password"
+    // truncated or damaged zip
+    return "unknown"
   }
   return "unknown"
 }
 
+const WRONG_KEY = "That recovery key doesn't open this backup."
+const WRONG_PASSWORD = "That password doesn't open this backup."
+
+/** A plain, secret-free sentence for a failure that isn't a wrong key or password. */
+function failureText(e: unknown): string {
+  const code = (e as { code?: unknown })?.code
+  if (code === "ENOSPC") return "Not enough disk space to unlock this backup."
+  if (typeof code === "string") return `Couldn't read this backup file (${code}).`
+  return "Couldn't unlock this backup. The file may be damaged."
+}
+
 export async function unprotectFile(src: string, destPlain: string, secret: UnlockSecret): Promise<{ ok: true } | { ok: false; error: string; needs?: "key" | "password" }> {
-  const kind = await detectProtection(src)
+  let kind: Protection | "unknown"
+  try {
+    kind = await detectProtection(src)
+  } catch (e) {
+    return { ok: false, error: failureText(e) }
+  }
   if (kind === "unknown") return { ok: false, error: "This isn't a HomeCenter backup." }
   if (kind === "none") return { ok: false, error: "This backup isn't protected." }
+  const id = kind === "key" && secret.key ? parseIdentity(secret.key) : null
+  if (kind === "key" && !id) return { ok: false, error: "This backup needs its recovery key.", needs: "key" }
+  if (kind === "password" && !secret.password) return { ok: false, error: "This backup needs its password.", needs: "password" }
   try {
     if (kind === "key") {
-      const id = secret.key ? parseIdentity(secret.key) : null
-      if (!id) return { ok: false, error: "This backup needs its recovery key.", needs: "key" }
       const d = new Decrypter()
-      d.addIdentity(id)
+      d.addIdentity(id!)
       const out = await d.decrypt(Readable.toWeb(createReadStream(src)) as ReadableStream<Uint8Array>)
       await pipeline(Readable.fromWeb(out as never), createWriteStream(destPlain))
       return { ok: true }
     }
-    if (!secret.password) return { ok: false, error: "This backup needs its password.", needs: "password" }
     const r = await ArchiveReader.open(src, secret.password)
     try {
       const [inner] = r.entries()
@@ -106,8 +125,11 @@ export async function unprotectFile(src: string, destPlain: string, secret: Unlo
       await r.close()
     }
     return { ok: true }
-  } catch {
+  } catch (e) {
     await rm(destPlain, { force: true })
-    return { ok: false, error: kind === "key" ? "That recovery key doesn't open this backup." : "That password doesn't open this backup." }
+    const msg = e instanceof Error ? e.message : ""
+    if (kind === "key" && /no identity matched/i.test(msg)) return { ok: false, error: WRONG_KEY, needs: "key" }
+    if (kind === "password" && /invalid password|invalid signature|hmac/i.test(msg)) return { ok: false, error: WRONG_PASSWORD, needs: "password" }
+    return { ok: false, error: failureText(e) }
   }
 }

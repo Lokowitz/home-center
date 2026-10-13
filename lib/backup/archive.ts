@@ -148,6 +148,10 @@ export class ArchiveReader {
     return [...this.byName.keys()]
   }
 
+  isEncrypted(name: string): boolean {
+    return this.entry(name).encrypted
+  }
+
   private entry(name: string): FileEntry {
     const e = this.byName.get(name)
     if (!e) throw new Error(`Not in archive: ${name}`)

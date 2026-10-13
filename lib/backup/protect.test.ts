@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import path from "node:path"
+import { existsSync } from "node:fs"
 import { readdir, readFile, writeFile } from "node:fs/promises"
 import { generateX25519Identity, identityToRecipient } from "age-encryption"
 import { ArchiveReader } from "./archive"
@@ -22,7 +23,8 @@ describe("recovery key", () => {
     expect(await detectProtection(dest)).toBe("key")
     expect(await unprotectFile(dest, path.join(dir, "o1"), {})).toMatchObject({ ok: false, needs: "key" })
     const other = await generateX25519Identity()
-    expect(await unprotectFile(dest, path.join(dir, "o2"), { key: other })).toMatchObject({ ok: false, error: expect.stringContaining("doesn't open") })
+    expect(await unprotectFile(dest, path.join(dir, "o2"), { key: other })).toMatchObject({ ok: false, needs: "key", error: expect.stringContaining("doesn't open") })
+    expect(existsSync(path.join(dir, "o2"))).toBe(false)
     expect(await unprotectFile(dest, path.join(dir, "o3"), { key: `# kit\n${id}\n` })).toEqual({ ok: true })
     expect(await readFile(path.join(dir, "o3"), "utf8")).toBe("PK-pretend-archive-bytes")
   })
@@ -37,7 +39,8 @@ describe("password zip", () => {
     const outer = await ArchiveReader.open(dest)
     expect(outer.entries()).toEqual(["homecenter-2026-10-11-0300.hcbackup"]) // the only visible name
     await outer.close()
-    expect(await unprotectFile(dest, path.join(dir, "o"), { password: "wrong1" })).toMatchObject({ ok: false, error: expect.stringContaining("doesn't open") })
+    expect(await unprotectFile(dest, path.join(dir, "o"), { password: "wrong1" })).toMatchObject({ ok: false, needs: "password", error: expect.stringContaining("doesn't open") })
+    expect(existsSync(path.join(dir, "o"))).toBe(false)
     expect(await unprotectFile(dest, path.join(dir, "o"), { password: "abcdef" })).toEqual({ ok: true })
     expect(await readFile(path.join(dir, "o"), "utf8")).toBe("PK-pretend-archive-bytes")
   })
@@ -50,6 +53,38 @@ describe("failure", () => {
     await expect(protectFile(await plain(dir), dest, { mode: "password", password: "abc" }, "x.hcbackup.zip")).rejects.toThrow("at least 6")
     await expect(protectFile(path.join(dir, "missing"), dest, { mode: "password", password: "abcdef" }, "x.hcbackup.zip")).rejects.toThrow()
     expect(await readdir(dir)).toEqual(["plain.hcbackup"])
+  })
+})
+
+describe("non-credential failures", () => {
+  it("do not claim a wrong key or password", async () => {
+    const dir = await tempDir()
+    const dest = path.join(dir, "b.hcbackup.zip")
+    await protectFile(await plain(dir), dest, { mode: "password", password: "abcdef" }, "b.hcbackup.zip")
+    const blocker = path.join(dir, "blocker")
+    await writeFile(blocker, "x")
+    const bad = await unprotectFile(dest, path.join(blocker, "sub", "out"), { password: "abcdef" })
+    expect(bad).toMatchObject({ ok: false })
+    expect(JSON.stringify(bad)).not.toContain("doesn't open")
+    expect(JSON.stringify(bad)).not.toContain("abcdef")
+    const missing = await unprotectFile(path.join(dir, "nope"), path.join(dir, "o"), { password: "abcdef" })
+    expect(missing).toMatchObject({ ok: false })
+    expect(JSON.stringify(missing)).not.toContain("doesn't open")
+  })
+  it("does not detect an unencrypted single-entry zip or a truncated zip as password", async () => {
+    const dir = await tempDir()
+    const { ArchiveWriter } = await import("./archive")
+    const p = path.join(dir, "one.hcbackup")
+    const w = await ArchiveWriter.create(p)
+    await w.addFile("only.hcbackup", await plain(dir))
+    await w.closeWithoutManifest()
+    expect(await detectProtection(p)).toBe("unknown")
+    const enc = path.join(dir, "e.hcbackup.zip")
+    await protectFile(await plain(dir), enc, { mode: "password", password: "abcdef" }, "e.hcbackup.zip")
+    const bytes = await readFile(enc)
+    const cut = path.join(dir, "cut.zip")
+    await writeFile(cut, bytes.subarray(0, bytes.length - 30))
+    expect(await detectProtection(cut)).toBe("unknown")
   })
 })
 
@@ -71,6 +106,7 @@ describe("helpers", () => {
   it("finds the key in a recovery kit", () => {
     expect(parseIdentity("HomeCenter recovery key\nAGE-SECRET-KEY-1QQQ\nmore")).toBe("AGE-SECRET-KEY-1QQQ")
     expect(parseIdentity("nothing here")).toBeNull()
+    expect(parseIdentity("key: age-secret-key-1qqq9")).toBe("AGE-SECRET-KEY-1QQQ9")
   })
   it("password rule is 6 characters, nothing else", () => {
     expect(passwordProblem("12345")).toBe("Use at least 6 characters.")
