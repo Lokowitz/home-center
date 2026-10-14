@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+import { toast } from "sonner"
 import { getBackupOverview } from "@/lib/actions/backup"
 import type { BackupOverview } from "@/lib/backup/overview-server"
 import { BackupStatus } from "./backup-status"
@@ -14,7 +15,14 @@ import { RestorePanel, type RestoreSource } from "./restore-panel"
 export function DataSettings({ initial }: { initial: BackupOverview }) {
   const [data, setData] = useState(initial)
   const [restoreSource, setRestoreSource] = useState<RestoreSource | null>(null)
-  const refresh = useCallback(async () => setData(await getBackupOverview()), [])
+  const refresh = useCallback(async () => {
+    try {
+      setData(await getBackupOverview())
+    } catch {
+      // One toast however many polls fail in a row.
+      toast.error("Couldn't refresh the backup status. Reload the page if this keeps happening.", { id: "backup-refresh" })
+    }
+  }, [])
 
   useEffect(() => {
     if (!data.running) return

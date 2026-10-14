@@ -25,12 +25,27 @@ export function BackupStatus({ data, onStarted }: { data: BackupOverview; onStar
 
   function now() {
     start(async () => {
-      const r = await backUpNow()
-      if ("error" in r) toast.error(r.error)
-      else toast.success("Backup started. You can leave this page.")
+      try {
+        const r = await backUpNow()
+        if ("error" in r) toast.error(r.error)
+        else toast.success("Backup started. You can leave this page.")
+      } catch {
+        toast.error("Couldn't start the backup. Try again.")
+      }
       await onStarted()
     })
   }
+
+  async function dismissHint() {
+    try {
+      await dismissBackupHint()
+    } catch {
+      return void toast.error("Couldn't dismiss the tip. Try again.")
+    }
+    await onStarted()
+  }
+
+  const busyLabel = run?.kind === "EXPORT" ? "Exporting" : "Backing up"
 
   return (
     <Card className="py-5">
@@ -66,14 +81,14 @@ export function BackupStatus({ data, onStarted }: { data: BackupOverview; onStar
         <div className="flex flex-wrap items-center gap-3">
           <Button onClick={now} disabled={pending || !!run}>
             {run ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-            {run ? (run.total ? `Backing up… ${run.done} of ${run.total} files` : "Backing up…") : "Back up now"}
+            {run ? (run.total ? `${busyLabel}… ${run.done} of ${run.total} files` : `${busyLabel}…`) : "Back up now"}
           </Button>
           <span className="text-xs text-muted-foreground">Saved to {data.settings.folder}</span>
         </div>
         {!newest && !data.settings.hintDismissed && data.settings.schedule === "OFF" && (
           <p className="text-xs text-muted-foreground">
             Tip: a daily backup to a different disk (a NAS share or USB drive) protects against a failed drive.{" "}
-            <button type="button" className="underline" onClick={() => void dismissBackupHint().then(onStarted)}>Dismiss</button>
+            <button type="button" className="underline" onClick={() => void dismissHint()}>Dismiss</button>
           </p>
         )}
       </CardContent>

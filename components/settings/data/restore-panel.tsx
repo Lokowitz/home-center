@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
-import { Upload, RotateCcw, TriangleAlert } from "lucide-react"
+import { Upload, RotateCcw, TriangleAlert, X } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { restoreCancel, restoreConfirm, restoreDryRun, restoreRestart, restoreUndo } from "@/lib/actions/backup"
+import { dismissRestoreNotice, restoreCancel, restoreCancelStaged, restoreConfirm, restoreDryRun, restoreRestart, restoreUndo } from "@/lib/actions/backup"
 import type { BackupOverview } from "@/lib/backup/overview-server"
 import type { DryRun, RestoreResult } from "@/lib/backup/restore"
 import { formatWhen } from "./format"
@@ -62,6 +62,27 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
     xhr.send(file)
   }
 
+  async function cancelStaged() {
+    try {
+      const res = await restoreCancelStaged()
+      if ("error" in res) return void toast.error(res.error, { duration: 15000 })
+      toast.success(res.keptIn ? `Cancelled. The staged data was kept in ${res.keptIn}.` : "Cancelled. Nothing was changed.", res.keptIn ? { duration: Infinity } : undefined)
+    } catch {
+      toast.error("Couldn't cancel the restore. Try again.")
+    }
+    await onChanged()
+  }
+
+  async function dismiss() {
+    try {
+      const res = await dismissRestoreNotice()
+      if ("error" in res) toast.error(res.error)
+    } catch {
+      toast.error("Couldn't dismiss the notice. Try again.")
+    }
+    await onChanged()
+  }
+
   async function restart() {
     const { restarting, reason } = await restoreRestart()
     if (reason === "busy") return void toast.error("A backup or export is running. Try again when it has finished.")
@@ -81,10 +102,13 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
           <div className="space-y-2 rounded-md border p-3 text-sm" role="status">
             <p className="font-medium">A restore is ready and waiting for a restart.</p>
             <p className="text-muted-foreground">{MANUAL_RESTART} If HomeCenter restarts by itself, use the button.</p>
-            <Button size="sm" disabled={pending} onClick={() => start(restart)}>Restart now</Button>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={pending} onClick={() => start(restart)}>Restart now</Button>
+              <Button size="sm" variant="outline" disabled={pending} onClick={() => start(cancelStaged)}>Cancel staged restore</Button>
+            </div>
           </div>
         )}
-        {r?.result && !r.pending && <ResultNotice result={r.result} />}
+        {r?.result && !r.pending && !r.result.seenAt && <ResultNotice result={r.result} onDismiss={pending ? undefined : () => start(dismiss)} />}
         <div className="flex flex-wrap gap-2">
           <input ref={input} type="file" className="hidden" accept=".hcbackup,.age,.zip" aria-label="Backup file" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
           <Button variant="outline" disabled={progress !== null || r?.pending} onClick={() => input.current?.click()}>
@@ -118,20 +142,35 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
   )
 }
 
-function ResultNotice({ result }: { result: RestoreResult }) {
+function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?: () => void }) {
+  const close = (
+    <button type="button" className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50" aria-label="Dismiss" disabled={!onDismiss} onClick={onDismiss}>
+      <X className="h-4 w-4" aria-hidden="true" />
+    </button>
+  )
   if (result.status === "ok") {
     return (
-      <p className="text-sm">
-        {result.source === "undo" ? "Undid the restore" : `Restored from the backup of ${result.backupCreatedAt ? formatWhen(result.backupCreatedAt) : "an earlier state"}`} on {formatWhen(result.appliedAt)}.
-      </p>
+      <div className="flex items-start gap-2 text-sm">
+        <p>{result.source === "undo" ? "Undid the restore" : `Restored from the backup of ${result.backupCreatedAt ? formatWhen(result.backupCreatedAt) : "an earlier state"}`} on {formatWhen(result.appliedAt)}.</p>
+        {close}
+      </div>
     )
   }
   if (result.rolledBack) {
-    return <p className="text-sm text-destructive">The last restore didn&apos;t finish ({formatWhen(result.appliedAt)}): {result.error} Nothing was changed.</p>
+    return (
+      <div className="flex items-start gap-2 text-sm">
+        <p className="text-destructive">The last restore didn&apos;t finish ({formatWhen(result.appliedAt)}): {result.error} Nothing was changed.</p>
+        {close}
+      </div>
+    )
   }
   return (
     <div className="space-y-2 rounded-md border border-destructive p-3 text-sm" role="alert">
-      <p className="flex items-center gap-2 font-medium text-destructive"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />The last restore failed part-way ({formatWhen(result.appliedAt)}).</p>
+      <div className="flex items-start gap-2">
+        <p className="flex items-center gap-2 font-medium text-destructive"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />The last restore failed part-way ({formatWhen(result.appliedAt)}).</p>
+        {/* Only once someone has dealt with the displaced data (npm run restore -- --ack). */}
+        {result.acknowledgedAt && close}
+      </div>
       <p>{result.error}</p>
       <p>Your earlier data was moved out of the way, so what HomeCenter shows may be incomplete. It is kept in {result.recoveryDirs.length === 1 ? "this folder" : "these folders"}:</p>
       {result.recoveryDirs.length > 0 && (

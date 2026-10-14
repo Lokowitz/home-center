@@ -89,11 +89,15 @@ function KeyDialog({ onClose, onSaved, replacing }: { onClose: () => void; onSav
   function download() {
     if (!kit) return
     const blob = new Blob([recoveryKitText({ ...kit, created: new Date() })], { type: "text/plain" })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
-    a.href = URL.createObjectURL(blob)
+    a.href = url
     a.download = "homecenter-recovery-key.txt"
+    // Some browsers only download from an anchor in the document, and start reading the blob after click() returns.
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(a.href)
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
     setDownloaded(true)
   }
 

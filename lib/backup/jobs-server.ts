@@ -23,6 +23,21 @@ const CLAIMING = "claiming"
 
 export const isJobRunning = () => state.running !== null
 
+/**
+ * Claims the same lock for work the caller does itself (restore checks, staging, restart).
+ * Synchronous, so two concurrent callers can't both get it. Returns a release, or null when busy.
+ */
+export function claimJobLock(label: string): (() => void) | null {
+  if (state.running) return null
+  state.running = label
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    if (state.running === label) state.running = null
+  }
+}
+
 /** Claims the lock and records the run; the work continues after this returns. */
 export async function startBackupJob(trigger: "MANUAL" | "SCHEDULE", userId?: string): Promise<{ runId: string } | { error: string }> {
   // Claim before any await so two concurrent callers can't both pass.

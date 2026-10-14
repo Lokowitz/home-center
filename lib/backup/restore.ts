@@ -28,6 +28,8 @@ export type RestoreResult = {
   recoveryDirs: string[]
   /** Set by `npm run restore -- --ack` once the household has dealt with recoveryDirs; until then a not-rolled-back failure blocks boot. */
   acknowledgedAt?: string
+  /** Set when an admin dismissed the notice in Settings → Data. */
+  seenAt?: string
 }
 
 const exists = (p: string) => stat(p).then(() => true, () => false)
@@ -283,6 +285,17 @@ export async function markFinalized(restoreDir: string): Promise<void> {
 
 /** A failed apply that left data displaced and has not been acknowledged yet. */
 export const isBlocking = (r: RestoreResult | null): boolean => !!r && r.status === "failed" && !r.rolledBack && !r.acknowledgedAt
+
+/** A notice that may be dismissed: never one about displaced data that nobody has dealt with yet. */
+export const canDismiss = (r: RestoreResult): boolean => r.status === "ok" || r.rolledBack || !!r.acknowledgedAt
+
+/** Records that the notice was dismissed. Returns false when there is nothing that may be dismissed. */
+export async function markSeen(restoreDir: string, now = new Date()): Promise<boolean> {
+  const r = await readResult(restoreDir)
+  if (!r || !canDismiss(r)) return false
+  if (!r.seenAt) await writeResult(restoreDir, { ...r, seenAt: now.toISOString() })
+  return true
+}
 
 /** Returns the result that was acknowledged, or null when nothing was blocking. */
 export async function acknowledgeBlocking(restoreDir: string, now = new Date()): Promise<RestoreResult | null> {

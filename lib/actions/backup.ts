@@ -4,6 +4,7 @@ import path from "node:path"
 import { revalidatePath } from "next/cache"
 import { mkdir } from "node:fs/promises"
 import { z } from "zod"
+import { Encrypter } from "age-encryption"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth-guard"
 import { startBackupJob } from "@/lib/backup/jobs-server"
@@ -13,9 +14,9 @@ import { deleteBackup, folderStatus, listBackups } from "@/lib/backup/store"
 import { hashFile } from "@/lib/backup/archive"
 import { verifyArchive } from "@/lib/backup/verify"
 import { appMigrations, dataDir, workDir } from "@/lib/backup/paths"
-import { cancelRestore, dryRun, hasPending, stage, stageUndo, type DryRun } from "@/lib/backup/restore"
+import { cancelRestore, cancelStaged, dryRun, hasPending, markSeen, stage, stageUndo, type DryRun } from "@/lib/backup/restore"
 import { restartToFinish, restorePaths } from "@/lib/backup/restore-server"
-import { isJobRunning, startExportJob } from "@/lib/backup/jobs-server"
+import { claimJobLock, startExportJob } from "@/lib/backup/jobs-server"
 import { loadFeatures } from "@/lib/features-server"
 import type { AssetKind, ExportScope } from "@/lib/backup/format"
 import { fingerprintOf, passwordProblem } from "@/lib/backup/protect-shared"
@@ -103,6 +104,12 @@ export async function setProtectionKey(input: { publicKey: string; fingerprint: 
   await requireAdmin()
   const key = String(input.publicKey ?? "").trim()
   if (!/^age1[0-9a-z]{20,}$/.test(key)) return { error: "That isn't a recovery key's public half." }
+  // The regex lets a mistyped key through; age checks the checksum, so backups can't fail on it later.
+  try {
+    new Encrypter().addRecipient(key)
+  } catch {
+    return { error: "That isn't a recovery key's public half." }
+  }
   // Recomputed here: the client's fingerprint is only trusted if it matches.
   if ((await fingerprintOf(key)) !== input.fingerprint) return { error: "The key and its fingerprint don't match." }
   await loadBackupSettings()
@@ -132,10 +139,25 @@ const UPLOAD_ID = /^[0-9a-f-]{36}$/
 const BUSY = "Wait for the running backup or export to finish."
 const WAITING = "A restore is already waiting for a restart."
 
+/** Runs fn holding the one job lock (shared with backups and exports), or returns null when it is taken. */
+async function withJobLock<T>(fn: () => Promise<T>): Promise<T | null> {
+  const release = claimJobLock("restore")
+  if (!release) return null
+  try {
+    return await fn()
+  } finally {
+    release()
+  }
+}
+
 /** Checks a backup without changing anything. Keys and passwords are used here only; they are never stored or logged. */
 export async function restoreDryRun(input: { source: { upload: string } | { file: string }; key?: string; password?: string }): Promise<DryRun> {
   await requireAdmin()
-  if (isJobRunning()) return { ok: false, error: BUSY }
+  // Under the lock: a check running beside a stage would replace the work folder the stage reads.
+  return (await withJobLock(() => restoreDryRunLocked(input))) ?? { ok: false, error: BUSY }
+}
+
+async function restoreDryRunLocked(input: { source: { upload: string } | { file: string }; key?: string; password?: string }): Promise<DryRun> {
   const paths = restorePaths()
   if (await hasPending(paths.restoreDir)) return { ok: false, error: WAITING }
   let archivePath: string
@@ -156,15 +178,17 @@ export async function restoreDryRun(input: { source: { upload: string } | { file
 /** Stages the checked backup. A stage error removes the unlocked work archive and is shown as is. */
 async function stageOrCancel(run: () => Promise<void>, fallback: string): Promise<{ ok: true } | { error: string }> {
   const paths = restorePaths()
-  if (isJobRunning()) return { error: BUSY }
-  if (await hasPending(paths.restoreDir)) return { error: WAITING }
-  try {
-    await run()
-  } catch (e) {
-    await cancelRestore(paths.restoreDir).catch(() => undefined)
-    return { error: e instanceof Error ? e.message : fallback }
-  }
-  return { ok: true }
+  const r = await withJobLock(async (): Promise<{ ok: true } | { error: string }> => {
+    if (await hasPending(paths.restoreDir)) return { error: WAITING }
+    try {
+      await run()
+    } catch (e) {
+      await cancelRestore(paths.restoreDir).catch(() => undefined)
+      return { error: e instanceof Error ? e.message : fallback }
+    }
+    return { ok: true }
+  })
+  return r ?? { error: BUSY }
 }
 
 export async function restoreConfirm(input: { word: string }): Promise<{ ok: true } | { error: string }> {
@@ -176,9 +200,21 @@ export async function restoreConfirm(input: { word: string }): Promise<{ ok: tru
 export async function restoreRestart(): Promise<{ restarting: boolean; reason?: "busy" | "nothing-staged" }> {
   await requireAdmin()
   // Exiting mid-backup would leave a partial archive, and with nothing staged a restart would only interrupt everyone.
-  if (isJobRunning()) return { restarting: false, reason: "busy" }
-  if (!(await hasPending(restorePaths().restoreDir))) return { restarting: false, reason: "nothing-staged" }
-  return restartToFinish()
+  const release = claimJobLock("restart")
+  if (!release) return { restarting: false, reason: "busy" }
+  try {
+    if (!(await hasPending(restorePaths().restoreDir))) {
+      release()
+      return { restarting: false, reason: "nothing-staged" }
+    }
+    const r = restartToFinish()
+    // When the process is about to exit, the lock stays taken so no backup or export starts in the meantime.
+    if (!r.restarting) release()
+    return r
+  } catch (e) {
+    release()
+    throw e
+  }
 }
 
 export async function restoreUndo(): Promise<{ ok: true } | { error: string }> {
@@ -189,6 +225,29 @@ export async function restoreUndo(): Promise<{ ok: true } | { error: string }> {
 export async function restoreCancel(): Promise<void> {
   await requireAdmin()
   await cancelRestore(restorePaths().restoreDir)
+}
+
+/** Takes back a restore or undo that is waiting for a restart. A staged undo goes back to being the undo point. */
+export async function restoreCancelStaged(): Promise<{ ok: true; keptIn: string | null } | { error: string }> {
+  await requireAdmin()
+  const r = await withJobLock(async (): Promise<{ ok: true; keptIn: string | null } | { error: string }> => {
+    try {
+      const c = await cancelStaged(restorePaths().restoreDir)
+      return c.cancelled ? { ok: true, keptIn: c.keptIn } : { error: "There's no restore waiting." }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Couldn't cancel the restore." }
+    }
+  })
+  revalidatePath("/settings")
+  return r ?? { error: BUSY }
+}
+
+/** Hides the last restore's notice. A failure that displaced data stays until it is acknowledged. */
+export async function dismissRestoreNotice(): Promise<{ ok: true } | { error: string }> {
+  await requireAdmin()
+  const ok = await markSeen(restorePaths().restoreDir)
+  revalidatePath("/settings")
+  return ok ? { ok: true } : { error: "This notice can't be dismissed yet." }
 }
 
 const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/

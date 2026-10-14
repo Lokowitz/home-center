@@ -19,6 +19,18 @@ const GROUPS: { type: AssetKind; label: string }[] = [
   { type: "PERSON", label: "People" },
 ]
 
+/** Checks first, so a gone or refused download shows a toast instead of replacing the page with an error. */
+async function download(runId: string) {
+  const url = `/api/backup/export/${runId}`
+  const head = await fetch(url, { method: "HEAD", cache: "no-store" }).catch(() => null)
+  if (!head?.ok) {
+    toast.error(head?.status === 410 ? "This export was already downloaded. Make a new one." : "The export couldn't be downloaded. Try making it again.")
+    return
+  }
+  window.location.href = url
+  toast.success("Export ready. It downloads once and isn't kept on the server.")
+}
+
 export function ExportPanel({ data }: { data: BackupOverview }) {
   const [scope, setScope] = useState("all")
   const [includeHealth, setIncludeHealth] = useState(false)
@@ -44,8 +56,7 @@ export function ExportPanel({ data }: { data: BackupOverview }) {
           finish()
           setPw("")
           setAgain("")
-          window.location.href = `/api/backup/export/${runId}`
-          toast.success("Export ready. It downloads once and isn't kept on the server.")
+          await download(runId)
         } else if (s.status !== "RUNNING") {
           finish()
           toast.error(s.error ?? "The export didn't finish.")

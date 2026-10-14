@@ -8,7 +8,7 @@ import { ArchiveWriter } from "./archive"
 import { createBackup } from "./backup"
 import { DB_ENTRY, FORMAT_VERSION } from "./format"
 import { appMigrations } from "./paths"
-import { applyPending, cancelStaged, dryRun, hasPending, latestPre, prunePre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
+import { applyPending, cancelStaged, dryRun, hasPending, latestPre, markSeen, prunePre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
 import { modelCounts, openDb, releaseDbHandles } from "./snapshot"
 import { fingerprintOf } from "./protect"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
@@ -505,4 +505,20 @@ describe("restore failure handling", () => {
     expect(await fingerprint(w.paths)).toBe(before)
     expect(existsSync(path.join(w.paths.restoreDir, "staging"))).toBe(true)
   })
+})
+
+describe("restore notice", () => {
+  const base = { status: "ok", error: null, backupCreatedAt: null, appliedAt: "2026-02-01T00:00:00.000Z", source: "backup", finalized: true, rolledBack: true, recoveryDirs: [] }
+  it.each([
+    ["an ok restore", base, true],
+    ["a rolled-back failure", { ...base, status: "failed", error: "x" }, true],
+    ["a failure that displaced data", { ...base, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"] }, false],
+    ["the same failure once acknowledged", { ...base, status: "failed", error: "x", rolledBack: false, recoveryDirs: ["/d"], acknowledgedAt: "2026-02-02T00:00:00.000Z" }, true],
+  ])("dismissing %s: %s", async (_name, result, dismissable) => {
+    const dir = await tempDir("hc-seen-")
+    await writeFile(path.join(dir, "result.json"), JSON.stringify(result))
+    expect(await markSeen(dir, new Date("2026-02-03T00:00:00.000Z"))).toBe(dismissable)
+    expect((await readResult(dir))?.seenAt).toBe(dismissable ? "2026-02-03T00:00:00.000Z" : undefined)
+  })
+  it("has nothing to dismiss without a result", async () => expect(await markSeen(await tempDir("hc-seen-"))).toBe(false))
 })

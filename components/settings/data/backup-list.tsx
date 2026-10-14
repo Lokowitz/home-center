@@ -11,7 +11,14 @@ import { formatBytes, formatWhen, PROTECTION_LABEL } from "./format"
 
 export function BackupList({ data, onChanged, onRestore }: { data: BackupOverview; onChanged: () => Promise<void>; onRestore?: (b: BackupRow) => void }) {
   const [pending, start] = useTransition()
-  const act = (fn: () => Promise<void>) => start(fn)
+  // A failed call (server restarting, network gone) shows a toast instead of an unhandled error.
+  const act = (fn: () => Promise<void>) => start(async () => {
+    try {
+      await fn()
+    } catch {
+      toast.error("That didn't work. Check the connection and try again.")
+    }
+  })
 
   if (data.backups.length === 0) return null
   return (
