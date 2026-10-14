@@ -31,6 +31,8 @@ export type ReadableData = {
   assets: PublicAsset[]; serviceRecords: PublicRecord[]; warranties: PublicWarranty[]; reminders: PublicReminder[]; documents: PublicDocument[]
   health: PublicHealth | null
 }
+/** Household labels read from the snapshot itself (this engine file cannot import app code). */
+export type ReadableRegional = { currency: string; areaUnit: "SQFT" | "SQM" }
 export type PlannedFile = { rel: string; archivePath: string }
 export type Place = (f: { rel: string; asset: PublicAsset | null; section: string; originalName: string }) => string
 
@@ -108,16 +110,20 @@ async function all(c: Client, sql: string): Promise<Row[]> {
   }
 }
 
-export async function loadReadable(snapshot: string, scope: ExportScope, place: Place): Promise<{ data: ReadableData; files: PlannedFile[] }> {
+export async function loadReadable(snapshot: string, scope: ExportScope, place: Place): Promise<{ data: ReadableData; files: PlannedFile[]; regional: ReadableRegional }> {
   const c = openDb(snapshot)
   try {
     const includeHealth = scope.kind === "all" ? scope.includeHealth : scope.assetType === "PERSON"
+    // Labels only: the stored numbers are never converted. Missing table (older schema) means the defaults.
+    const regionalRow = (await all(c, `SELECT "currency", "areaUnit" FROM "RegionalSettings" LIMIT 1`))[0]
+    const regional: ReadableRegional = { currency: str(regionalRow?.currency) ?? "USD", areaUnit: str(regionalRow?.areaUnit) === "SQM" ? "SQM" : "SQFT" }
+    const areaLabel = regional.areaUnit === "SQM" ? "Square metres" : "Square feet"
     const [props, vehicles, equipment, people] = await Promise.all([
       all(c, `SELECT * FROM "Property"`), all(c, `SELECT * FROM "Vehicle"`), all(c, `SELECT * FROM "Equipment"`), includeHealth ? all(c, `SELECT * FROM "Person"`) : Promise.resolve([] as Row[]),
     ])
     let assets: PublicAsset[] = [
       ...props.map((r) => ({ id: String(r.id), type: "property" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
-        details: { Type: str(r.type), Address: str(r.address), "Year built": num(r.yearBuilt), "Square feet": num(r.sqFt), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
+        details: { Type: str(r.type), Address: str(r.address), "Year built": num(r.yearBuilt), [areaLabel]: num(r.sqFt), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...vehicles.map((r) => ({ id: String(r.id), type: "vehicle" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Make: str(r.make), Model: str(r.model), Year: num(r.year), VIN: str(r.vin), Color: str(r.color), "Current reading": num(r.currentMileage), Unit: str(r.meterUnit), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...equipment.map((r) => ({ id: String(r.id), type: "equipment" as const, name: String(r.name), propertyId: str(r.propertyId), photo: str(r.imageFilename),
@@ -205,6 +211,7 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
     return {
       data: { formatVersion: 1, generatedAt: new Date().toISOString(), scope, assets, serviceRecords, warranties, reminders, documents, health },
       files,
+      regional,
     }
   } finally {
     c.close()

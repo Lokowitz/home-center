@@ -8,6 +8,12 @@ describe("offline viewer", () => {
     expect(html).not.toMatch(/(src|href)=["']https?:/)
     expect(html).not.toMatch(/@import|url\(http/)
   })
+  it("formats money with the household currency, and rejects anything that is not a plain code", () => {
+    expect(viewerHtml("EUR")).toContain('var CURRENCY = "EUR";')
+    expect(viewerHtml()).toContain('var CURRENCY = "USD";')
+    expect(viewerHtml('";alert(1);//')).toContain('var CURRENCY = "USD";')
+    expect(viewerHtml("EUR")).not.toContain('"$" +')
+  })
   it("data.js cannot break out of its script", () => {
     const js = dataJs({ assets: [{ name: "</script><script>alert(1)</script>" }] } as never)
     expect(js.startsWith("window.HC_DATA = ")).toBe(true)

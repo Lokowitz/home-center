@@ -29,6 +29,22 @@ describe("readable", () => {
     expect(files.map((f) => f.rel).sort()).toEqual(["properties/p1/img-p1.jpg", "service/s1/f-a1.pdf", "service/s2/f-a2.pdf"])
   })
 
+  it("labels square footage with the household area unit; the number stays raw", async () => {
+    const db = await snap()
+    const before = await loadReadable(db, { kind: "all", includeHealth: false }, rawPlacement)
+    expect(before.regional).toEqual({ currency: "USD", areaUnit: "SQFT" })
+    const house = before.data.assets.find((a) => a.name === "Main House")!
+    const sqFt = house.details["Square feet"]
+    const c = createClient({ url: fileUrl(db) })
+    await c.execute(`INSERT INTO "RegionalSettings" ("id","currency","distanceUnit","areaUnit","dateFormat","hour12","updatedAt") VALUES ('singleton','EUR','KM','SQM','ISO',0,0)`)
+    c.close()
+    const after = await loadReadable(db, { kind: "all", includeHealth: false }, rawPlacement)
+    expect(after.regional).toEqual({ currency: "EUR", areaUnit: "SQM" })
+    const h = after.data.assets.find((a) => a.name === "Main House")!
+    expect(h.details["Square feet"]).toBeUndefined()
+    expect(h.details["Square metres"]).toBe(sqFt)
+  })
+
   it("excluding health drops people, their records and their files", async () => {
     const { data, files } = await loadReadable(await snap(), { kind: "all", includeHealth: false }, rawPlacement)
     expect(data.assets.some((a) => a.type === "person")).toBe(false)
