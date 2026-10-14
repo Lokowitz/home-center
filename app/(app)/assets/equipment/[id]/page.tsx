@@ -62,8 +62,8 @@ export default async function EquipmentDetailPage({
               }
             />
           )}
-          {equipment.installDate && <Stat icon={Calendar} label="Installed" value={new Date(equipment.installDate).toLocaleDateString()} />}
-          {equipment.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(equipment.purchaseDate).toLocaleDateString()} />}
+          {equipment.installDate && <Stat icon={Calendar} label="Installed" value={fmt.date(equipment.installDate)} />}
+          {equipment.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(equipment.purchaseDate)} />}
           {equipment.purchasePrice != null && (
             <Stat icon={DollarSign} label="Price" value={fmt.moneyWhole(equipment.purchasePrice)} />
           )}

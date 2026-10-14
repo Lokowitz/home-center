@@ -59,6 +59,15 @@ describe("date presets", () => {
   })
 })
 
+describe("stored day display", () => {
+  it("shows the stored UTC day, whatever the local zone", () => {
+    const shown = fmt().date(new Date("2026-01-05"), { utc: true })
+    expect(shown).toContain("2026")
+    expect(shown).toContain("5")
+    expect(shown).not.toContain("4,")
+  })
+})
+
 describe("utc vs local", () => {
   it("utc reads UTC fields; default reads local fields", () => {
     const d = new Date("2026-01-05T03:30:00Z")
@@ -74,6 +83,11 @@ describe("time", () => {
   it("12h", () => expect(fmt().time(d)).toBe("2:07 PM"))
   it("24h", () => expect(fmt({ hour12: false }).time(d)).toBe("14:07"))
   it("24h clock", () => expect(fmt({ hour12: false }).clock("09:05")).toBe("09:05"))
+  it("clock", () => {
+    expect(fmt().clock("00:05")).toBe("12:05 AM")
+    expect(fmt().clock("14:30")).toBe("2:30 PM")
+    expect(fmt().clock(null)).toBe("")
+  })
   it("dateTime", () => expect(fmt({ dateFormat: "ISO", hour12: false }).dateTime(d)).toBe("2026-01-05 14:07"))
 })
 

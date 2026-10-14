@@ -9,7 +9,7 @@ import { Pencil, Trash2 } from "lucide-react"
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { createInsurancePolicy, deleteInsurancePolicy, updateInsurancePolicy } from "@/lib/actions/insurance"
-import { daysUntil, formatDay, HEALTH_WINDOWS, INSURANCE_KINDS, labelFor, toDateInput } from "@/lib/health"
+import { daysUntil, HEALTH_WINDOWS, INSURANCE_KINDS, labelFor, toDateInput } from "@/lib/health"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
 import type { Attachment, InsurancePolicy } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
@@ -109,7 +109,7 @@ export function InsuranceList({ policies, people, openId }: Props) {
               ["Phone", p.phone],
               ["Deductible", p.deductible != null ? fmt.money(p.deductible) : null],
               ["Out-of-pocket max", p.outOfPocketMax != null ? fmt.money(p.outOfPocketMax) : null],
-              ["Coverage", p.startDate || p.endDate ? `${formatDay(p.startDate)} – ${formatDay(p.endDate)}` : null],
+              ["Coverage", p.startDate || p.endDate ? `${p.startDate ? fmt.date(p.startDate, { utc: true }) : "—"} – ${p.endDate ? fmt.date(p.endDate, { utc: true }) : "—"}` : null],
               ["Covers", p.members.length > 0 ? p.members.map((m) => m.name).join(", ") : "Nobody yet"],
             ]
             return (

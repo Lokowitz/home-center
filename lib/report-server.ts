@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma"
 import { categoryLabel as equipmentCategoryLabel } from "@/components/equipment/categories"
 import type { AssetType, MeterUnit, Prisma, Provider } from "@/app/generated/prisma/client"
 import type { CostRow } from "@/lib/costs"
-import { ageFrom, formatDay, labelFor, RELATIONSHIPS } from "@/lib/health"
+import { getFormat } from "@/lib/regional-server"
+import { ageFrom, labelFor, RELATIONSHIPS } from "@/lib/health"
 
 // Everything the printable asset report needs, in one place.
 //
@@ -164,6 +165,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
     })
     if (!p) return null
     const relationship = labelFor(RELATIONSHIPS, p.relationship)
+    const fmt = await getFormat()
     const age = p.dateOfBirth ? ageFrom(p.dateOfBirth, new Date()) : null
     return {
       type: "PERSON",
@@ -178,7 +180,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       currentMeter: null,
       details: [
         { label: "Relationship", value: relationship },
-        ...(p.dateOfBirth ? [{ label: "Date of birth", value: formatDay(p.dateOfBirth) }] : []),
+        ...(p.dateOfBirth ? [{ label: "Date of birth", value: fmt.date(p.dateOfBirth, { utc: true }) }] : []),
         ...(p.sex ? [{ label: "Sex", value: p.sex }] : []),
         ...(p.bloodType ? [{ label: "Blood type", value: p.bloodType }] : []),
         ...(p.primaryProvider ? [{ label: "Primary care", value: p.primaryProvider.name }] : []),

@@ -144,7 +144,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                       onClick={() => { setEditingId(record.id); setDialogOpen(true) }}
                     >
                       <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {new Date(record.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
+                        {fmt.date(record.date, { utc: true })}
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{record.title}</div>

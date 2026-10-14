@@ -14,7 +14,6 @@ import { AttachRecordDialog, loadAttachChoices, type AttachChoices } from "@/com
 import type { InboxAssetOption, InboxReminderOption } from "@/components/inbox/asset-select"
 import { discardInboxItem, reparseInboxItem } from "@/lib/actions/inbox"
 import { assetIcon, assetLabel } from "@/lib/assets"
-import { formatDay } from "@/lib/health"
 import {
   assetKey, defaultDestination, fileFormDefaults, inboxHeadline, inboxReadiness, isPreviewableImage, localDay, readByLabel, readerNote, readFields,
   type FieldRead, type FileFormValues, type InboxDestination, type InboxReadiness,
@@ -132,7 +131,7 @@ export function InboxItemCard({
       total: item.parsedTotal != null ? fmt.money(item.parsedTotal) : null,
       // A doubtful vendor ("Job #1882…") would make the sentence read wrong; the row still shows it.
       vendor: fields.vendor.state === "found" ? item.parsedVendor : null,
-      date: item.parsedDate ? formatDay(item.parsedDate) : null,
+      date: item.parsedDate ? fmt.date(item.parsedDate, { utc: true }) : null,
     },
     fileName
   )
@@ -245,7 +244,7 @@ export function InboxItemCard({
             {" · added by "}
             {item.createdBy},{" "}
             <time dateTime={added.toISOString()} suppressHydrationWarning>
-              {added.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              {`${fmt.dayMonth(added)} ${fmt.time(added)}`}
             </time>
           </p>
         </div>
@@ -281,7 +280,7 @@ export function InboxItemCard({
           {item.status === "READY" && (
             <>
               <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-2">
-                <ReadRow label="Date" read={fields.date} value={item.parsedDate ? formatDay(item.parsedDate) : null} />
+                <ReadRow label="Date" read={fields.date} value={item.parsedDate ? fmt.date(item.parsedDate, { utc: true }) : null} />
                 <ReadRow label="Total" read={fields.total} value={item.parsedTotal != null ? fmt.money(item.parsedTotal) : null} />
                 <ReadRow label="Shop" read={fields.vendor} value={item.parsedVendor} />
                 <ReadRow

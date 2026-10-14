@@ -47,7 +47,7 @@ export default async function VehicleDetailPage({
           {vehicle.currentMileage != null && <Stat icon={Gauge} label={fmt.meterNoun(vehicle.meterUnit)} value={`${vehicle.currentMileage.toLocaleString()} ${fmt.meterShort(vehicle.meterUnit)}`} />}
           {vehicle.color && <Stat icon={Palette} label="Color" value={vehicle.color} />}
           {vehicle.vin && <Stat icon={Fingerprint} label="VIN" value={vehicle.vin} mono />}
-          {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(vehicle.purchaseDate).toLocaleDateString()} />}
+          {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(vehicle.purchaseDate)} />}
         </div>
 
         <AssetCostPanel

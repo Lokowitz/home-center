@@ -34,7 +34,7 @@ const SORTABLE: SortMap<Prisma.MaintenanceScheduleOrderByWithRelationInput> = {
 
 function statusOf(due: Due, snoozedUntil: Date | null, now: Date, fmt: Formatter) {
   if (isSnoozed({ snoozedUntil }, now)) {
-    return { label: `Snoozed to ${snoozedUntil!.toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
+    return { label: `Snoozed to ${fmt.date(snoozedUntil!)}`, variant: "outline" as const, icon: AlarmClockOff }
   }
   const badge = dueBadge(due, true, fmt)!
   const icon = due.overdue ? AlertTriangle : due.dueSoon ? Clock : CheckCircle2
@@ -156,11 +156,11 @@ export default async function MaintenancePage({
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {s.nextDueDate ? new Date(s.nextDueDate).toLocaleDateString() : "—"}
+                        {s.nextDueDate ? fmt.date(s.nextDueDate) : "—"}
                         {s.nextDueMileage != null && <span className="block text-xs">{s.nextDueMileage.toLocaleString()} {fmt.meterShort(mileage.get(s.assetId)?.unit ?? "MILES")}</span>}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                        {s.lastCompletedDate ? new Date(s.lastCompletedDate).toLocaleDateString() : "Never"}
+                        {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "Never"}
                       </td>
                     </tr>
                   )

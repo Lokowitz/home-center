@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  byNewest, filterObservations, formatDuration, formatTime, summarizeObservations, typeSuggestions, weeklyCounts,
+  byNewest, filterObservations, formatDuration, summarizeObservations, typeSuggestions, weeklyCounts,
   type ObservationLike,
 } from "./observations"
 
@@ -16,9 +16,6 @@ describe("formatting", () => {
     expect(formatDuration(60)).toBe("1 h")
     expect(formatDuration(95)).toBe("1 h 35 min")
     expect(formatDuration(null)).toBe("—")
-    expect(formatTime("00:05")).toBe("12:05 AM")
-    expect(formatTime("14:30")).toBe("2:30 PM")
-    expect(formatTime(null)).toBe("")
   })
 })
 

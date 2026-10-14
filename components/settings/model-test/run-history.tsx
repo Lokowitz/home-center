@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useFormat } from "@/components/regional-provider"
 import { formatSeconds, shortJson } from "./summary"
 import type { HistoryEntry } from "./types"
 import type { StageInfo } from "./use-model-test"
@@ -19,6 +20,7 @@ export function RunHistory({
   onUseSettings: (entry: HistoryEntry) => void
   onClear: () => void
 }) {
+  const fmt = useFormat()
   return (
     <Card className="py-5">
       <CardHeader className="px-5">
@@ -48,7 +50,7 @@ export function RunHistory({
                 <TableBody>
                   {history.map((entry, i) => (
                     <TableRow key={`${entry.at}-${i}`}>
-                      <TableCell className="text-xs text-muted-foreground">{new Date(entry.at).toLocaleString()}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{fmt.dateTime(entry.at)}</TableCell>
                       <TableCell className="max-w-40 truncate font-medium" title={entry.model}>
                         {entry.model}
                         {entry.topics && (

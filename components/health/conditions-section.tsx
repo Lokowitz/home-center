@@ -9,19 +9,21 @@ import { EntityTable, type EntityColumn } from "@/components/forms/entity-table"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
 import { createCondition, deleteCondition, updateCondition } from "@/lib/actions/health"
-import { CONDITION_STATUSES, formatDay, labelFor, toDateInput } from "@/lib/health"
+import { CONDITION_STATUSES, labelFor, toDateInput } from "@/lib/health"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
-import { filterObservations, formatTime, type ObservationLike } from "@/lib/observations"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
+import { filterObservations, type ObservationLike } from "@/lib/observations"
 import type { Attachment, HealthCondition } from "@/app/generated/prisma/client"
 
 export type ConditionRow = HealthCondition & { attachments: Attachment[]; provider: { name: string } | null }
 
 const STATUS_VARIANT = { ACTIVE: "destructive", MANAGED: "secondary", RESOLVED: "outline" } as const
 
-const COLUMNS: EntityColumn<ConditionRow>[] = [
+const columnsFor = (fmt: Formatter): EntityColumn<ConditionRow>[] => [
   { key: "name", label: "Condition", cell: (c) => <span className="font-medium">{c.name}</span> },
   { key: "status", label: "Status", cell: (c) => <Badge variant={STATUS_VARIANT[c.status]}>{labelFor(CONDITION_STATUSES, c.status)}</Badge> },
-  { key: "diagnosed", label: "Diagnosed", className: "whitespace-nowrap text-muted-foreground", cell: (c) => formatDay(c.diagnosedDate) },
+  { key: "diagnosed", label: "Diagnosed", className: "whitespace-nowrap text-muted-foreground", cell: (c) => (c.diagnosedDate ? fmt.date(c.diagnosedDate, { utc: true }) : "—") },
   { key: "provider", label: "Provider", className: "text-muted-foreground", cell: (c) => c.provider?.name ?? "—" },
   { key: "files", label: "Files", cell: (c) => <AttachmentCount attachments={c.attachments} /> },
 ]
@@ -46,6 +48,7 @@ interface Props {
 }
 
 export function ConditionsSection({ personId, conditions, providers, observations = [] }: Props) {
+  const fmt = useFormat()
   const [editing, setEditing] = useState<ConditionRow | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -74,7 +77,7 @@ export function ConditionsSection({ personId, conditions, providers, observation
 
       <EntityTable
         rows={conditions}
-        columns={COLUMNS}
+        columns={columnsFor(fmt)}
         describe={(c) => c.name}
         onEdit={(c) => { setEditing(c); setOpen(true) }}
         onDelete={handleDelete}
@@ -82,7 +85,7 @@ export function ConditionsSection({ personId, conditions, providers, observation
         renderExpanded={(c) => (
           <div className="space-y-3">
             {c.notes && <p className="text-sm text-muted-foreground whitespace-pre-wrap">{c.notes}</p>}
-            {c.resolvedDate && <p className="text-sm text-muted-foreground">Resolved {formatDay(c.resolvedDate)}</p>}
+            {c.resolvedDate && <p className="text-sm text-muted-foreground">Resolved {fmt.date(c.resolvedDate, { utc: true })}</p>}
             <LinkedObservations rows={observations.filter((o) => o.conditionId === c.id)} />
             <AttachmentList recordId={c.id} recordType="CONDITION" attachments={c.attachments} />
           </div>
@@ -107,6 +110,7 @@ export function ConditionsSection({ personId, conditions, providers, observation
 }
 
 function LinkedObservations({ rows }: { rows: ObservationLike[] }) {
+  const fmt = useFormat()
   if (!rows.length) return null
   const recent = filterObservations(rows, { range: "30" }, new Date()).length
   return (
@@ -117,7 +121,7 @@ function LinkedObservations({ rows }: { rows: ObservationLike[] }) {
       <ul className="mt-1 space-y-0.5">
         {rows.slice(0, 5).map((o, i) => (
           <li key={i}>
-            {formatDay(o.date)}{o.time ? ` ${formatTime(o.time)}` : ""} — {o.type}
+            {fmt.date(o.date, { utc: true })}{o.time ? ` ${fmt.clock(o.time)}` : ""} — {o.type}
             {o.severity ? <span className="text-muted-foreground"> ({o.severity}/5)</span> : null}
           </li>
         ))}

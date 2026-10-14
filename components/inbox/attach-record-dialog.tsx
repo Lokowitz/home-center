@@ -11,7 +11,6 @@ import { AssetSelect, type InboxAssetOption } from "@/components/inbox/asset-sel
 import { attachToRecord, listAttachCandidates } from "@/lib/actions/inbox"
 import { bestAttachMatch, type AttachCandidate } from "@/lib/inbox"
 import { parseAssetKey } from "@/lib/inbox-form"
-import { formatDay } from "@/lib/health"
 import { useFormat } from "@/components/regional-provider"
 
 export type AttachChoices = {
@@ -123,7 +122,7 @@ export function AttachRecordDialog({
                             onChange={() => setChoices((cur) => ({ ...cur, selected: key }))}
                             className="accent-primary"
                           />
-                          <span className="w-24 shrink-0 text-muted-foreground">{c.date ? formatDay(c.date) : "No date"}</span>
+                          <span className="w-24 shrink-0 text-muted-foreground">{c.date ? fmt.date(c.date, { utc: true }) : "No date"}</span>
                           <span className="min-w-0 flex-1 truncate font-medium">{c.title}</span>
                           <span className="shrink-0 text-xs text-muted-foreground">
                             {c.kind === "WARRANTY" ? "Warranty" : c.cost != null ? fmt.money(c.cost) : "—"}

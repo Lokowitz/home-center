@@ -43,6 +43,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
         subtitle={asset.subtitle}
         kind={isPerson ? "Medical summary" : assetLabel[asset.type]}
         generatedAt={generatedAt}
+        fmt={fmt}
       />
 
       <section className="report-section mt-7 grid grid-cols-[1.6fr_1fr] gap-7">
@@ -141,7 +142,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
       ) : null}
 
       <ServiceHistory services={services} asset={data.asset} total={lifetime} fmt={fmt} />
-      {!isPerson && <Warranties warranties={warranties} now={now} />}
+      {!isPerson && <Warranties warranties={warranties} now={now} fmt={fmt} />}
       <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} fmt={fmt} />
 
       <footer
@@ -152,7 +153,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
         <div className="flex justify-between gap-6">
           <span>
             {asset.name} · {isPerson ? "medical summary" : `${assetLabel[asset.type]} report`} · generated{" "}
-            {generatedAt.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })}
+            {`${fmt.date(generatedAt, { long: true })} ${fmt.time(generatedAt)}`}
           </span>
           <span>HomeCenter</span>
         </div>
@@ -181,11 +182,13 @@ function Masthead({
   subtitle,
   kind,
   generatedAt,
+  fmt,
 }: {
   title: string
   subtitle: string | null
   kind: string
   generatedAt: Date
+  fmt: Formatter
 }) {
   return (
     <header>
@@ -195,7 +198,7 @@ function Masthead({
         data-print-color=""
       >
         <span>HomeCenter · {kind} report</span>
-        <span>{generatedAt.toLocaleDateString(undefined, { dateStyle: "long" })}</span>
+        <span>{fmt.date(generatedAt, { long: true })}</span>
       </div>
       <h1 className="font-heading mt-5 text-[26pt] font-semibold leading-none">{title}</h1>
       {subtitle ? (
@@ -291,12 +294,7 @@ function ServiceHistory({
             <tbody key={s.id} className="report-break-avoid">
               <tr className="border-t align-top" style={{ borderColor: "var(--rule)" }}>
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums" style={{ color: "var(--ink-soft)" }}>
-                  {new Date(s.date).toLocaleDateString(undefined, {
-                    timeZone: "UTC",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {fmt.date(s.date, { utc: true })}
                 </td>
                 <td className="py-2.5 pr-3">
                   <div className="font-semibold">{s.title}</div>
@@ -340,7 +338,7 @@ function ServiceHistory({
   )
 }
 
-function Warranties({ warranties, now }: { warranties: ReportWarranty[]; now: Date }) {
+function Warranties({ warranties, now, fmt }: { warranties: ReportWarranty[]; now: Date; fmt: Formatter }) {
   return (
     <section className="report-section mt-7">
       <SectionTitle>Warranties</SectionTitle>
@@ -377,12 +375,12 @@ function Warranties({ warranties, now }: { warranties: ReportWarranty[]; now: Da
                   <span>
                     Purchased{" "}
                     {w.purchaseDate
-                      ? new Date(w.purchaseDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(w.purchaseDate, { utc: true })
                       : "—"}
                   </span>
                   <span>
                     Expires{" "}
-                    {expires ? expires.toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" }) : "—"}
+                    {expires ? fmt.date(expires, { utc: true }) : "—"}
                   </span>
                 </div>
                 {contact ? (
@@ -478,7 +476,7 @@ function Maintenance({
                   <span>
                     Last completed{" "}
                     {m.lastCompletedDate
-                      ? new Date(m.lastCompletedDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(m.lastCompletedDate, { utc: true })
                       : "—"}
                     {m.lastCompletedMileage != null
                       ? ` at ${m.lastCompletedMileage.toLocaleString()} ${unit}`
@@ -487,7 +485,7 @@ function Maintenance({
                   <span>
                     Next due{" "}
                     {m.nextDueDate
-                      ? new Date(m.nextDueDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(m.nextDueDate, { utc: true })
                       : "—"}
                     {m.nextDueMileage != null ? ` / ${m.nextDueMileage.toLocaleString()} ${unit}` : ""}
                   </span>

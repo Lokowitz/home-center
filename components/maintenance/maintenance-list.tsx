@@ -58,7 +58,7 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
   // Paused and snoozed say so first: whatever the due date, they're on hold.
   if (!s.isActive) return { label: "Paused", variant: "outline" as const, icon: Pause }
   if (isSnoozed(s)) {
-    return { label: `Snoozed to ${new Date(s.snoozedUntil!).toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
+    return { label: `Snoozed to ${fmt.date(s.snoozedUntil!)}`, variant: "outline" as const, icon: AlarmClockOff }
   }
   const due = scheduleDue(s, mileage)
   const badge = dueBadge(due, s.nextDueDate != null || s.nextDueMileage != null, fmt)
@@ -210,7 +210,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {s.nextDueDate && <div>{new Date(s.nextDueDate).toLocaleDateString()}</div>}
+                      {s.nextDueDate && <div>{fmt.date(s.nextDueDate)}</div>}
                       {s.nextDueMileage != null && <div>{s.nextDueMileage.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
                       {!s.nextDueDate && s.nextDueMileage == null && "—"}
                     </TableCell>
@@ -220,7 +220,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                       {!s.intervalDays && !s.intervalMiles && "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {s.lastCompletedDate ? new Date(s.lastCompletedDate).toLocaleDateString() : "—"}
+                      {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "—"}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <AttachmentCount attachments={s.attachments} onClick={() => setExpandedId(expanded ? null : s.id)} />

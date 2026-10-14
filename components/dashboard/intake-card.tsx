@@ -6,7 +6,6 @@ import { InboxDropZone } from "@/components/inbox/inbox-drop-zone"
 import { IntakeTip } from "@/components/dashboard/intake-tip"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
-import { formatDay } from "@/lib/health"
 import { inboxHeadline, inboxReadiness, readFields, type InboxReadiness } from "@/lib/inbox-form"
 import { intakeSummary } from "@/lib/intake-ui"
 import type { InboxListItem } from "@/lib/inbox-server"
@@ -27,7 +26,7 @@ function headlineOf(item: InboxListItem, householdNames: string[], fmt: Formatte
     {
       total: item.parsedTotal != null ? fmt.money(item.parsedTotal) : null,
       vendor: fields.vendor.state === "found" ? item.parsedVendor : null,
-      date: item.parsedDate ? formatDay(item.parsedDate) : null,
+      date: item.parsedDate ? fmt.date(item.parsedDate, { utc: true }) : null,
     },
     fileName
   )

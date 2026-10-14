@@ -4,7 +4,7 @@ import { assetHref } from "@/lib/assets"
 import { categoryLabel as equipmentCategoryLabel } from "@/components/equipment/categories"
 import { categoryLabel as serviceCategoryLabel } from "@/lib/costs"
 import {
-  ageFrom, ALLERGY_SEVERITIES, CONDITION_STATUSES, formatDay, INSURANCE_KINDS, insuranceExpiring, isMedicationActive,
+  ageFrom, ALLERGY_SEVERITIES, CONDITION_STATUSES, INSURANCE_KINDS, insuranceExpiring, isMedicationActive,
   labelFor, RELATIONSHIPS,
 } from "@/lib/health"
 import { dueBadge, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
@@ -44,7 +44,8 @@ const SEMANTIC_RECORD_LIMIT = 24
 
 const moneyWith = (fmt: Formatter) => (n: number | null | undefined) =>
   n == null ? null : Number.isInteger(n) ? fmt.moneyWhole(n) : fmt.money(n)
-const day = (d: Date | null | undefined) => (d ? formatDay(d) : null)
+/** Stored days are shown in UTC: that is the day that was typed. */
+const dayWith = (fmt: Formatter) => (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : null)
 const clip = (s: string | null | undefined, n = 160) => {
   if (!s) return null
   const flat = s.replace(/\s+/g, " ").trim()
@@ -280,6 +281,7 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
 async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<Section[]> {
   const fmt = await getFormat()
   const money = moneyWith(fmt)
+  const day = dayWith(fmt)
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)
   const [properties, vehicles, equipment, people] = await Promise.all([
@@ -397,6 +399,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
 async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[]): Promise<Section[]> {
   const fmt = await getFormat()
   const money = moneyWith(fmt)
+  const day = dayWith(fmt)
   const thumb = (id: string) => owners.thumbs.get(id) ?? null
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)

@@ -1,17 +1,18 @@
 import { Empty, SectionTitle } from "./report-parts"
 import type { Formatter } from "@/lib/regional"
 import {
-  ALLERGY_SEVERITIES, CONDITION_STATUSES, formatDay, INSURANCE_KINDS, isMedicationActive, labelFor,
+  ALLERGY_SEVERITIES, CONDITION_STATUSES, INSURANCE_KINDS, isMedicationActive, labelFor,
 } from "@/lib/health"
 import type { ReportHealth } from "@/lib/report-server"
 import {
-  filterObservations, formatDuration, formatTime, summarizeObservations, type RangeValue,
+  filterObservations, formatDuration, summarizeObservations, type RangeValue,
 } from "@/lib/observations"
 
 // Ordered the way a clinician reads a chart: what could hurt them, what they
 // have, what they take, what they've had, who pays, who treats them.
 export function HealthSummary({ health, now, observationDays, fmt }: { health: ReportHealth; now: Date; observationDays: number | null; fmt: Formatter }) {
   const { person, careTeam } = health
+  const day = (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : "—")
   const conditions = person.conditions.filter((c) => c.status !== "RESOLVED")
   const resolved = person.conditions.length - conditions.length
   const medications = person.medications.filter((m) => isMedicationActive(m, now))
@@ -42,7 +43,7 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
         ) : (
           <Rows
             head={["Condition", "Status", "Since", "Provider"]}
-            rows={conditions.map((c) => [c.name, labelFor(CONDITION_STATUSES, c.status), formatDay(c.diagnosedDate), c.provider?.name ?? "—"])}
+            rows={conditions.map((c) => [c.name, labelFor(CONDITION_STATUSES, c.status), day(c.diagnosedDate), c.provider?.name ?? "—"])}
           />
         )}
         {resolved > 0 && <Empty>{resolved} resolved condition{resolved === 1 ? "" : "s"} not shown.</Empty>}
@@ -59,7 +60,7 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
               m.name,
               [m.dosage, m.frequency].filter(Boolean).join(" · ") || "—",
               m.prescriber?.name ?? "—",
-              formatDay(m.startDate),
+              day(m.startDate),
             ])}
           />
         )}
@@ -72,12 +73,12 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
         ) : (
           <Rows
             head={["Vaccine", "Given", "Next due"]}
-            rows={person.immunizations.map((i) => [i.dose ? `${i.vaccine} (${i.dose})` : i.vaccine, formatDay(i.dateGiven), formatDay(i.nextDueDate)])}
+            rows={person.immunizations.map((i) => [i.dose ? `${i.vaccine} (${i.dose})` : i.vaccine, day(i.dateGiven), day(i.nextDueDate)])}
           />
         )}
       </section>
 
-      {observationDays != null && <Observations rows={person.observations} days={observationDays} now={now} />}
+      {observationDays != null && <Observations rows={person.observations} days={observationDays} now={now} fmt={fmt} />}
 
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Insurance</SectionTitle>
@@ -113,7 +114,8 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
   )
 }
 
-function Observations({ rows, days, now }: { rows: ReportHealth["person"]["observations"]; days: number; now: Date }) {
+function Observations({ rows, days, now, fmt }: { rows: ReportHealth["person"]["observations"]; days: number; now: Date; fmt: Formatter }) {
+  const day = (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : "—")
   const shown = filterObservations(rows, { range: String(days) as RangeValue }, now)
   const summary = summarizeObservations(shown)
   return (
@@ -130,7 +132,7 @@ function Observations({ rows, days, now }: { rows: ReportHealth["person"]["obser
           <Rows
             head={["When", "What", "Severity", "Duration", "Notes"]}
             rows={shown.map((o) => [
-              `${formatDay(o.date)}${o.time ? ` ${formatTime(o.time)}` : ""}`,
+              `${day(o.date)}${o.time ? ` ${fmt.clock(o.time)}` : ""}`,
               o.condition ? `${o.type} (${o.condition.name})` : o.type,
               o.severity ? `${o.severity} / 5` : "—",
               formatDuration(o.durationMinutes),
