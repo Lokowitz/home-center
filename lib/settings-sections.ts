@@ -1,9 +1,9 @@
-import { Bell, Bot, FileSearch, Mail, Palette, ToggleRight, Users } from "lucide-react"
+import { Bell, Bot, DatabaseBackup, FileSearch, Mail, Palette, ToggleRight, Users } from "lucide-react"
 
 // The sub-pages of Settings, chosen with ?tab= like the asset pages' tabs.
 // Everyone gets their own email preferences and appearance; the rest is server setup.
 
-export type SettingsSectionId = "notifications" | "appearance" | "features" | "mail" | "assistant" | "documents" | "users"
+export type SettingsSectionId = "notifications" | "appearance" | "features" | "mail" | "assistant" | "documents" | "users" | "data"
 
 export type SettingsSection = {
   id: SettingsSectionId
@@ -21,6 +21,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: "assistant", label: "Assistant", description: "The AI assistant's model and behavior", icon: Bot, adminOnly: true },
   { id: "documents", label: "Documents & search", description: "Reading uploads, OCR and semantic search", icon: FileSearch, adminOnly: true },
   { id: "users", label: "Users", description: "Who can sign in, and their roles", icon: Users, adminOnly: true },
+  { id: "data", label: "Data & backups", description: "Backups, restore and export of everything in HomeCenter", icon: DatabaseBackup, adminOnly: true },
 ]
 
 export function visibleSections(isAdmin: boolean): SettingsSection[] {

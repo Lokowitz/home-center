@@ -4,9 +4,9 @@
 
 ---
 
-## Progress as of 2026-10-11
+## Progress as of 2026-10-13
 
-*Checked against the code on `FEAT/EnhancementsV1`. The milestones in §5 carry the same status inline. "Done", "Partial" and "Not started" describe the code, not user validation.*
+*Checked against the code on `FEAT/EnhancementsV1` and `FEAT/ExportBackupRestore`. The milestones in §5 carry the same status inline. "Done", "Partial" and "Not started" describe the code, not user validation.*
 
 | Milestone | Status | Summary |
 |---|---|---|
@@ -14,10 +14,10 @@
 | **M1 Close the loop** | Done | Logging a service can complete a reminder in the same transaction, and the odometer is raised. A matching title suggests the reminder. Snooze, skip, pause and resume are on the dashboard and the bell, and starter plans (F4) exist. Filing a receipt from Intake offers the reminder it reads as. |
 | **M2 Capture foundations** | Partial | Asset Documents tabs (F7) and camera capture on uploads (F14) are done. Not started: PWA manifest and icons (F14) and the ICS feed (F11). The F6 spike was folded into M3: fixtures and an accuracy test live in `lib/capture/`, but no written results. |
 | **M3 Capture inbox** | Done, with gaps | Intake (`/intake`, `InboxItem`), the deterministic parser with fixtures, asset suggestion, attach-to-existing, `.eml`/`.msg` support and optional Local AI reading (Settings → Receipt reading). Unverified: "keep as asset document" and keeping person-owned files away from the LLM. |
-| **M4 Portability (F15)** | Not started | No export, scheduled backup or restore script. This is now the largest gap against §4 of the one-page answer. |
+| **M4 Portability (F15)** | Done (2026-10-13) | Settings → Data has a verified **Back up now**, a daily or weekly schedule with retention and a stale-backup warning, optional protection (recovery key or password zip), and restore with a dry run, a `RESTORE` confirmation and a 7-day undo. **Export** makes an offline zip: `index.html` viewer, JSON, CSVs and a readable file tree (`docs/export-format.md`). The per-asset zip download now runs on the export engine. CLI: `npm run backup`, `backup:verify` and `restore`. Commits `3d70bf5..6ecdbaa` on `FEAT/ExportBackupRestore`. Pending: the Docker smoke test (build the image, back up, restore and undo in a container). |
 | **M5 Proactive** | Not started | F9, F5, F10, F19 and F13 have no code. |
 
-**Suggested next:** M4 (F15 export and backup), since M1 and M3 have landed. Then close the small M0 leftovers.
+**Suggested next:** close the small M0 leftovers, then M5 as feedback directs.
 
 ---
 
@@ -167,7 +167,7 @@ These assume one maintainer working part-time. Durations are rough calendar esti
 
 ### M4: Portability (2–3 weeks)
 
-**Status: not started.** No export, `VACUUM INTO` backup or `scripts/restore.ts` exists.
+**Status: done 2026-10-13** (commits `3d70bf5..6ecdbaa` on `FEAT/ExportBackupRestore`). Backup, schedule, protection, restore and export are all in Settings → Data, with `scripts/backup.ts`, `scripts/restore.ts` and `scripts/restore-apply.ts` for the command line. Verified end to end on a scratch household: recovery key, back up, restore, undo, then an export (with and without health records) that opens offline from `file://`. Still pending: a Docker smoke test of the built image (backup, restore, undo inside the container). The plan below is what was scoped.
 
 - F15 export: JSON with `formatVersion`, CSVs, a readable file tree, and a static `index.html` viewer.
 - Scheduled `VACUUM INTO` backups with retention and a stale-backup warning.

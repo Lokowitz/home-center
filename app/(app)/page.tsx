@@ -18,6 +18,7 @@ import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
 import { listInboxItems } from "@/lib/inbox-server"
 import { IntakeCard } from "@/components/dashboard/intake-card"
+import { FreshStartCard } from "@/components/dashboard/fresh-start-card"
 
 // Months of history in the dashboard's spending chart. Twelve rather than six:
 // six months cannot show a season, and a household's spending is seasonal.
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
 
   const [
     propertyCount, vehicleCount, equipmentCount, personCount, recordCount,
-    warrantyCount,
+    warrantyCount, personTotal, recordTotal,
     maintenanceCandidates, mileage, expiringWarranties,
     properties, vehicles, equipment, people, assets, activity, costRows, intake,
   ] = await Promise.all([
@@ -48,6 +49,9 @@ export default async function DashboardPage() {
     features.health ? prisma.person.count() : 0,
     prisma.serviceRecord.count({ where: owned }),
     prisma.warranty.count({ where: { ...owned, expirationDate: { gt: now } } }),
+    // Unfiltered, so a household whose only data is hidden by a feature toggle is not called empty.
+    prisma.person.count(),
+    prisma.serviceRecord.count(),
     // Everything that could be due either way; narrowed to what actually is,
     // and counted, below — mileage can't be filtered in SQL.
     prisma.maintenanceSchedule.findMany({
@@ -75,6 +79,8 @@ export default async function DashboardPage() {
   const dueMaintenance = maintenanceCandidates
     .map((s) => ({ s, due: scheduleDue(s, mileage, now) }))
     .filter(({ due }) => due.overdue || due.dueSoon || (due.daysLeft != null && due.daysLeft <= 30))
+
+  const empty = propertyCount + vehicleCount + equipmentCount + personTotal + recordTotal === 0
 
   const maintenanceCount = dueMaintenance.length
 
@@ -113,6 +119,8 @@ export default async function DashboardPage() {
           Welcome back{session?.user?.name ? `, ${session.user.name.split(" ")[0]}` : ""}
         </h1>
       </div>
+
+      {empty && session?.user.role === "ADMIN" && <FreshStartCard />}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-[1.3fr_1.3fr_1.6fr_1fr]">
         <SummaryCard icon={<Building2 />} label="Properties" value={propertyCount} href="/assets/properties" thumbnails={propertyThumbnails} hero />

@@ -1,11 +1,12 @@
 {
   "name": "home-center",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
-    "predev": "prisma migrate deploy",
+    "predev": "tsx scripts/restore-apply.ts && prisma migrate deploy",
     "dev": "next dev",
     "build": "next build",
+    "prestart": "tsx scripts/restore-apply.ts",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -14,6 +15,9 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:seed:demo": "tsx prisma/seed-demo.ts",
+    "backup": "tsx scripts/backup.ts",
+    "backup:verify": "tsx scripts/backup-verify.ts",
+    "restore": "tsx scripts/restore.ts",
     "models:fetch-builtin": "tsx scripts/fetch-builtin-model.ts"
   },
   "prisma": {
@@ -32,6 +36,8 @@
     "@prisma/client": "^7.9.1",
     "@tesseract.js-data/eng": "^1.0.0",
     "@types/bcryptjs": "^2.4.6",
+    "@zip.js/zip.js": "^2.23.0",
+    "age-encryption": "^0.3.1",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

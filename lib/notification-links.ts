@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { assetHref } from "@/lib/assets"
 import { INTAKE_NUDGE_ENTITY } from "@/lib/notifications/intake-nudge"
+import { BACKUP_ENTITY } from "@/lib/backup/alerts-server"
 import type { Notification } from "@/app/generated/prisma/client"
 
 const ASSET_TAB: Record<string, string> = { MaintenanceSchedule: "maintenance", Warranty: "warranties" }
@@ -36,6 +37,10 @@ export async function resolveNotificationHrefs(notifications: Notification[]): P
     // The Intake nudge is about the whole Intake, not one record.
     if (type === INTAKE_NUDGE_ENTITY) {
       links.set(n.id, "/intake")
+      continue
+    }
+    if (type === BACKUP_ENTITY) {
+      links.set(n.id, "/settings?tab=data")
       continue
     }
     if (!type || !id) continue

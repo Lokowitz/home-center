@@ -6,6 +6,8 @@
 
 Service history, costs and reminders for your homes, vehicles, equipment and family health. Every receipt and manual is searchable, and it all runs in one Docker container.
 
+**[More details at home-center.dazzos.com](https://home-center.dazzos.com/)**
+
 **[Install in 5 minutes](#get-started)** · [Features](#features) · [AI assistant](#ask-your-house-a-question) · [Demos](#see-it-in-action) · [FAQ](#faq) · [Updating](#updating)
 
 ![MIT licence](https://img.shields.io/badge/licence-MIT-blue) ![Self-hosted](https://img.shields.io/badge/self--hosted-Docker-2496ED) ![amd64 and arm64](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-555) ![No cloud](https://img.shields.io/badge/cloud-none-success)
@@ -58,7 +60,7 @@ When was the furnace last serviced? Is the fridge still under warranty? What did
 | **Money** | Costs by asset, category and vendor, and a 12-month spending chart |
 | **Finding things** | Global search across records and documents, plus an optional AI assistant |
 | **Reminders** | In-app bell and per-person email digests |
-| **Records & export** | Attachments, printable reports and one-click zip downloads |
+| **Records & export** | Attachments, printable reports, a full offline export, and scheduled backups with restore ([how backups work](#how-do-i-back-it-up)) |
 | **Security** | Local login, admin and standard users, sign-in throttling, encrypted secrets |
 
 ### Every house, car and appliance, with its whole history
@@ -402,7 +404,13 @@ Your question and the records needed to answer it go to the AI provider you conf
 
 ### How do I back it up?
 
-Back up the data folder. It holds the database, uploaded files and downloaded models. Copy it while the container is stopped, or use your NAS's snapshots. Keep your `AUTH_SECRET` as well, because the saved mail password and API key can't be decrypted without it.
+Settings → Data. **Back up now** makes a verified backup; a daily or weekly **schedule** keeps the newest 14 (configurable). Point the folder at a different disk or NAS share (mount it in `docker-compose.yml`, e.g. `/backups`), because a backup on the same disk as your data doesn't survive that disk failing.
+
+Each backup is one file holding the database and every uploaded file. Protection is optional: none, a **recovery key** (the server can't open its own backups), or a **password zip** (opens in 7-Zip, WinRAR or Keka). From the command line: `npm run backup` and `npm run backup:verify -- <file>`.
+
+Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password and AI key. Protected backups carry them.
+
+**Restoring** is done in the app (Settings → Data), or from the command line when the app won't start: stop HomeCenter, then `npm run restore -- <file>` (`--dry-run` to only look). The command line swaps the data in right away. The next start upgrades the database if the backup is older and finishes the restore (everyone is signed out, carried secrets are put back); in Docker that start is the container restarting. `npm start` outside Docker does not run `prisma migrate deploy`, so run `npx prisma migrate deploy` before starting if the backup came from an older version. A restore made in the app waits for a restart; `npm run restore -- --cancel` (or **Cancel staged restore** in Settings → Data) takes it back. In Docker, `docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- /data/backups/<file> --yes` runs it in a fresh container.
 
 ### Will it run on my NAS?
 
