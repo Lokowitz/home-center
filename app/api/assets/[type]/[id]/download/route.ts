@@ -24,9 +24,9 @@ export async function GET(
   if (!assetType) return NextResponse.json({ error: "Invalid asset type" }, { status: 400 })
   if (assetType === "PERSON" && !(await loadFeatures()).health) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  const release = acquireAssetDownload()
-  if (!release) return NextResponse.json({ error: "Busy building another download. Try again in a moment." }, { status: 429 })
   const run = `asset-${randomUUID()}`
+  const release = acquireAssetDownload(run)
+  if (!release) return NextResponse.json({ error: "Busy building another download. Try again in a moment." }, { status: 429 })
   const outDir = path.join(workDir(), "exports", run)
   let streaming = false
   try {

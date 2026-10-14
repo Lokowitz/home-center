@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { uploadDir, dbPathFromUrl, workDir } from "./paths"
 import { createBackup } from "./backup"
 import { createExport } from "./export"
-import { sweepOldExports } from "./export-limits-server"
+import { markExportActive, sweepOldExports } from "./export-limits-server"
 import type { ExportScope } from "./format"
 import { backupReadable } from "./viewer"
 import { cleanupPartials, pruneBackups } from "./store"
@@ -69,10 +69,12 @@ export async function startExportJob(input: ExportJobInput): Promise<{ runId: st
     state.running = null
     throw e
   }
+  const unmark = markExportActive(runId)
   void sweepOldExports(runId).catch(() => undefined)
   void runExportJob(runId, input)
     .catch((e) => console.error("[export] job crashed:", e))
     .finally(() => {
+      unmark()
       state.running = null
     })
   return { runId }
