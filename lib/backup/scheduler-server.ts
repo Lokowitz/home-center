@@ -21,6 +21,7 @@ async function tick(now = new Date()) {
     await raiseBackupAlert(
       `stale:${newest?.createdAt ?? "none"}`,
       "Backups are behind",
+      // eslint-disable-next-line no-restricted-syntax -- machine-facing backup timestamp, not household display
       newestAt ? `The last backup is from ${newestAt.toLocaleDateString()}. Check Settings → Data.` : "No backup has been made yet. Check Settings → Data.",
     )
   }

@@ -29,7 +29,9 @@ export async function backupReadable(snapshot: string, w: ArchiveWriter): Promis
 }
 
 /** Only a plain ISO 4217 code is ever placed in the page; anything else falls back to USD. */
+// eslint-disable-next-line no-restricted-syntax -- offline standalone viewer; default currency literal
 export function viewerHtml(currency = "USD"): string {
+  // eslint-disable-next-line no-restricted-syntax -- offline standalone viewer; fallback currency literal
   const code = /^[A-Z]{3}$/.test(currency) ? currency : "USD"
   return `<!doctype html>
 <html lang="en">

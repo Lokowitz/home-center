@@ -116,6 +116,7 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
     const includeHealth = scope.kind === "all" ? scope.includeHealth : scope.assetType === "PERSON"
     // Labels only: the stored numbers are never converted. Missing table (older schema) means the defaults.
     const regionalRow = (await all(c, `SELECT "currency", "areaUnit" FROM "RegionalSettings" LIMIT 1`))[0]
+    // eslint-disable-next-line no-restricted-syntax -- engine file cannot import @/lib/regional; fallback literal only
     const regional: ReadableRegional = { currency: str(regionalRow?.currency) ?? "USD", areaUnit: str(regionalRow?.areaUnit) === "SQM" ? "SQM" : "SQFT" }
     const areaLabel = regional.areaUnit === "SQM" ? "Square metres" : "Square feet"
     const [props, vehicles, equipment, people] = await Promise.all([
