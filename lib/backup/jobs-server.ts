@@ -1,6 +1,10 @@
+import path from "node:path"
+import { rm, stat } from "node:fs/promises"
 import { prisma } from "@/lib/prisma"
 import { uploadDir, dbPathFromUrl, workDir } from "./paths"
 import { createBackup } from "./backup"
+import { createExport } from "./export"
+import type { ExportScope } from "./format"
 import { backupReadable } from "./viewer"
 import { cleanupPartials, pruneBackups } from "./store"
 import { appVersion, backupFolder, loadBackupSettings, loadSecrets, protectionConfig } from "./settings-server"
@@ -41,6 +45,69 @@ export async function startBackupJob(trigger: "MANUAL" | "SCHEDULE", userId?: st
       state.running = null
     })
   return { runId }
+}
+
+/** Where one export run writes its file; the download route serves it from here and deletes it. */
+export const exportDir = (runId: string) => path.join(workDir(), "exports", runId)
+
+type ExportJobInput = { scope: ExportScope; password: string | null; userId: string }
+
+/** Same one-job lock as backups. The password goes to the job in memory only; it is never stored or logged. */
+export async function startExportJob(input: ExportJobInput): Promise<{ runId: string } | { error: string }> {
+  // Claim before any await so two concurrent callers can't both pass.
+  if (state.running) return { error: "A backup or export is already running." }
+  state.running = CLAIMING
+  let runId: string
+  try {
+    const run = await prisma.backupRun.create({
+      data: { kind: "EXPORT", trigger: "MANUAL", protection: input.password !== null ? "PASSWORD" : "NONE", createdById: input.userId },
+    })
+    runId = run.id
+    state.running = runId
+  } catch (e) {
+    state.running = null
+    throw e
+  }
+  void runExportJob(runId, input)
+    .catch((e) => console.error("[export] job crashed:", e))
+    .finally(() => {
+      state.running = null
+    })
+  return { runId }
+}
+
+/** Never rejects past its own bookkeeping: the row ends FAILED if any update is still possible. */
+export async function runExportJob(runId: string, input: ExportJobInput): Promise<void> {
+  let last = 0
+  const outDir = exportDir(runId)
+  try {
+    const out = await createExport({
+      dbPath: dbPathFromUrl(process.env.DATABASE_URL), uploadDir: uploadDir(), outDir, workDir: workDir(),
+      appVersion: await appVersion(), scope: input.scope, password: input.password,
+      onProgress: (done, total) => {
+        const now = Date.now()
+        if (done === total || now - last > 1000) {
+          last = now
+          void prisma.backupRun.update({ where: { id: runId }, data: { progressDone: done, progressTotal: total } }).catch(() => {})
+        }
+      },
+    })
+    const size = await stat(out.path).then((s) => s.size, () => null)
+    await prisma.backupRun.update({
+      where: { id: runId },
+      data: { status: out.warnings.length ? "WARN" : "OK", finishedAt: new Date(), file: out.file, size, warnings: JSON.stringify(out.warnings) },
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error("[export] failed:", message)
+    // The run folder is this run's alone.
+    await rm(outDir, { recursive: true, force: true }).catch(() => undefined)
+    try {
+      await prisma.backupRun.update({ where: { id: runId }, data: { status: "FAILED", finishedAt: new Date(), error: message } })
+    } catch (e2) {
+      console.error("[export] couldn't record the failure:", e2)
+    }
+  }
 }
 
 /** Never rejects past its own bookkeeping: the row ends FAILED if any update is still possible. */

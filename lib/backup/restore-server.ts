@@ -2,7 +2,7 @@ import { readFile, rm } from "node:fs/promises"
 import path from "node:path"
 import { prisma } from "@/lib/prisma"
 import { SETTINGS_ID } from "@/lib/notifications/mail-config"
-import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "./paths"
+import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "./paths"
 import { isBlocking, markFinalized, prunePre, readResult, type RestorePaths } from "./restore"
 import { raiseBackupAlert } from "./alerts-server"
 
@@ -64,6 +64,8 @@ export async function finalizeRestore(now = new Date()): Promise<void> {
   await prunePre(dir, now)
   await rm(path.join(dir, "work"), { recursive: true, force: true })
   await rm(path.join(dir, "incoming"), { recursive: true, force: true })
+  // Exports are one-time downloads; none survives a restart. Only this folder is ever removed.
+  await rm(path.join(workDir(), "exports"), { recursive: true, force: true })
 }
 
 /** Exits so Docker's restart policy starts a fresh process that applies the staged restore. */

@@ -6,7 +6,7 @@ import { folderStatus, listBackups, type FolderStatus } from "./store"
 import { backupFolder, loadBackupSettings } from "./settings-server"
 import { isStale, nextSlot } from "./schedule"
 import { statusTone, type Tone } from "./overview"
-import type { Protection } from "./format"
+import type { AssetKind, Protection } from "./format"
 
 export type BackupRow = { file: string; createdAt: string; size: number; protection: Protection; keyFingerprint: string | null; warningCount: number; kind: "backup" | "export" }
 
@@ -24,6 +24,8 @@ export type BackupOverview = {
   nextRunAt: string | null
   tone: Tone
   healthEnabled: boolean
+  /** For the export scope picker. */
+  assets: { type: AssetKind; id: string; name: string }[]
   restore: RestoreState
 }
 
@@ -40,6 +42,15 @@ export async function loadBackupOverview(now = new Date()): Promise<BackupOvervi
     latestPre(restoreDir()),
     hasPending(restoreDir()),
   ])
+  const [properties, vehicles, equipment, people] = await Promise.all([
+    prisma.property.findMany({ select: { id: true, name: true } }),
+    prisma.vehicle.findMany({ select: { id: true, name: true } }),
+    prisma.equipment.findMany({ select: { id: true, name: true } }),
+    features.health ? prisma.person.findMany({ select: { id: true, name: true } }) : Promise.resolve([]),
+  ])
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
+  const assets = ([["PROPERTY", properties], ["VEHICLE", vehicles], ["EQUIPMENT", equipment], ["PERSON", people]] as const).flatMap(([type, rows]) =>
+    [...rows].sort(byName).map((r) => ({ type: type as AssetKind, id: r.id, name: r.name })))
   const backups = stored.filter((b) => b.kind === "backup")
   const newestAt = backups[0] ? new Date(backups[0].createdAt) : null
   const stale = isStale(s, newestAt, s.enabledAt ?? s.updatedAt, now)
@@ -55,6 +66,7 @@ export async function loadBackupOverview(now = new Date()): Promise<BackupOvervi
     nextRunAt: nextSlot(s, now)?.toISOString() ?? null,
     tone: statusTone({ newestAt, lastStatus: last?.status ?? null, stale }),
     healthEnabled: features.health,
+    assets,
     restore: {
       result,
       undoAvailableUntil: pre ? new Date(new Date(pre.createdAt).getTime() + 7 * 86_400_000).toISOString() : null,

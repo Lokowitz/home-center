@@ -7,6 +7,7 @@ import { BackupStatus } from "./backup-status"
 import { BackupSchedule } from "./backup-schedule"
 import { BackupProtection } from "./backup-protection"
 import { BackupList } from "./backup-list"
+import { ExportPanel } from "./export-panel"
 import { RestorePanel, type RestoreSource } from "./restore-panel"
 
 /** Settings → Data. Holds the overview and polls it while a job runs. */
@@ -27,6 +28,7 @@ export function DataSettings({ initial }: { initial: BackupOverview }) {
       <BackupSchedule data={data} onSaved={refresh} />
       <BackupProtection data={data} onSaved={refresh} />
       <BackupList data={data} onChanged={refresh} onRestore={(b) => setRestoreSource({ file: b.file })} />
+      <ExportPanel data={data} />
       <RestorePanel data={data} source={restoreSource} setSource={setRestoreSource} onChanged={refresh} />
     </div>
   )

@@ -15,7 +15,9 @@ import { verifyArchive } from "@/lib/backup/verify"
 import { appMigrations, dataDir, workDir } from "@/lib/backup/paths"
 import { cancelRestore, dryRun, hasPending, stage, stageUndo, type DryRun } from "@/lib/backup/restore"
 import { restartToFinish, restorePaths } from "@/lib/backup/restore-server"
-import { isJobRunning } from "@/lib/backup/jobs-server"
+import { isJobRunning, startExportJob } from "@/lib/backup/jobs-server"
+import { loadFeatures } from "@/lib/features-server"
+import type { AssetKind, ExportScope } from "@/lib/backup/format"
 import { fingerprintOf, passwordProblem } from "@/lib/backup/protect-shared"
 import { encrypt } from "@/lib/secret-box"
 
@@ -187,4 +189,37 @@ export async function restoreUndo(): Promise<{ ok: true } | { error: string }> {
 export async function restoreCancel(): Promise<void> {
   await requireAdmin()
   await cancelRestore(restorePaths().restoreDir)
+}
+
+const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/
+const ASSET_KINDS = ["PROPERTY", "VEHICLE", "EQUIPMENT", "PERSON"]
+
+/** The password goes to the job in memory only. It is not stored, logged or sent back. */
+export async function startExport(input: { scope: "all" | { assetType: AssetKind; assetId: string }; includeHealth: boolean; password: string }): Promise<{ runId: string } | { error: string }> {
+  const session = await requireAdmin()
+  const password = String(input.password ?? "")
+  if (password) {
+    const problem = passwordProblem(password)
+    if (problem) return { error: problem }
+  }
+  const health = (await loadFeatures()).health
+  let scope: ExportScope
+  if (input.scope === "all") {
+    // With Health off it stays out of exports too.
+    scope = { kind: "all", includeHealth: health && !!input.includeHealth }
+  } else {
+    const { assetType, assetId } = input.scope
+    if (!ASSET_KINDS.includes(assetType) || typeof assetId !== "string" || !assetId) return { error: "Pick what to export." }
+    if (assetType === "PERSON" && !health) return { error: "Health is turned off." }
+    scope = { kind: "asset", assetType, assetId }
+  }
+  return startExportJob({ scope, password: password || null, userId: session.user.id })
+}
+
+/** Only the admin who started the export can see how it is going. */
+export async function exportStatus(runId: string): Promise<{ status: string; done: number; total: number; error: string | null }> {
+  const session = await requireAdmin()
+  const r = RUN_ID.test(String(runId)) ? await prisma.backupRun.findUnique({ where: { id: runId } }) : null
+  if (!r || r.kind !== "EXPORT" || r.createdById !== session.user.id) return { status: "FAILED", done: 0, total: 0, error: "Export not found." }
+  return { status: r.status, done: r.progressDone, total: r.progressTotal, error: r.error }
 }
