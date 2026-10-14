@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { loadFeatures } from "@/lib/features-server"
+import { loadRegionalSettings } from "@/lib/regional-server"
 import { loadLlmConfig } from "@/lib/llm/config"
 import { createChatClient } from "@/lib/llm/client"
 import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
@@ -96,10 +97,12 @@ async function readWithLlm(text: string): Promise<LlmReceiptRead | { note: "llm-
   if (!isLlmReady(config) || !config.baseUrl || !config.model) return { note: "llm-not-ready", detail: "settings changed while reading" }
   const { baseUrl, model } = config
   const extraBody = parseExtraBody(config.extraBody)
+  const { currency } = await loadRegionalSettings()
   return readReceiptByLlm(
     text,
     (opts) => createChatClient({ baseUrl, apiKey: config.apiKey, model, ...receiptChatOptions(extraBody, opts) }),
     AbortSignal.timeout(LLM_TIMEOUT_MS),
+    currency,
   )
 }
 

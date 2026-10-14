@@ -1,6 +1,7 @@
 // Deterministic receipt reader: date, total and vendor from extracted text.
 // Ported from the F6 spike (71% date+total on real receipts). Pure — no I/O.
 import { looksLikeHouseholdName } from "@/lib/inbox-form"
+import { AMOUNT_RE, parseAmount } from "./amount"
 
 export type ParsedReceipt = { date: string | null; total: number | null; vendor: string | null }
 
@@ -81,8 +82,9 @@ export function pickDate(text: string, maxYear: number): string | null {
   return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0]
 }
 
-const AMOUNT = /\$?\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})\b/g
-const amounts = (s: string) => [...s.matchAll(AMOUNT)].map((m) => Number(m[1].replace(/,/g, "") + "." + m[2]))
+// Magnitudes: a refund line "-96.29" counts as 96.29 (see the fixtures convention).
+const amounts = (s: string) =>
+  [...s.matchAll(AMOUNT_RE)].map((m) => parseAmount(m[0])).filter((n): n is number => n != null).map(Math.abs)
 
 const TOTAL_LABEL =
   /\b(grand\s*total|invoice\s*total|total\s*due|amount\s*due|balance\s*due|total\s*amount|amount\s*paid|total\s*paid|total\s*charges|total\s*sale|order\s*total|total)\b/i
@@ -121,8 +123,8 @@ const HEADING =
   /^(recipient|estimate|quote|quotation|proposal|warning|notice|summary|order summary|statement|report|inspection report|work order|description|notes?|bill to|ship to|sold to|customer|patient|results?)$/i
 const GREETING = /^(hi|hello|hey|dear|thanks?|thank you|we appreciate)\b/i
 const TABLE_WORDS = /\b(item|description|qty|quantity|price|amount|unit|rate|hours|total)\b/gi
-// A price, with or without the dollar sign: an item line, not a name.
-const MONEY = /\$\s?\d|\b\d+\.\d{2}\b/
+// A price, with or without a currency sign: an item line, not a name.
+const MONEY = /\p{Sc}\s?\d|\b\d+[.,]\d{2}\b/u
 const STREET =
   /^\d+[\w-]*\s+(?:[\p{L}.]+\s+){0,4}(rd|road|st|street|ave|avenue|blvd|boulevard|dr|drive|ln|lane|ct|court|hwy|highway|way|pkwy|parkway|pl|place|cir|circle|ter|terrace|trl|trail)\b\.?/iu
 const PO_BOX = /\bp\.?\s?o\.?\s?box\b/i
