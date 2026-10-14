@@ -17,6 +17,8 @@ export async function readSidecar(p: string): Promise<Sidecar | null> {
   try {
     const s = JSON.parse(await readFile(p, "utf8")) as Sidecar
     if (s.sidecarVersion !== SIDECAR_VERSION || typeof s.file !== "string" || path.basename(s.file) !== s.file) return null
+    // Listing sorts and filters on these, so a hand-edited or damaged sidecar is skipped rather than thrown on.
+    if (typeof s.createdAt !== "string" || (s.kind !== "backup" && s.kind !== "export")) return null
     return s
   } catch {
     return null
@@ -77,6 +79,7 @@ export async function uniqueName(folder: string, name: string): Promise<string> 
   }
 }
 
+/** Removes HomeCenter's own unfinished archives. Only names it writes (homecenter-…); the folder may be shared. */
 export async function cleanupPartials(folder: string): Promise<number> {
   let names: string[]
   try {
@@ -84,7 +87,7 @@ export async function cleanupPartials(folder: string): Promise<number> {
   } catch {
     return 0
   }
-  const partials = names.filter((n) => n.endsWith(".partial"))
+  const partials = names.filter((n) => n.startsWith("homecenter-") && n.endsWith(".partial"))
   for (const n of partials) await rm(path.join(folder, n), { force: true })
   return partials.length
 }

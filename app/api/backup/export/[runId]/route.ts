@@ -10,7 +10,7 @@ import { safeJoin } from "@/lib/backup/paths"
 
 const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/
 
-const asciiName = (n: string) => n.replace(/[^\x20-\x7e]|["\%]/g, "_")
+const asciiName = (n: string) => n.replace(/[^\x20-\x7e]|["\\%]/g, "_")
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ runId: string }> }) {
   const session = await adminSession()

@@ -46,9 +46,25 @@ describe("backup folder", () => {
 
   it("cleanupPartials removes leftovers from an interrupted run", async () => {
     const f = await tempDir()
-    await writeFiles(f, { "a.hcbackup.partial": "x", "keep.hcbackup": "y" })
+    await writeFiles(f, { "homecenter-2026-01-01-0300.hcbackup.age.partial": "x", "keep.hcbackup": "y" })
     expect(await cleanupPartials(f)).toBe(1)
     expect(existsSync(path.join(f, "keep.hcbackup"))).toBe(true)
+  })
+
+  it("cleanupPartials leaves other programs' .partial files in a shared folder alone", async () => {
+    const f = await tempDir()
+    await writeFiles(f, { "homecenter-2026-01-01-0300.hcbackup.partial": "x", "movie.mkv.partial": "someone else's download", "a.hcbackup.partial": "not our name" })
+    expect(await cleanupPartials(f)).toBe(1)
+    expect((await readdir(f)).sort()).toEqual(["a.hcbackup.partial", "movie.mkv.partial"])
+  })
+
+  it("skips sidecars whose createdAt or kind is malformed instead of throwing", async () => {
+    const f = await tempDir()
+    await put(f, "homecenter-2026-01-01-0300.hcbackup", "2026-01-01T03:00:00.000Z")
+    for (const [file, bad] of [["homecenter-2026-01-02-0300.hcbackup", { createdAt: 123 }], ["homecenter-2026-01-03-0300.hcbackup", { kind: 7 }], ["homecenter-2026-01-04-0300.hcbackup", { createdAt: null }]] as const) {
+      await writeFiles(f, { [file]: "z", [file + ".meta.json"]: JSON.stringify({ ...side(file, "2026-01-02T03:00:00.000Z"), ...bad }) })
+    }
+    expect((await listBackups(f)).map((b) => b.file)).toEqual(["homecenter-2026-01-01-0300.hcbackup"])
   })
 
   it("reports folder status", async () => {
