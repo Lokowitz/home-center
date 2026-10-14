@@ -5,7 +5,6 @@ import {
   costPerMeter, costRange, stackedBuckets, sum, yearToDate,
   type Granularity,
 } from "@/lib/costs"
-import { meterUnitWord } from "@/lib/maintenance-due"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
@@ -77,7 +76,7 @@ export async function AssetCostPanel({
       <dl className="space-y-1.5 text-sm">
         <Row label={`${now.getFullYear()} to date`} value={fmt.money(sum(yearToDate(rows, now)))} />
         {perMeter != null && (
-          <Row label={`Per ${meterUnitWord(meterUnit!)}`} value={fmt.money(perMeter)} />
+          <Row label={`Per ${fmt.meterWord(meterUnit!)}`} value={fmt.money(perMeter)} />
         )}
         {purchasePrice != null && (
           <>

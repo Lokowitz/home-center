@@ -75,7 +75,7 @@ export default async function PropertyDetailPage({
           <Stat icon={Home} label="Type" value={typeLabel[property.type]} />
           <Stat icon={MapPin} label="Address" value={property.address} />
           {property.yearBuilt && <Stat icon={Calendar} label="Year Built" value={property.yearBuilt.toString()} />}
-          {property.sqFt && <Stat icon={Maximize} label="Sq Footage" value={`${property.sqFt.toLocaleString()} ft²`} />}
+          {property.sqFt && <Stat icon={Maximize} label={fmt.areaLabel} value={fmt.area(property.sqFt)} />}
           {property.purchasePrice && <Stat icon={DollarSign} label="Purchase Price" value={fmt.moneyWhole(property.purchasePrice)} />}
           {property.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(property.purchaseDate).toLocaleDateString()} />}
         </div>

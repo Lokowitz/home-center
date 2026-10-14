@@ -10,8 +10,8 @@ import { MaintenanceList } from "@/components/maintenance/maintenance-list"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { VehicleEditButton } from "@/components/vehicles/vehicle-edit-button"
+import { getFormat } from "@/lib/regional-server"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
-import { meterUnitNoun, meterUnitShort } from "@/lib/maintenance-due"
 
 export default async function VehicleDetailPage({
   params,
@@ -22,6 +22,7 @@ export default async function VehicleDetailPage({
 }) {
   const { id } = await params
   const { tab, open } = await searchParams
+  const fmt = await getFormat()
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) notFound()
 
@@ -43,7 +44,7 @@ export default async function VehicleDetailPage({
           <Stat icon={Factory} label="Make" value={vehicle.make} />
           <Stat icon={Tag} label="Model" value={vehicle.model} />
           <Stat icon={Calendar} label="Year" value={vehicle.year.toString()} />
-          {vehicle.currentMileage != null && <Stat icon={Gauge} label={meterUnitNoun(vehicle.meterUnit)} value={`${vehicle.currentMileage.toLocaleString()} ${meterUnitShort(vehicle.meterUnit)}`} />}
+          {vehicle.currentMileage != null && <Stat icon={Gauge} label={fmt.meterNoun(vehicle.meterUnit)} value={`${vehicle.currentMileage.toLocaleString()} ${fmt.meterShort(vehicle.meterUnit)}`} />}
           {vehicle.color && <Stat icon={Palette} label="Color" value={vehicle.color} />}
           {vehicle.vin && <Stat icon={Fingerprint} label="VIN" value={vehicle.vin} mono />}
           {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(vehicle.purchaseDate).toLocaleDateString()} />}

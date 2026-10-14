@@ -9,7 +9,7 @@ import { ReminderRow } from "@/components/dashboard/reminder-row"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { loadActivityIndex, mostRecentlyActive } from "@/lib/asset-activity"
 import { assetHref } from "@/lib/assets"
-import { scheduleDue, dueCandidateFilter, meterUnitShort, type Due } from "@/lib/maintenance-due"
+import { scheduleDue, dueCandidateFilter, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { loadCostRecords } from "@/lib/costs-server"
 import { bucketed, priorPeriod, sum, yearToDate } from "@/lib/costs"
@@ -20,6 +20,7 @@ import { listInboxItems } from "@/lib/inbox-server"
 import { IntakeCard } from "@/components/dashboard/intake-card"
 import { FreshStartCard } from "@/components/dashboard/fresh-start-card"
 import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 
 // Months of history in the dashboard's spending chart. Twelve rather than six:
 // six months cannot show a season, and a household's spending is seasonal.
@@ -175,7 +176,7 @@ export default async function DashboardPage() {
                   assetName={assets.assetName(s.assetType, s.assetId)}
                   href={assetHref(s.assetType, s.assetId)}
                   overdue={due.overdue}
-                  dueLabel={dueLabel(due)}
+                  dueLabel={dueLabel(due, fmt)}
                   currentMileage={reading?.value ?? null}
                   meterUnit={reading?.unit ?? "MILES"}
                 />
@@ -271,9 +272,9 @@ export default async function DashboardPage() {
 }
 
 // Mileage-driven rows have no meaningful day count, so they report the meter instead.
-function dueLabel(due: Due) {
+function dueLabel(due: Due, fmt: Formatter) {
   if (due.reason === "mileage" && due.milesLeft != null) {
-    const unit = meterUnitShort(due.meterUnit ?? "MILES")
+    const unit = fmt.meterShort(due.meterUnit ?? "MILES")
     return due.milesLeft < 0
       ? `${Math.abs(due.milesLeft).toLocaleString()} ${unit} over`
       : `${due.milesLeft.toLocaleString()} ${unit}`

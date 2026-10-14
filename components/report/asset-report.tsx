@@ -1,7 +1,7 @@
 import { AssetImage } from "@/components/asset-image"
 import { assetLabel } from "@/lib/assets"
 import { averagePerMonth, categoryLabel, costPerMeter, sum, UNCATEGORIZED } from "@/lib/costs"
-import { meterUnitShort, meterUnitWord, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
+import { scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
 import type { ReportData, ReportSchedule, ReportService, ReportWarranty } from "@/lib/report-server"
 import type { ServiceCategory } from "@/app/generated/prisma/client"
 import { Empty, SectionTitle } from "./report-parts"
@@ -112,7 +112,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
           )}
           {perMeter != null ? (
             <Stat
-              label={`Cost per ${meterUnitWord(asset.meterUnit!)}`}
+              label={`Cost per ${fmt.meterWord(asset.meterUnit!)}`}
               value={fmt.money(perMeter)}
             />
           ) : asset.purchasePrice != null ? (
@@ -142,7 +142,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
 
       <ServiceHistory services={services} asset={data.asset} total={lifetime} fmt={fmt} />
       {!isPerson && <Warranties warranties={warranties} now={now} />}
-      <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} />
+      <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} fmt={fmt} />
 
       <footer
         className="mt-9 border-t pt-3 text-[8.5pt]"
@@ -262,7 +262,7 @@ function ServiceHistory({
   fmt: Formatter
 }) {
   const showMeter = asset.type === "VEHICLE" && services.some((s) => s.mileageAtService != null)
-  const unit = meterUnitShort(asset.meterUnit ?? "MILES")
+  const unit = fmt.meterShort(asset.meterUnit ?? "MILES")
 
   return (
     <section className="report-section mt-7">
@@ -410,13 +410,15 @@ function Maintenance({
   mileage,
   asset,
   now,
+  fmt,
 }: {
   schedules: ReportSchedule[]
   mileage: MileageIndex
   asset: ReportData["asset"]
   now: Date
+  fmt: Formatter
 }) {
-  const unit = meterUnitShort(asset.meterUnit ?? "MILES")
+  const unit = fmt.meterShort(asset.meterUnit ?? "MILES")
 
   return (
     <section className="report-section mt-7">

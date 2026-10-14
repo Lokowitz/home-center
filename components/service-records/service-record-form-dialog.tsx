@@ -16,7 +16,6 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createServiceRecord, updateServiceRecord } from "@/lib/actions/service-records"
 import { deleteAttachment } from "@/lib/actions/attachments"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import { matchingReminder } from "@/lib/maintenance-match"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { ASSET_TYPES } from "@/lib/assets"
@@ -406,7 +405,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{meterUnitNoun(meterUnit)} at Service</FormLabel>
+                    <FormLabel>{fmt.meterNoun(meterUnit)} at Service</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

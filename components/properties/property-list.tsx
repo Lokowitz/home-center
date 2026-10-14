@@ -35,7 +35,7 @@ const columnsFor = (fmt: Formatter): AssetColumn<Property>[] => [
   { key: "name", label: "Name", cell: (p) => <span className="font-medium">{p.name}</span> },
   { key: "type", label: "Type", cell: (p) => <Badge variant="secondary" className="text-xs">{typeLabel[p.type]}</Badge> },
   { key: "address", label: "Address", className: "text-muted-foreground max-w-[280px] truncate", cell: (p) => p.address },
-  { key: "sqFt", label: "Sq Ft", className: "text-muted-foreground whitespace-nowrap", cell: (p) => (p.sqFt ? p.sqFt.toLocaleString() : "—") },
+  { key: "sqFt", label: fmt.areaShort === "ft²" ? "Sq Ft" : fmt.areaShort, className: "text-muted-foreground whitespace-nowrap", cell: (p) => (p.sqFt ? p.sqFt.toLocaleString() : "—") },
   { key: "yearBuilt", label: "Built", className: "text-muted-foreground whitespace-nowrap", cell: (p) => p.yearBuilt ?? "—" },
   { key: "purchasePrice", label: "Price", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (p) => (p.purchasePrice ? fmt.moneyWhole(p.purchasePrice) : "—") },
 ]
@@ -48,7 +48,7 @@ function toCard(p: Property, fmt: Formatter) {
     badge: typeLabel[p.type],
     meta: [
       { icon: MapPin, text: p.address, clamp: true },
-      ...(p.sqFt ? [{ text: `${p.sqFt.toLocaleString()} sq ft` }] : []),
+      ...(p.sqFt ? [{ text: fmt.area(p.sqFt) }] : []),
       ...(p.yearBuilt ? [{ text: `Built ${p.yearBuilt}` }] : []),
       ...(p.purchasePrice ? [{ text: fmt.moneyWhole(p.purchasePrice) }] : []),
     ],

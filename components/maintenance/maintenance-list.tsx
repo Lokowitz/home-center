@@ -20,7 +20,9 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import { scheduleDue, dueBadge, isSnoozed, meterUnitShort, type MileageIndex } from "@/lib/maintenance-due"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
+import { scheduleDue, dueBadge, isSnoozed, type MileageIndex } from "@/lib/maintenance-due"
 import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 type MaintenanceScheduleWithAttachments = MaintenanceSchedule & { attachments: Attachment[] }
@@ -47,7 +49,7 @@ interface Props {
   openId?: string
 }
 
-function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number | null | undefined, meterUnit: MeterUnit) {
+function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number | null | undefined, meterUnit: MeterUnit, fmt: Formatter) {
   // One-entry index: this list only ever shows a single asset's schedules, and
   // the odometer is already on the page.
   const mileage: MileageIndex = new Map(
@@ -59,7 +61,7 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
     return { label: `Snoozed to ${new Date(s.snoozedUntil!).toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
   }
   const due = scheduleDue(s, mileage)
-  const badge = dueBadge(due, s.nextDueDate != null || s.nextDueMileage != null)
+  const badge = dueBadge(due, s.nextDueDate != null || s.nextDueMileage != null, fmt)
   if (!badge) return null
   const icon = due.overdue ? AlertTriangle : due.dueSoon ? Clock : CheckCircle2
   return { ...badge, label: due.dueSoon ? "Due soon" : badge.label, icon }
@@ -75,6 +77,7 @@ const stickyActions =
 
 export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, openId }: Props) {
   const router = useRouter()
+  const fmt = useFormat()
   const [schedules, setSchedules] = useState(initialSchedules)
   const [prevInitialSchedules, setPrevInitialSchedules] = useState(initialSchedules)
   const [editing, setEditing] = useState<MaintenanceScheduleWithAttachments | null>(null)
@@ -165,7 +168,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
             </TableHeader>
             <TableBody>
               {table.rows.map((s) => {
-                const status = getStatus(s, currentMileage, meterUnit)
+                const status = getStatus(s, currentMileage, meterUnit, fmt)
                 const StatusIcon = status?.icon
                 const expanded = expandedId === s.id
                 return (
@@ -208,12 +211,12 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {s.nextDueDate && <div>{new Date(s.nextDueDate).toLocaleDateString()}</div>}
-                      {s.nextDueMileage != null && <div>{s.nextDueMileage.toLocaleString()} {meterUnitShort(meterUnit)}</div>}
+                      {s.nextDueMileage != null && <div>{s.nextDueMileage.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
                       {!s.nextDueDate && s.nextDueMileage == null && "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {s.intervalDays && <div>Every {s.intervalDays}d</div>}
-                      {s.intervalMiles && <div>Every {s.intervalMiles.toLocaleString()} {meterUnitShort(meterUnit)}</div>}
+                      {s.intervalMiles && <div>Every {s.intervalMiles.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
                       {!s.intervalDays && !s.intervalMiles && "—"}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">

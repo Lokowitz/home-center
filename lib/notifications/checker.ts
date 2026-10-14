@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 import { notificationService, type NotificationPayload } from "./channels"
-import { scheduleDue, dueCandidateFilter, meterUnitWord, type Due } from "@/lib/maintenance-due"
+import { scheduleDue, dueCandidateFilter, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { daysUntil, HEALTH_WINDOWS, immunizationDue, insuranceExpiring, isSupersededImmunization, refillDue } from "@/lib/health"
 import { ownedWhere } from "@/lib/features"
@@ -23,9 +25,9 @@ function dueWhen(days: number) {
 
 // Says which of the two clocks ran out, so "due soon" on an oil change reads
 // "in 300 miles" rather than a date the owner may be nowhere near.
-function dueMessage(title: string, due: Due) {
+function dueMessage(title: string, due: Due, fmt: Formatter) {
   if (due.reason === "mileage" && due.milesLeft != null) {
-    const word = meterUnitWord(due.meterUnit ?? "MILES")
+    const word = fmt.meterWord(due.meterUnit ?? "MILES")
     return due.milesLeft < 0
       ? `"${title}" was due ${plural(Math.abs(due.milesLeft), word)} ago.`
       : `"${title}" is due in ${plural(due.milesLeft, word)}.`
@@ -57,6 +59,7 @@ export async function checkAndNotify(): Promise<number> {
   })
   if (users.length === 0) return 0
 
+  const fmt = await getFormat()
   const now = new Date()
   const startOfToday = new Date(now)
   startOfToday.setUTCHours(0, 0, 0, 0)
@@ -124,7 +127,7 @@ export async function checkAndNotify(): Promise<number> {
         userId: user.id,
         type: "MAINTENANCE_DUE",
         title: due.overdue ? `Overdue: ${s.title}` : stage === "DUE" ? `Due today: ${s.title}` : `Due soon: ${s.title}`,
-        message: dueMessage(s.title, due),
+        message: dueMessage(s.title, due, fmt),
         relatedEntityId: s.id,
         relatedEntityType: "MaintenanceSchedule",
         cycleKey,

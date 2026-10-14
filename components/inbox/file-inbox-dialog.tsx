@@ -15,7 +15,6 @@ import { AssetSelect, type InboxAssetOption, type InboxReminderOption } from "@/
 import { fileInboxItem } from "@/lib/actions/inbox"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { BellRing } from "lucide-react"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import { matchingReminder } from "@/lib/maintenance-match"
 import { NO_CATEGORY, fieldErrorTarget, fileFormPayload, parseAssetKey, type FileFormValues } from "@/lib/inbox-form"
 // Type only: service-record-server reaches Prisma.
@@ -218,7 +217,7 @@ export function FileInboxDialog({
               {asset?.assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{meterUnitNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
+                    <FormLabel>{fmt.meterNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
                     <FormControl><Input type="number" inputMode="numeric" placeholder={chosen?.meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

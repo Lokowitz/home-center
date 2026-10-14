@@ -18,7 +18,6 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import { meterUnitShort, meterUnitNoun } from "@/lib/maintenance-due"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 type RecordWithAttachments = ServiceRecord & { attachments: Attachment[] }
@@ -128,7 +127,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                 {showSource && <TableHead>Source</TableHead>}
                 <SortableTableHead column="cost" label="Cost" sortState={table.sortState} onToggle={table.toggleSort} />
                 {assetType === "VEHICLE" && (
-                  <SortableTableHead column="mileage" label={meterUnitNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
+                  <SortableTableHead column="mileage" label={fmt.meterNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
                 )}
                 <TableHead>Files</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -178,11 +177,11 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap">
-                        {record.cost != null ? fmt.moneyWhole(record.cost) : <span className="text-muted-foreground">—</span>}
+                        {record.cost != null ? fmt.money(record.cost) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       {assetType === "VEHICLE" && (
                         <TableCell className="whitespace-nowrap">
-                          {record.mileageAtService != null ? `${record.mileageAtService.toLocaleString()} ${meterUnitShort(meterUnit)}` : <span className="text-muted-foreground">—</span>}
+                          {record.mileageAtService != null ? `${record.mileageAtService.toLocaleString()} ${fmt.meterShort(meterUnit)}` : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                       )}
                       <TableCell onClick={(e) => e.stopPropagation()}>

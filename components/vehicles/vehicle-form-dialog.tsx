@@ -13,7 +13,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createVehicle, updateVehicle } from "@/lib/actions/vehicles"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 import type { Vehicle } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
@@ -158,7 +157,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="currentMileage" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Current {meterUnitNoun(form.watch("meterUnit"))}</FormLabel>
+                  <FormLabel>Current {fmt.meterNoun(form.watch("meterUnit"))}</FormLabel>
                   <FormControl><Input type="number" placeholder={form.watch("meterUnit") === "HOURS" ? "1250" : "45000"} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

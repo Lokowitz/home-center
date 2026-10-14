@@ -13,7 +13,8 @@ import { AssetViewToggle } from "@/components/assets/asset-view-toggle"
 import { useAssetView } from "@/components/assets/use-asset-view"
 import type { Accessor } from "@/lib/use-client-table"
 import type { AssetView } from "@/lib/asset-view"
-import { meterUnitShort } from "@/lib/maintenance-due"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
 import type { Vehicle } from "@/app/generated/prisma/client"
 
 const ACCESSORS: Record<string, Accessor<Vehicle>> = {
@@ -25,23 +26,23 @@ const ACCESSORS: Record<string, Accessor<Vehicle>> = {
   vin: (v) => v.vin,
 }
 
-const COLUMNS: AssetColumn<Vehicle>[] = [
+const columnsFor = (fmt: Formatter): AssetColumn<Vehicle>[] => [
   { key: "name", label: "Name", cell: (v) => <span className="font-medium">{v.name}</span> },
   { key: "year", label: "Year", className: "text-muted-foreground whitespace-nowrap", cell: (v) => v.year },
   { key: "make", label: "Make / Model", className: "text-muted-foreground", cell: (v) => `${v.make} ${v.model}` },
-  { key: "currentMileage", label: "Mileage", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (v) => (v.currentMileage != null ? `${v.currentMileage.toLocaleString()} ${meterUnitShort(v.meterUnit)}` : "—") },
+  { key: "currentMileage", label: "Mileage", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (v) => (v.currentMileage != null ? `${v.currentMileage.toLocaleString()} ${fmt.meterShort(v.meterUnit)}` : "—") },
   { key: "color", label: "Color", className: "text-muted-foreground", cell: (v) => v.color ?? "—" },
   { key: "vin", label: "VIN", className: "text-muted-foreground font-mono text-xs max-w-[180px] truncate", cell: (v) => v.vin ?? "—" },
 ]
 
 const INITIAL_DIRS = { year: "desc" as const, currentMileage: "desc" as const }
 
-function toCard(v: Vehicle) {
+function toCard(v: Vehicle, fmt: Formatter) {
   return {
     name: v.name,
     subtitle: `${v.year} ${v.make} ${v.model}`,
     meta: [
-      ...(v.currentMileage != null ? [{ icon: Gauge, text: `${v.currentMileage.toLocaleString()} ${meterUnitShort(v.meterUnit)}` }] : []),
+      ...(v.currentMileage != null ? [{ icon: Gauge, text: `${v.currentMileage.toLocaleString()} ${fmt.meterShort(v.meterUnit)}` }] : []),
       ...(v.color ? [{ text: v.color }] : []),
     ],
     mono: v.vin ? `VIN: ${v.vin}` : null,
@@ -55,6 +56,7 @@ interface Props {
 
 export function VehicleList({ vehicles, initialView }: Props) {
   const router = useRouter()
+  const fmt = useFormat()
   const [view, setView] = useAssetView("vehicles", initialView)
   const [editing, setEditing] = useState<Vehicle | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -114,8 +116,8 @@ export function VehicleList({ vehicles, initialView }: Props) {
           view={view}
           assetType="VEHICLE"
           imageFilenameOf={(v) => v.imageFilename}
-          toCard={toCard}
-          columns={COLUMNS}
+          toCard={(v) => toCard(v, fmt)}
+          columns={columnsFor(fmt)}
           accessors={ACCESSORS}
           defaultSort="name"
           defaultDir="asc"
