@@ -1,5 +1,5 @@
 // Engine file: relative imports and npm packages only.
-import { rm } from "node:fs/promises"
+import { rm, stat } from "node:fs/promises"
 import v8 from "node:v8"
 import { runInNewContext } from "node:vm"
 import { createClient, type Client } from "@libsql/client"
@@ -108,6 +108,20 @@ export async function latestMigration(dbPath: string): Promise<string | null> {
     const r = await c.execute(`SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name DESC LIMIT 1`)
     return r.rows[0] ? String(r.rows[0].migration_name) : null
   })
+}
+
+/** Highest User.sessionVersion in a database, or null when there is none to read (no file, older schema, unreadable). */
+export async function maxSessionVersion(dbPath: string): Promise<number | null> {
+  // Opening a missing path would create an empty database there.
+  if (!(await stat(dbPath).then((s) => s.isFile(), () => false))) return null
+  try {
+    return await withDb(dbPath, async (c) => {
+      const v = (await c.execute(`SELECT MAX("sessionVersion") AS v FROM "User"`)).rows[0]?.v
+      return v === null || v === undefined ? null : Number(v)
+    })
+  } catch {
+    return null
+  }
 }
 
 export const COUNTED_MODELS = [

@@ -35,6 +35,13 @@ export function safeJoin(root: string, rel: string): string | null {
   return full.startsWith(path.resolve(root) + path.sep) ? full : null
 }
 
+/** True when child is dir itself or anything inside it (case-insensitive on Windows). */
+export function containsPath(dir: string, child: string): boolean {
+  const norm = (p: string) => (process.platform === "win32" ? path.resolve(p).toLowerCase() : path.resolve(p))
+  const rel = path.relative(norm(dir), norm(child))
+  return rel === "" || (rel.split(path.sep)[0] !== ".." && !path.isAbsolute(rel))
+}
+
 /** Migration folder names this build knows, oldest first. */
 export async function appMigrations(dir = path.join(process.cwd(), "prisma", "migrations")): Promise<string[]> {
   const names = await readdir(dir)

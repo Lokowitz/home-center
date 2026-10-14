@@ -302,6 +302,9 @@ export async function prunePre(restoreDir: string, now: Date, days = 7): Promise
 
 const safeStamp = (d: Date) => d.toISOString().replace(/[:.]/g, "-")
 
+/** The pre-* folder an apply at appliedAt moved the displaced household into. */
+export const preDirFor = (restoreDir: string, appliedAt: string) => path.join(restoreDir, `pre-${safeStamp(new Date(appliedAt))}`)
+
 /** Swap the staged household in. Runs before Prisma connects (boot script or CLI). Any failure puts everything back. */
 export async function applyPending(
   paths: RestorePaths,
@@ -336,7 +339,7 @@ export async function applyPending(
   base.backupCreatedAt = meta.backupCreatedAt
   base.source = meta.source
 
-  const pre = path.join(paths.restoreDir, `pre-${stampText}`)
+  const pre = preDirFor(paths.restoreDir, base.appliedAt)
   const moves: [from: string, to: string][] = []
   const move = async (from: string, to: string) => {
     await fsOps.rename(from, to)

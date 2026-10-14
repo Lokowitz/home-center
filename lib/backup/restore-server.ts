@@ -1,10 +1,12 @@
-import { readFile, rm } from "node:fs/promises"
+import { readdir, readFile, rm } from "node:fs/promises"
 import path from "node:path"
 import { prisma } from "@/lib/prisma"
 import { SETTINGS_ID } from "@/lib/notifications/mail-config"
-import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "./paths"
-import { isBlocking, markFinalized, prunePre, readResult, type RestorePaths } from "./restore"
+import { containsPath, dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "./paths"
+import { isBlocking, markFinalized, preDirFor, prunePre, readResult, type RestorePaths } from "./restore"
+import { maxSessionVersion } from "./snapshot"
 import { raiseBackupAlert } from "./alerts-server"
+import { backupFolder, loadBackupSettings } from "./settings-server"
 
 export const restorePaths = (): RestorePaths => ({
   dbPath: dbPathFromUrl(process.env.DATABASE_URL), uploadDir: uploadDir(), restoreDir: restoreDir(), searchIndexPath: searchIndexFile(),
@@ -29,16 +31,66 @@ async function reWrapSecrets(dir: string): Promise<void> {
   await rm(file, { force: true })
 }
 
+/**
+ * A version above every one any session can hold: above the displaced household's highest (sessions
+ * were issued from it) and at least the minutes since 1970, which keeps rising across restores and
+ * fits the Int column (seconds would overflow it in 2038). Restored rows never go down.
+ */
+async function signEveryoneOut(dir: string, appliedAt: string, now: Date): Promise<void> {
+  const displaced = await maxSessionVersion(path.join(preDirFor(dir, appliedAt), "homecenter.db"))
+  const floor = Math.max(Math.floor(now.getTime() / 60_000), (displaced ?? 0) + 1)
+  const users = await prisma.user.findMany({ select: { id: true, sessionVersion: true } })
+  for (const u of users) {
+    await prisma.user.update({ where: { id: u.id }, data: { sessionVersion: Math.max(u.sessionVersion + 1, floor) } })
+  }
+}
+
+/**
+ * Empties the work folder at boot: a crash can leave plaintext there (snapshots, unlocked archives with
+ * secrets, exports). Skipped, with a warning, if the work folder is or holds live data or backups.
+ */
+export async function clearWorkDir(dir: string, keepOut: string[]): Promise<boolean> {
+  const clash = keepOut.find((p) => containsPath(dir, p))
+  if (clash) {
+    console.warn(`[backup] not clearing ${dir}: it is or holds ${clash}`)
+    return false
+  }
+  for (const n of await readdir(dir).catch(() => [] as string[])) {
+    await rm(path.join(dir, n), { recursive: true, force: true }).catch(() => undefined)
+  }
+  return true
+}
+
+async function clearWorkAtBoot(): Promise<void> {
+  const p = restorePaths()
+  const folder = await loadBackupSettings().then(backupFolder, () => null)
+  if (folder === null) return void console.warn("[backup] not clearing the work folder: couldn't read where backups go")
+  await clearWorkDir(workDir(), [p.restoreDir, folder, p.dbPath, p.uploadDir, p.searchIndexPath])
+}
+
 /** After boot (migrations done): finish what the apply step started. Idempotent: a crash part-way is finished by the next boot without repeating what was done. */
 export async function finalizeRestore(now = new Date()): Promise<void> {
   const dir = restoreDir()
+  try {
+    await finishResult(dir, now)
+  } finally {
+    // Runs even when finishing the notice failed: nothing unlocked or plaintext should outlive a restart.
+    await prunePre(dir, now).catch((e) => console.error("[restore] couldn't prune the undo point:", e))
+    await rm(path.join(dir, "work"), { recursive: true, force: true }).catch(() => undefined)
+    await rm(path.join(dir, "incoming"), { recursive: true, force: true }).catch(() => undefined)
+    // Nothing in the work folder outlives a restart, exports (one-time downloads) included.
+    await clearWorkAtBoot().catch((e) => console.error("[backup] couldn't clear the work folder:", e))
+  }
+}
+
+async function finishResult(dir: string, now: Date): Promise<void> {
   const result = await readResult(dir)
   // A failed restore that displaced data is not finalized: the app reports it from result.json until it is acknowledged.
   if (result && !result.finalized && !isBlocking(result)) {
     if (result.status === "ok") {
       await reWrapSecrets(dir)
       // Everyone signs in again, with the accounts in the restored data. A repeat after a crash only signs them out once more.
-      await prisma.user.updateMany({ data: { sessionVersion: { increment: 1 } } })
+      await signEveryoneOut(dir, result.appliedAt, now)
       // The run that made this backup was RUNNING when it was snapshotted; its real record is the file.
       await prisma.backupRun.deleteMany({ where: { status: "RUNNING" } })
     }
@@ -61,11 +113,6 @@ export async function finalizeRestore(now = new Date()): Promise<void> {
     )
     await markFinalized(dir)
   }
-  await prunePre(dir, now)
-  await rm(path.join(dir, "work"), { recursive: true, force: true })
-  await rm(path.join(dir, "incoming"), { recursive: true, force: true })
-  // Exports are one-time downloads; none survives a restart. Only this folder is ever removed.
-  await rm(path.join(workDir(), "exports"), { recursive: true, force: true })
 }
 
 /** Exits so Docker's restart policy starts a fresh process that applies the staged restore. */
