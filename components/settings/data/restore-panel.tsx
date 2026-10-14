@@ -144,7 +144,7 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
 
 function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?: () => void }) {
   const close = (
-    <button type="button" className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50" aria-label="Dismiss" disabled={!onDismiss} onClick={onDismiss}>
+    <button type="button" className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50" aria-label="Dismiss this notice" disabled={!onDismiss} onClick={onDismiss}>
       <X className="h-4 w-4" aria-hidden="true" />
     </button>
   )
