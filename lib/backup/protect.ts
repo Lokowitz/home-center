@@ -43,8 +43,10 @@ export async function protectFile(plainPath: string, destPath: string, cfg: Prot
     }
     throw new Error("protectFile called without protection")
   } catch (e) {
-    await rm(destPath, { force: true })
-    await rm(destPath + ".partial", { force: true })
+    // Best effort: force only ignores ENOENT, but Linux reports ENOTDIR for a path under a file, and
+    // a cleanup error must never hide the real one.
+    await rm(destPath, { force: true }).catch(() => undefined)
+    await rm(destPath + ".partial", { force: true }).catch(() => undefined)
     throw e
   }
 }
@@ -115,7 +117,8 @@ export async function unprotectFile(src: string, destPlain: string, secret: Unlo
     }
     return { ok: true }
   } catch (e) {
-    await rm(destPlain, { force: true })
+    // Best effort (see protectFile): this function never throws, and a failed cleanup must not change that.
+    await rm(destPlain, { force: true }).catch(() => undefined)
     const msg = e instanceof Error ? e.message : ""
     if (kind === "key" && /no identity matched/i.test(msg)) return { ok: false, error: WRONG_KEY, needs: "key" }
     if (kind === "password" && /invalid password|invalid signature|hmac/i.test(msg)) return { ok: false, error: WRONG_PASSWORD, needs: "password" }

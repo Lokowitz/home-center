@@ -71,6 +71,15 @@ describe("non-credential failures", () => {
     expect(missing).toMatchObject({ ok: false })
     expect(JSON.stringify(missing)).not.toContain("doesn't open")
   })
+  it("never throws when cleaning up an unusable destination (Linux reports ENOTDIR, an invalid path throws on any OS)", async () => {
+    const dir = await tempDir()
+    const dest = path.join(dir, "c.hcbackup.zip")
+    await protectFile(await plain(dir), dest, { mode: "password", password: "abcdef" }, "c.hcbackup.zip")
+    const bad = await unprotectFile(dest, path.join(dir, "bad\0name"), { password: "abcdef" })
+    expect(bad).toMatchObject({ ok: false })
+    expect(JSON.stringify(bad)).not.toContain("abcdef")
+    await expect(protectFile(await plain(dir), path.join(dir, "bad\0name.zip"), { mode: "password", password: "abcdef" }, "x.zip")).rejects.toThrow()
+  })
   it("does not detect an unencrypted single-entry zip or a truncated zip as password", async () => {
     const dir = await tempDir()
     const { ArchiveWriter } = await import("./archive")
