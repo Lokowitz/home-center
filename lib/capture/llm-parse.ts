@@ -40,7 +40,10 @@ function validDate(v: unknown): string | null {
 
 function validTotal(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null
-  return typeof v === "string" ? parseAmount(v) : null
+  if (typeof v !== "string") return null
+  // The prompt asks for a dot decimal, so "12.500" is 12.5, not twelve thousand five hundred.
+  if (/^-?\d+\.\d+$/.test(v.trim())) return Number(v.trim())
+  return parseAmount(v)
 }
 
 function validVendor(v: unknown): string | null {

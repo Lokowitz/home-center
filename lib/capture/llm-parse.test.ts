@@ -35,6 +35,9 @@ describe("receiptPrompt", () => {
   it("accepts a European total string", () => {
     expect(parseLlmReply('{"date":null,"total":"1.234,56","vendor":null}')?.total).toBe(1234.56)
   })
+  it("reads a dot-decimal string as a decimal, not thousands", () => {
+    expect(parseLlmReply('{"date":null,"total":"12.500","vendor":null}')?.total).toBe(12.5)
+  })
 })
 
 describe("parseLlmReply", () => {

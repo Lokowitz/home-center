@@ -52,7 +52,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
           <Label>Currency</Label>
           <Select value={value.currency} onValueChange={(v) => v && set("currency", v)}>
             <SelectTrigger className="w-full sm:w-64" disabled={pending}>
-              <SelectValue>{(v: string) => currencyLabel(v)}</SelectValue>
+              <SelectValue suppressHydrationWarning>{(v: string) => currencyLabel(v)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {currencies.map((c) => (
@@ -97,7 +97,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
             </SelectTrigger>
             <SelectContent>
               {DATE_FORMATS.map((f) => (
-                <SelectItem key={f} value={f}>{dateLabel(f)}</SelectItem>
+                <SelectItem key={f} value={f} suppressHydrationWarning>{dateLabel(f)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -114,7 +114,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
           24-hour clock
         </label>
 
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground" suppressHydrationWarning>
           Preview: {preview.money(1234.56)} · {(12345).toLocaleString()} {preview.distanceShort} · {preview.area(1200)} · {preview.dateTime(now)}
         </p>
 

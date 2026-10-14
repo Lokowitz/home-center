@@ -1,3 +1,5 @@
+"use client"
+
 import { useFormat } from "@/components/regional-provider"
 import type { Formatter } from "@/lib/regional"
 import type { WeekBucket } from "@/lib/observations"

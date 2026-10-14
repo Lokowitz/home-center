@@ -22,6 +22,7 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": [
         "error",
         { selector: "CallExpression[callee.property.name=/^toLocale(Date|Time)String$/]", message: "Use fmt.date/fmt.time from lib/regional.ts." },
+        { selector: "CallExpression[callee.property.name='toLocaleString'][callee.object.type='NewExpression'][callee.object.callee.name='Date']", message: "Use fmt.dateTime from lib/regional.ts." },
         { selector: "Literal[value='USD']", message: "Use the household currency (getFormat/useFormat)." },
       ],
     },

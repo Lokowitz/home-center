@@ -6,6 +6,7 @@ import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "
 import { isBlocking, markFinalized, preDirFor, prunePre, readResult, type RestorePaths } from "./restore"
 import { maxSessionVersion } from "./snapshot"
 import { raiseBackupAlert } from "./alerts-server"
+import { getFormat } from "@/lib/regional-server"
 import { sweepRefusal, sweepWorkFiles, type KeepOut, type SweepFs } from "./work-sweep"
 import { backupFolder, loadBackupSettings } from "./settings-server"
 
@@ -109,7 +110,7 @@ async function finishResult(dir: string, now: Date): Promise<void> {
         data: { kind: "RESTORE", trigger: "MANUAL", status: result.status === "ok" ? "OK" : "FAILED", startedAt, finishedAt: now, error: result.error },
       })
     }
-    const when = result.backupCreatedAt ? new Date(result.backupCreatedAt).toLocaleString() : "an earlier state"
+    const when = result.backupCreatedAt ? (await getFormat()).dateTime(new Date(result.backupCreatedAt)) : "an earlier state"
     const failedText = result.rolledBack
       ? `${result.error} Nothing was changed.`
       : `${result.error} Your data is in ${result.recoveryDirs.join(", ") || "the restore folder"}.`

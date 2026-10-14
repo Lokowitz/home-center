@@ -4,6 +4,7 @@ import { listBackups } from "./store"
 import { backupFolder, loadBackupSettings } from "./settings-server"
 import { isJobRunning, markInterruptedRuns, startBackupJob } from "./jobs-server"
 import { raiseBackupAlert } from "./alerts-server"
+import { getFormat } from "@/lib/regional-server"
 
 const TICK_MS = 15 * 60_000
 const BOOT_DELAY_MS = 20_000
@@ -21,8 +22,7 @@ async function tick(now = new Date()) {
     await raiseBackupAlert(
       `stale:${newest?.createdAt ?? "none"}`,
       "Backups are behind",
-      // eslint-disable-next-line no-restricted-syntax -- machine-facing backup timestamp, not household display
-      newestAt ? `The last backup is from ${newestAt.toLocaleDateString()}. Check Settings → Data.` : "No backup has been made yet. Check Settings → Data.",
+      newestAt ? `The last backup is from ${(await getFormat()).date(newestAt)}. Check Settings → Data.` : "No backup has been made yet. Check Settings → Data.",
     )
   }
 }
