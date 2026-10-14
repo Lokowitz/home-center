@@ -1,11 +1,12 @@
-import { readdir, readFile, rm } from "node:fs/promises"
+import { readFile, rm, stat } from "node:fs/promises"
 import path from "node:path"
 import { prisma } from "@/lib/prisma"
 import { SETTINGS_ID } from "@/lib/notifications/mail-config"
-import { containsPath, dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "./paths"
+import { dbPathFromUrl, restoreDir, searchIndexFile, uploadDir, workDir } from "./paths"
 import { isBlocking, markFinalized, preDirFor, prunePre, readResult, type RestorePaths } from "./restore"
 import { maxSessionVersion } from "./snapshot"
 import { raiseBackupAlert } from "./alerts-server"
+import { sweepRefusal, sweepWorkFiles, type KeepOut, type SweepFs } from "./work-sweep"
 import { backupFolder, loadBackupSettings } from "./settings-server"
 
 export const restorePaths = (): RestorePaths => ({
@@ -46,18 +47,18 @@ async function signEveryoneOut(dir: string, appliedAt: string, now: Date): Promi
 }
 
 /**
- * Empties the work folder at boot: a crash can leave plaintext there (snapshots, unlocked archives with
- * secrets, exports). Skipped, with a warning, if the work folder is or holds live data or backups.
+ * Clears crash leftovers (snapshots, unlocked archives with secrets, export runs) from the work folder at
+ * boot. Refuses, with a warning, unless the work folder provably isn't and doesn't hold live data or
+ * backups (see work-sweep.ts); even then only the engine's own file names are removed.
  */
-export async function clearWorkDir(dir: string, keepOut: string[]): Promise<boolean> {
-  const clash = keepOut.find((p) => containsPath(dir, p))
-  if (clash) {
-    console.warn(`[backup] not clearing ${dir}: it is or holds ${clash}`)
+export async function clearWorkDir(dir: string, keepOut: KeepOut[], fs?: SweepFs): Promise<boolean> {
+  if (!(await stat(dir).then((s) => s.isDirectory(), () => false))) return true
+  const why = await sweepRefusal(dir, keepOut, fs)
+  if (why) {
+    console.warn(`[backup] not clearing ${dir}: ${why}`)
     return false
   }
-  for (const n of await readdir(dir).catch(() => [] as string[])) {
-    await rm(path.join(dir, n), { recursive: true, force: true }).catch(() => undefined)
-  }
+  await sweepWorkFiles(dir)
   return true
 }
 
@@ -65,7 +66,14 @@ async function clearWorkAtBoot(): Promise<void> {
   const p = restorePaths()
   const folder = await loadBackupSettings().then(backupFolder, () => null)
   if (folder === null) return void console.warn("[backup] not clearing the work folder: couldn't read where backups go")
-  await clearWorkDir(workDir(), [p.restoreDir, folder, p.dbPath, p.uploadDir, p.searchIndexPath])
+  await clearWorkDir(workDir(), [
+    { path: p.restoreDir, label: "restore folder", both: true },
+    { path: folder, label: "backup folder", both: true },
+    { path: p.uploadDir, label: "upload folder", both: true },
+    // The database's folder always holds the work folder, so only the files themselves are checked.
+    { path: p.dbPath, label: "database", both: false },
+    { path: p.searchIndexPath, label: "search index", both: false },
+  ])
 }
 
 /** After boot (migrations done): finish what the apply step started. Idempotent: a crash part-way is finished by the next boot without repeating what was done. */

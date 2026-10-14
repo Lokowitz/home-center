@@ -1,5 +1,5 @@
 // npm run restore -- --ack   (after dealing with the data of a failed restore, lets HomeCenter start again)
-// npm run restore -- --cancel   (takes back a restore or undo that is staged and waiting for a restart)
+// npm run restore -- --cancel [--force]   (takes back a restore or undo that is staged and waiting for a restart)
 // npm run restore -- <file> [--dry-run] [--key kit.txt | --passphrase-env VAR] [--yes]
 // For when the app won't start. Stop HomeCenter first (refuses if it answers on PORT, unless --force).
 // In Docker run it in a fresh container as the app user (the running one may be restarting in a loop):
@@ -10,8 +10,8 @@ import { mkdir } from "node:fs/promises"
 import path from "node:path"
 import { createInterface } from "node:readline/promises"
 import { appMigrations, dbPathFromUrl, restoreDir, searchIndexFile, uploadDir } from "../lib/backup/paths"
-import { appIsRunning } from "../lib/backup/restore-boot"
-import { acknowledgeBlocking, ALREADY_STAGED, applyPending, cancelRestore, cancelStaged, dryRun, hasPending, stage } from "../lib/backup/restore"
+import { APP_RUNNING, appIsRunning, cancelFromCli } from "../lib/backup/restore-boot"
+import { acknowledgeBlocking, ALREADY_STAGED, applyPending, cancelRestore, dryRun, hasPending, stage } from "../lib/backup/restore"
 import { unlockArgs } from "../lib/backup/protect"
 
 async function main() {
@@ -22,9 +22,7 @@ async function main() {
     return
   }
   if (args[0] === "--cancel") {
-    const r = await cancelStaged(restoreDir())
-    if (!r.cancelled) console.log("Nothing to cancel: no restore is staged.")
-    else console.log(r.keptIn ? `Cancelled. The staged data was kept in ${r.keptIn}; nothing deletes it.` : "Cancelled the staged restore. Nothing was changed.")
+    console.log(await cancelFromCli(args, restoreDir(), process.env.PORT || "3000"))
     return
   }
   const file = args[0]
@@ -47,7 +45,7 @@ async function main() {
   }
   if (!args.includes("--force") && (await appIsRunning(process.env.PORT || "3000"))) {
     await cancelRestore(paths.restoreDir)
-    throw new Error("HomeCenter looks like it is running. Stop it first, then run this again (or add --force if that is not HomeCenter).")
+    throw new Error(APP_RUNNING)
   }
   if (!args.includes("--yes")) {
     if (!process.stdin.isTTY) {

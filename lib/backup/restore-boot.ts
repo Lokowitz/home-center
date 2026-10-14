@@ -1,5 +1,5 @@
 // Engine file: relative imports and npm packages only.
-import { isBlocking, type RestoreResult } from "./restore"
+import { cancelStaged, isBlocking, type RestoreResult } from "./restore"
 
 /**
  * What the boot-time apply step should print and whether startup may continue.
@@ -61,4 +61,17 @@ export async function appIsRunning(port: string, probe: (url: string, init: { si
   } catch {
     return false
   }
+}
+
+export const APP_RUNNING = "HomeCenter looks like it is running. Stop it first, then run this again (or add --force if that is not HomeCenter)."
+
+/** `npm run restore -- --cancel`. Like a restore, it refuses while HomeCenter answers on port, unless --force. Returns what to print. */
+export async function cancelFromCli(
+  args: string[], restoreDir: string, port: string,
+  probe: (url: string, init: { signal: AbortSignal }) => Promise<unknown> = fetch,
+): Promise<string> {
+  if (!args.includes("--force") && (await appIsRunning(port, probe))) throw new Error(APP_RUNNING)
+  const r = await cancelStaged(restoreDir)
+  if (!r.cancelled) return "Nothing to cancel: no restore is staged."
+  return r.keptIn ? `Cancelled. The staged data was kept in ${r.keptIn}; nothing deletes it.` : "Cancelled the staged restore. Nothing was changed."
 }

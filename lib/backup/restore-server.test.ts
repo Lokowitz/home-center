@@ -27,7 +27,7 @@ vi.mock("./settings-server", () => ({
   backupFolder: (s: { folder: string | null }) => s.folder ?? "/elsewhere/backups",
 }))
 
-import { finalizeRestore } from "./restore-server"
+import { clearWorkDir, finalizeRestore } from "./restore-server"
 import { preDirFor } from "./restore"
 
 const result = { status: "ok", error: null, backupCreatedAt: "2026-01-02T03:04:05.000Z", appliedAt: "2026-02-01T00:00:00.000Z", source: "backup", finalized: false, rolledBack: true, recoveryDirs: [] }
@@ -155,34 +155,46 @@ describe("finalizeRestore", () => {
     expect(versionsSet()).toEqual({ u1: Math.floor(now.getTime() / 60_000) })
   })
 
-  it("clears leftover plaintext work files at boot and keeps the folder", async () => {
+  it("clears leftover plaintext work files at boot, keeps the folder and anything that isn't a work file", async () => {
     const work = path.join(root, "backup-work")
     await writeFiles(work, {
-      "snapshot-1.db": "plain", "homecenter-2026-01-01-0300.hcbackup": "plain archive with secrets.json",
-      "export-2.db": "x", "a-export.zip": "x", "verify-cli-3.hcbackup": "x", "exports/run1/homecenter-export.zip": "x",
+      "snapshot-1a2b3c4d.db": "plain", "1a2b3c4d.hcbackup": "plain archive with secrets.json", "export-0f0f0f0f.db": "x",
+      "0f0f0f0f-export.zip": "x", "verify-cli-3.hcbackup": "x", "exports/run1/homecenter-export.zip": "x",
+      "homecenter-2026-01-01-0300.hcbackup": "a real backup someone put here", "notes.txt": "mine",
     })
     await finalizeRestore()
-    expect(await readdir(work)).toEqual([])
-    await writeFiles(work, { "snapshot-2.db": "plain" })
+    expect((await readdir(work)).sort()).toEqual(["homecenter-2026-01-01-0300.hcbackup", "notes.txt"])
+    await writeFiles(work, { "snapshot-2b3c4d5e.db": "plain" })
     alert.raise.mockRejectedValueOnce(new Error("crash"))
     await writeFile(path.join(dir, "result.json"), JSON.stringify({ ...result, appliedAt: "2026-02-03T00:00:00.000Z" }))
     await expect(finalizeRestore()).rejects.toThrow("crash")
-    expect(await readdir(work)).toEqual([]) // cleared even when finishing the notice failed
+    expect(await readdir(work)).not.toContain("snapshot-2b3c4d5e.db") // cleared even when finishing the notice failed
   })
 
   it("refuses to clear the work folder when it holds live data or backups", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
     const work = path.join(root, "backup-work")
-    await writeFiles(work, { "snapshot-1.db": "x", "uploads/receipt.pdf": "the only copy" })
+    await writeFiles(work, { "snapshot-1a2b3c4d.db": "x", "uploads/receipt.pdf": "the only copy" })
     for (const setup of [
       () => { process.env.UPLOAD_DIR = path.join(work, "uploads") },
       () => { process.env.UPLOAD_DIR = path.join(root, "uploads"); cfg.folder = work },
     ]) {
       setup()
       await finalizeRestore()
-      expect((await readdir(work)).sort()).toEqual(["snapshot-1.db", "uploads"])
+      expect((await readdir(work)).sort()).toEqual(["snapshot-1a2b3c4d.db", "uploads"])
     }
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("not clearing"))
+    warn.mockRestore()
+  })
+
+  it("deletes nothing when the safety check itself fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined)
+    const work = path.join(root, "backup-work")
+    await writeFiles(work, { "snapshot-1a2b3c4d.db": "x" })
+    const failing = { realpath: async () => { throw Object.assign(new Error("denied"), { code: "EACCES" }) }, stat: async () => ({ dev: BigInt(1), ino: BigInt(1) }) }
+    expect(await clearWorkDir(work, [{ path: path.join(root, "backups"), label: "backup folder", both: true }], failing)).toBe(false)
+    expect(await readdir(work)).toEqual(["snapshot-1a2b3c4d.db"])
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not clearing .*EACCES/))
     warn.mockRestore()
   })
 })

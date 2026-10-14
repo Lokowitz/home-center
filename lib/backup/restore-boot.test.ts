@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { appIsRunning, bootOutcome, crashOutcome } from "./restore-boot"
+import path from "node:path"
+import { existsSync } from "node:fs"
+import { appIsRunning, bootOutcome, cancelFromCli, crashOutcome } from "./restore-boot"
+import { tempDir, writeFiles } from "./test-support"
 import type { RestoreResult } from "./restore"
 
 const base: RestoreResult = { status: "ok", error: null, backupCreatedAt: "2026-01-02T03:04:05.000Z", appliedAt: "2026-02-01T00:00:00.000Z", source: "backup", finalized: false, rolledBack: true, recoveryDirs: [] }
@@ -79,5 +82,31 @@ describe("boot message and crash handling", () => {
     expect(await appIsRunning("4999", async (u) => void seen.push(u))).toBe(true)
     expect(seen).toEqual(["http://127.0.0.1:4999/api/health"])
     expect(await appIsRunning("4999", async () => { throw new Error("ECONNREFUSED") })).toBe(false)
+  })
+})
+
+describe("restore --cancel", () => {
+  const up = async () => undefined
+  const down = async () => { throw new Error("ECONNREFUSED") }
+  async function staged() {
+    const dir = await tempDir("hc-cancel-")
+    await writeFiles(dir, { "pending.json": JSON.stringify({ source: "backup", backupCreatedAt: null }), "staging/homecenter.db": "x" })
+    return dir
+  }
+
+  it("refuses while HomeCenter answers, and changes nothing", async () => {
+    const dir = await staged()
+    await expect(cancelFromCli(["--cancel"], dir, "4999", up)).rejects.toThrow(/looks like it is running/)
+    expect(existsSync(path.join(dir, "pending.json"))).toBe(true)
+    expect(existsSync(path.join(dir, "staging", "homecenter.db"))).toBe(true)
+  })
+
+  it("cancels when the app is stopped, or with --force", async () => {
+    const dir = await staged()
+    expect(await cancelFromCli(["--cancel"], dir, "4999", down)).toMatch(/Cancelled the staged restore/)
+    expect(existsSync(path.join(dir, "pending.json"))).toBe(false)
+    const dir2 = await staged()
+    expect(await cancelFromCli(["--cancel", "--force"], dir2, "4999", up)).toMatch(/Cancelled/)
+    expect(await cancelFromCli(["--cancel"], dir2, "4999", down)).toMatch(/Nothing to cancel/)
   })
 })
