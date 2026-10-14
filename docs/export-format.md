@@ -90,3 +90,58 @@ Remove the `'` if you need the original text. The JSON files are never changed t
 A protected export is a `.zip` with AES-256 encryption. It holds one inner zip, `<name>-inner.zip`, so even file names stay hidden.
 7-Zip opens it. So do most other tools that support AES zips. Enter the password, then open the inner zip.
 The password is at least 6 characters. It is not stored anywhere. If you lose it, the export cannot be opened.
+
+## Backup archive layout
+
+A backup is also a zip, but it is for restoring, not reading. Restore it in Settings → Data or with `npm run restore`.
+
+```
+homecenter-YYYY-MM-DD-HHmm.hcbackup
+  manifest.json       same fields as above, with kind "backup", scope null and migration set
+  db/homecenter.db    a consistent copy of the database (SQLite)
+  files/<upload rel>  every uploaded file, at its path inside the upload folder (for example files/service/<id>/<file>)
+  readable/           the same offline viewer, JSON and CSVs as an export, covering everything including health
+  secrets.json        only in protected backups: { "mailPassword", "llmApiKey" } in plain text inside the protection
+```
+
+An unprotected backup never contains `secrets.json`. Restoring one under a different `AUTH_SECRET` means re-entering the mail password and AI key.
+
+### Protection wrappers
+
+| Protection | File name | What it is |
+| --- | --- | --- |
+| None | `homecenter-….hcbackup` | The zip above. Any zip tool opens it. |
+| Recovery key | `homecenter-….hcbackup.age` | The `.hcbackup` encrypted with [age](https://age-encryption.org) to the recovery key's public half. Only the key file opens it. |
+| Password zip | `homecenter-….hcbackup.zip` | An AES-256 zip holding one entry, the `.hcbackup`, so even file names stay hidden. 7-Zip, WinRAR and Keka open it. |
+
+### Sidecar
+
+Next to every backup is `<file>.meta.json`, in plain text. It lets HomeCenter list and check a backup without opening it. It holds no record content.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| sidecarVersion | number | 1 today. |
+| file | string | The backup's file name. |
+| createdAt | string | ISO time. |
+| kind | "backup" | |
+| size | number | Bytes of the file as stored (after protection). |
+| sha256 | string | Hash of the file as stored. **Check this backup** compares it. |
+| appVersion | string | HomeCenter version that made it. |
+| migration | string | Latest database migration in the backup. |
+| protection | "none" \| "key" \| "password" | |
+| keyFingerprint | string \| null | Which recovery key it needs, for key-protected backups. |
+| warningCount | number | Files that were missing on disk when it was made. |
+
+HomeCenter lists, prunes and deletes only files that have a valid sidecar. Other files in the folder are left alone.
+
+## Opening a recovery-key backup with age
+
+You don't need HomeCenter to open a key-protected backup. Install [age](https://age-encryption.org) and use the recovery kit file you downloaded as the identity:
+
+```bash
+age -d -i homecenter-recovery-key.txt homecenter-2026-01-01-0300.hcbackup.age > homecenter-2026-01-01-0300.hcbackup
+```
+
+The result is the plain `.hcbackup` zip described above.
+
+Kit files downloaded before this version have text lines that age doesn't accept. For one of those, put the line that starts with `AGE-SECRET-KEY-1` in a file of its own and pass that file to `-i`.
