@@ -8,7 +8,7 @@
  * US line "Qty 2 450.00" is not read as 2,450.
  */
 export const AMOUNT_RE =
-  /(?:\p{Sc}\s?|\b[A-Z]{3}\s)?-?(?:\d{1,3}(?:[\s  ]\d{3})+,\d{2}|(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2})\b(?:\s?\p{Sc})?/gu
+  /(?:\p{Sc}\s?|\b[A-Z]{3}\s)?-?(?:\d{1,3}(?:[   ]\d{3})+,\d{2}|(?:\d{1,3}(?:[.,]\d{3})+|\d+)[.,]\d{2})\b(?:\s?\p{Sc})?/gu
 
 export function parseAmount(raw: string): number | null {
   const s = raw.replace(/\p{Sc}|\b[A-Z]{3}\b/gu, "").trim()

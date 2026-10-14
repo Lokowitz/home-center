@@ -38,6 +38,9 @@ describe("AMOUNT_RE", () => {
   it("does not glue a quantity onto a US price", () => {
     expect(found("Qty 2 450.00")).toEqual([450])
   })
+  it("does not glue numbers across a line break", () => {
+    expect(found("Menge 2\n450,00 €")).toEqual([450])
+  })
   it("reads space-grouped European amounts", () => {
     expect(found("Total 1 234,56 €")).toEqual([1234.56])
   })
