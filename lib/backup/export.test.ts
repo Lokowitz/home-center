@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import path from "node:path"
+import { readdir, writeFile } from "node:fs/promises"
 import { createExport } from "./export"
 import { createBackup } from "./backup"
 import { backupReadable } from "./viewer"
@@ -51,5 +52,29 @@ describe("exports", () => {
     expect(js).toContain('"../files/service/s1/f-a1.pdf"')
     expect((await r.manifest()).hasReadable).toBe(true)
     await r.close()
+  })
+
+  it("two exports in the same minute both survive, and a failed one removes only its own file", async () => {
+    const s = await setup()
+    const input = { ...s, outDir: path.join(s.dir, "out"), appVersion: "t", scope: { kind: "all", includeHealth: false } as const, now: new Date(2026, 9, 11, 9, 30) }
+    const a = await createExport(input)
+    const b = await createExport(input)
+    expect(b.path).not.toBe(a.path)
+    const bad = path.join(s.dir, "bad.db")
+    await writeFile(bad, "this is not a database".repeat(200))
+    await expect(createExport({ ...input, dbPath: bad })).rejects.toThrow()
+    expect((await verifyArchive(a.path, { workDir: s.workDir })).ok).toBe(true)
+    expect((await verifyArchive(b.path, { workDir: s.workDir })).ok).toBe(true)
+    expect((await readdir(input.outDir)).sort()).toEqual([a.file, b.file].sort())
+  })
+
+  it("rejects an empty or short password before building anything", async () => {
+    const s = await setup()
+    const outDir = path.join(s.dir, "out")
+    for (const password of ["", "abc"]) {
+      await expect(createExport({ ...s, outDir, appVersion: "t", scope: { kind: "all", includeHealth: false }, password })).rejects.toThrow()
+    }
+    expect(await readdir(s.workDir).catch(() => [])).toEqual([])
+    expect(await readdir(outDir).catch(() => [])).toEqual([])
   })
 })

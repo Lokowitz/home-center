@@ -78,7 +78,7 @@ dt { color:var(--muted); }
     var n = document.createElement(tag);
     for (var k in attrs || {}) {
       if (k === "text") n.textContent = attrs[k];
-      else if (k === "href" && attrs[k].charAt(0) === "#") n.setAttribute(k, attrs[k]);
+      else if (k === "href" && typeof attrs[k] === "string" && attrs[k].charAt(0) === "#") n.setAttribute(k, attrs[k]);
       else if (k === "href" || k === "src") { var u = safePath(attrs[k]); if (u) n.setAttribute(k, u); }
       else n.setAttribute(k, attrs[k]);
     }
@@ -140,7 +140,7 @@ dt { color:var(--muted); }
     }
     window.scrollTo(0, 0);
   }
-  function route() { var id = decodeURIComponent(location.hash.slice(1)); if (id) asset(id); else home(document.getElementById("q").value); }
+  function route() { var id = ""; try { id = decodeURIComponent(location.hash.slice(1)); } catch (e) { id = ""; } if (id) asset(id); else home(document.getElementById("q").value); }
   document.getElementById("q").addEventListener("input", function (e) { location.hash = ""; home(e.target.value); });
   window.addEventListener("hashchange", route);
   route();

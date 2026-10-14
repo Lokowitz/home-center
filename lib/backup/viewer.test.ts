@@ -30,4 +30,13 @@ describe("offline viewer", () => {
     expect(html).toContain("encodeURIComponent")
     expect(html).toContain('indexOf("../files/") !== 0')
   })
+  it("safePath rejects everything but relative files/ paths and encodes each segment", () => {
+    const m = /function safePath\(p\) \{[\s\S]*?\n  \}\n/.exec(viewerHtml())
+    expect(m).not.toBeNull()
+    const safePath = new Function(m![0] + "; return safePath")() as (p: unknown) => string | null
+    for (const bad of ["javascript:alert(1)", "//evil", "https://evil/x", "../files/a/../../x", "../files/a" + String.fromCharCode(92) + "b", "../files//x", "../x", "files/a", "data:text/html,x", 5, null, undefined])
+      expect(safePath(bad), String(bad)).toBeNull()
+    expect(safePath("../files/..%2f")).toBe("../files/..%252f")
+    expect(safePath("../files/A B/c#.pdf")).toBe("../files/A%20B/c%23.pdf")
+  })
 })
