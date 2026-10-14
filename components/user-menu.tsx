@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { LogOut, KeyRound, Smartphone } from "lucide-react"
+import { LogOut, KeyRound, Settings, Smartphone } from "lucide-react"
 
 export function UserMenu({ name, email }: { name: string; email: string }) {
   const router = useRouter()
@@ -44,6 +44,10 @@ export function UserMenu({ name, email }: { name: string; email: string }) {
           </div>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
+          <Settings className="h-4 w-4 mr-2" />
+          Settings
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push("/change-password")}>
           <KeyRound className="h-4 w-4 mr-2" />
           Change Password
