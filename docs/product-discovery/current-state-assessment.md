@@ -134,8 +134,8 @@ HomeCenter is a single Next.js 16 app (`package.json`: `next 16.2.12`, React 19.
 - There is no "unfiled" inbox and no document-first creation.
 
 ### 4.5 No data portability
-- No full export (JSON/CSV) and no import (`grep` for csv, export or backup is negative outside MIME tables).
-- No in-app backup or restore. PLANNING floats `/settings/backup` (`PLANNING.md:416`).
+- ~~No full export (JSON/CSV) and no import (`grep` for csv, export or backup is negative outside MIME tables).~~ **Fixed 2026-10-13 (M4, `3d70bf5..HEAD`):** Settings → Data → Export makes a zip with an offline `index.html` viewer, JSON, CSVs and every file in readable folders (`docs/export-format.md`). Import is still not built; exports can't be restored, backups can.
+- ~~No in-app backup or restore. PLANNING floats `/settings/backup` (`PLANNING.md:416`).~~ **Fixed 2026-10-13 (M4, `3d70bf5..HEAD`):** Settings → Data has Back up now, a schedule, optional protection and a restore with dry run and undo, plus `npm run backup` and `npm run restore`.
 - The per-asset zip leaves out maintenance-schedule attachments (`download/route.ts` queries only service, warranty and health types).
 - A property zip leaves out its equipment's files, although the tabs show them.
 
@@ -197,7 +197,7 @@ HomeCenter is a single Next.js 16 app (`package.json`: `next 16.2.12`, React 19.
 | PLANNING: "Skip / snooze" on `/maintenance` | Does not exist | `PLANNING.md:191-192` |
 | README: `NOTIFY_INTERVAL_MINUTES` checks "due maintenance and expiring warranties" | Also refills, vaccines and insurance | `README.md:224`; `lib/notifications/checker.ts:66-68` |
 | README: "one-click zip downloads" of an asset's files | Zip omits maintenance attachments and property equipment | `README.md:50,60`; D3 |
-| README feature table: "Records & export" | No data export exists, only file zips and print | `README.md:50` |
+| README feature table: "Records & export" | ~~No data export exists, only file zips and print~~ **Fixed 2026-10-13:** full export, backup and restore now exist and the README row says so | `README.md:50` |
 | `proxy.ts` lists `/setup` as public | No `/setup` route exists | `proxy.ts:12` |
 | `NotificationType.CUSTOM` | Nothing produces it | `schema.prisma:126-133` |
 | Asset delete confirmation | See D1 (fixed: the confirmation is now true) | |

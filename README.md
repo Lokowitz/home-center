@@ -60,7 +60,7 @@ When was the furnace last serviced? Is the fridge still under warranty? What did
 | **Money** | Costs by asset, category and vendor, and a 12-month spending chart |
 | **Finding things** | Global search across records and documents, plus an optional AI assistant |
 | **Reminders** | In-app bell and per-person email digests |
-| **Records & export** | Attachments, printable reports and one-click zip downloads |
+| **Records & export** | Attachments, printable reports, a full offline export, and scheduled backups with restore ([how backups work](#how-do-i-back-it-up)) |
 | **Security** | Local login, admin and standard users, sign-in throttling, encrypted secrets |
 
 ### Every house, car and appliance, with its whole history
