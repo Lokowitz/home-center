@@ -1,5 +1,6 @@
 // npm run backup [-- --folder /path]
 // Same engine and settings as Settings → Data; works with the app running or stopped.
+import "dotenv/config"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { createBackup } from "../lib/backup/backup"

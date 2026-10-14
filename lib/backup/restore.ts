@@ -116,6 +116,13 @@ async function refuseIfKept(staging: string) {
   if (await isKept(staging)) throw new Error(`Data from a failed restore is still in ${staging}. Move it somewhere safe before starting another restore.`)
 }
 
+export const ALREADY_STAGED = "A restore is already staged. Restart HomeCenter to finish it, or cancel it first."
+
+/** staging may hold a staged Undo, which is the only copy of the household from before the last restore. */
+async function refuseIfPending(d: ReturnType<typeof dirs>) {
+  if (await exists(d.pending)) throw new Error(ALREADY_STAGED)
+}
+
 /** Renames a dir holding displaced data out of the pre-* and staging names; if even that fails, marks it so nothing deletes it. */
 async function preserve(
   dir: string, restoreDir: string, label: string, stampText: string,
@@ -138,6 +145,7 @@ async function preserve(
 export async function stage(i: { paths: RestorePaths; now?: Date }): Promise<void> {
   const d = dirs(i.paths.restoreDir)
   try {
+    await refuseIfPending(d)
     await refuseIfKept(d.staging)
   } catch (e) {
     await rm(d.work, { recursive: true, force: true }).catch(() => undefined) // no unlocked archive left lying around
@@ -190,6 +198,7 @@ export async function latestPre(restoreDir: string): Promise<{ dir: string; crea
 
 export async function stageUndo(i: { paths: RestorePaths; now?: Date }): Promise<void> {
   const d = dirs(i.paths.restoreDir)
+  await refuseIfPending(d)
   const pre = await latestPre(i.paths.restoreDir)
   if (!pre) throw new Error("There's no earlier state to go back to.")
   await refuseIfKept(d.staging)
@@ -206,6 +215,58 @@ export async function cancelRestore(restoreDir: string): Promise<void> {
 }
 
 export const hasPending = (restoreDir: string) => exists(dirs(restoreDir).pending)
+
+/**
+ * Takes back a staged restore before it is applied. A staged Undo goes back to its pre-* folder (or, if
+ * that rename fails, is kept as failed-*-undo-snapshot or marked in place); a staged backup is removed,
+ * since the backup file still has it. keptIn names where kept data ended up, when not where it came from.
+ */
+export async function cancelStaged(
+  restoreDir: string,
+  now = new Date(),
+  fsOps: { rename: typeof fsRename; writeMarker?: (file: string) => Promise<void> } = { rename: fsRename },
+): Promise<{ cancelled: boolean; keptIn: string | null }> {
+  const d = dirs(restoreDir)
+  if (!(await exists(d.pending))) return { cancelled: false, keptIn: null }
+  const keepOps = { rename: fsOps.rename, writeMarker: fsOps.writeMarker ?? ((file: string) => writeFile(file, "{}")) }
+  let meta: { source?: string; undoOf?: string } | null = null
+  try {
+    meta = JSON.parse(await readFile(d.pending, "utf8"))
+  } catch {
+    meta = null
+  }
+  let keptIn: string | null = null
+  if (await exists(d.staging)) {
+    if (await isKept(d.staging)) {
+      keptIn = d.staging // already marked: never moved or deleted here
+    } else if (meta?.source === "backup" && meta.undoOf === undefined) {
+      await rm(d.pending, { force: true }) // first, so a crash part-way can't apply a half-removed staging
+      await rm(d.staging, { recursive: true, force: true })
+      return { cancelled: true, keptIn: null }
+    } else {
+      // An Undo, or a pending file we can't read: staging may hold the only copy, so it is handed back or kept.
+      const u = meta?.source === "undo" && typeof meta.undoOf === "string" ? path.resolve(meta.undoOf) : null
+      const valid = u !== null && path.dirname(u) === path.resolve(restoreDir) && path.basename(u).startsWith("pre-") && !(await exists(u))
+      let handedBack = false
+      if (valid) {
+        try {
+          await fsOps.rename(d.staging, u)
+          handedBack = true
+        } catch {
+          handedBack = false
+        }
+      }
+      if (!handedBack) {
+        const p = await preserve(d.staging, restoreDir, meta?.source === "undo" ? "undo-snapshot" : "staged", safeStamp(now), keepOps)
+        keptIn = p.dir
+        // Neither renamed nor marked: leave pending in place so nothing (stage, a later cancel) touches staging.
+        if (!p.protected) throw new Error(`Couldn't put the staged data back or mark it. It is in ${d.staging}; move it somewhere safe.`)
+      }
+    }
+  }
+  await rm(d.pending, { force: true })
+  return { cancelled: true, keptIn }
+}
 
 async function writeResult(restoreDir: string, r: RestoreResult) {
   await writeFile(dirs(restoreDir).result, JSON.stringify(r, null, 2))

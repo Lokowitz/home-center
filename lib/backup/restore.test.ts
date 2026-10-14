@@ -8,7 +8,7 @@ import { ArchiveWriter } from "./archive"
 import { createBackup } from "./backup"
 import { DB_ENTRY, FORMAT_VERSION } from "./format"
 import { appMigrations } from "./paths"
-import { applyPending, dryRun, latestPre, prunePre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
+import { applyPending, cancelStaged, dryRun, hasPending, latestPre, prunePre, readResult, stage, stageUndo, type RestorePaths } from "./restore"
 import { modelCounts, openDb, releaseDbHandles } from "./snapshot"
 import { fingerprintOf } from "./protect"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
@@ -403,6 +403,97 @@ describe("restore failure handling", () => {
     expect(r.result.recoveryDirs).toHaveLength(1)
     expect(path.basename(r.result.recoveryDirs[0])).toMatch(/^failed-/)
     expect(existsSync(path.join(r.result.recoveryDirs[0], "homecenter.db"))).toBe(true)
+  })
+
+  it("refuses to stage or stage an undo while a restore is already staged", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    await stageUndo({ paths: w.paths }) // the staged undo holds the household from before the restore
+    const before = await readFile(path.join(w.paths.restoreDir, "staging", "homecenter.db"))
+    await dryRun({ archivePath: w.backup.path, secret: {}, paths: w.paths, known: await appMigrations() })
+    await expect(stage({ paths: w.paths })).rejects.toThrow(/already staged/)
+    await expect(stageUndo({ paths: w.paths })).rejects.toThrow(/already staged/)
+    expect(await readFile(path.join(w.paths.restoreDir, "staging", "homecenter.db"))).toEqual(before)
+    expect(existsSync(path.join(w.paths.restoreDir, "work"))).toBe(false) // no unlocked archive left behind
+  })
+
+  it("cancelStaged of an undo hands the snapshot back to its pre-* folder intact", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    const pre = (await latestPre(w.paths.restoreDir))!
+    const dbBefore = await readFile(path.join(pre.dir, "homecenter.db"))
+    await stageUndo({ paths: w.paths })
+    expect(existsSync(pre.dir)).toBe(false)
+    expect(await cancelStaged(w.paths.restoreDir)).toEqual({ cancelled: true, keptIn: null })
+    expect(await readFile(path.join(pre.dir, "homecenter.db"))).toEqual(dbBefore)
+    expect(existsSync(path.join(pre.dir, "uploads", "service", "zz", "old.pdf"))).toBe(true)
+    expect((await latestPre(w.paths.restoreDir))?.dir).toBe(pre.dir)
+    expect(await hasPending(w.paths.restoreDir)).toBe(false)
+    expect(existsSync(path.join(w.paths.restoreDir, "staging"))).toBe(false)
+    // and it can still be used
+    await stageUndo({ paths: w.paths })
+    await applyPending(w.paths, later())
+    expect(existsSync(path.join(w.paths.uploadDir, "service/zz/old.pdf"))).toBe(true)
+  })
+
+  it("cancelStaged of an undo that can't be handed back keeps the snapshot (renamed, or marked in place)", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    const pre = (await latestPre(w.paths.restoreDir))!
+    await stageUndo({ paths: w.paths })
+    const noHandBack = (async (a: string, b: string) => {
+      if (path.basename(b).startsWith("pre-")) throw new Error("refused")
+      await rename(a, b)
+    }) as typeof rename
+    const r = await cancelStaged(w.paths.restoreDir, new Date(), { rename: noHandBack })
+    expect(r.cancelled).toBe(true)
+    expect(path.basename(r.keptIn!)).toMatch(/^failed-.*-undo-snapshot$/)
+    expect(existsSync(path.join(r.keptIn!, "homecenter.db"))).toBe(true)
+    expect(existsSync(pre.dir)).toBe(false)
+    expect(await hasPending(w.paths.restoreDir)).toBe(false)
+
+    const w2 = await world()
+    await stageFresh(w2)
+    await applyPending(w2.paths)
+    await stageUndo({ paths: w2.paths })
+    const refuse = (async () => { throw new Error("refused") }) as unknown as typeof rename
+    const r2 = await cancelStaged(w2.paths.restoreDir, new Date(), { rename: refuse })
+    const staging = path.join(w2.paths.restoreDir, "staging")
+    expect(r2).toEqual({ cancelled: true, keptIn: staging })
+    expect(existsSync(path.join(staging, "homecenter.db"))).toBe(true)
+    expect(existsSync(path.join(staging, "keep.json"))).toBe(true)
+  })
+
+  it("cancelStaged of a restore removes staging and pending, and leaves the undo point", async () => {
+    const w = await world()
+    await stageFresh(w)
+    await applyPending(w.paths)
+    const undoPoint = await latestPre(w.paths.restoreDir)
+    const before = await fingerprint(w.paths)
+    await stageFresh(w)
+    expect(await cancelStaged(w.paths.restoreDir)).toEqual({ cancelled: true, keptIn: null })
+    expect(existsSync(path.join(w.paths.restoreDir, "staging"))).toBe(false)
+    expect(await hasPending(w.paths.restoreDir)).toBe(false)
+    expect((await latestPre(w.paths.restoreDir))?.dir).toBe(undoPoint!.dir)
+    expect(await fingerprint(w.paths)).toBe(before)
+    expect(await applyPending(w.paths)).toEqual({ applied: false })
+  })
+
+  it("cancelStaged with nothing staged does nothing, and keeps staging when pending.json is unreadable", async () => {
+    const w = await world()
+    await mkdir(w.paths.restoreDir, { recursive: true })
+    expect(await cancelStaged(w.paths.restoreDir)).toEqual({ cancelled: false, keptIn: null })
+    await mkdir(path.join(w.paths.restoreDir, "staging"), { recursive: true })
+    await writeFile(path.join(w.paths.restoreDir, "staging", "homecenter.db"), "maybe the only copy")
+    await writeFile(path.join(w.paths.restoreDir, "pending.json"), "{nope")
+    const r = await cancelStaged(w.paths.restoreDir)
+    expect(r.cancelled).toBe(true)
+    expect(path.basename(r.keptIn!)).toMatch(/^failed-.*-staged$/)
+    expect(await readFile(path.join(r.keptIn!, "homecenter.db"), "utf8")).toBe("maybe the only copy")
+    expect(await hasPending(w.paths.restoreDir)).toBe(false)
   })
 
   it("rejects an undoOf outside the restore dir without touching anything", async () => {

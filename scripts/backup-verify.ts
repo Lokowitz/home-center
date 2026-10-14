@@ -1,4 +1,5 @@
 // npm run backup:verify -- <file> [--key kit.txt | --passphrase-env VAR]
+import "dotenv/config"
 import path from "node:path"
 import { mkdir, rm } from "node:fs/promises"
 import { verifyArchive } from "../lib/backup/verify"
