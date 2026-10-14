@@ -283,7 +283,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                   <FormItem>
                     <FormLabel>Remind ({fmt.meterShort(meterUnit)} before)</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "10" : "500"} {...field} /></FormControl>
-                    <FormDescription className="text-xs">How close to the due {meterUnit === "HOURS" ? "hour count" : "mileage"} to start warning</FormDescription>
+                    <FormDescription className="text-xs">How close to the due {meterUnit === "HOURS" ? "hour count" : fmt.distanceNoun.toLowerCase()} to start warning</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />

@@ -17,8 +17,6 @@ import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-
 import type { Vehicle } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
 
-const METER_UNIT_LABELS: Record<string, string> = { MILES: "Miles", HOURS: "Hours" }
-
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
   make: z.string().min(1, "Make is required"),
@@ -44,6 +42,8 @@ interface Props {
 export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
   const router = useRouter()
   const fmt = useFormat()
+  const milesLabel = fmt.distanceWords.charAt(0).toUpperCase() + fmt.distanceWords.slice(1)
+  const meterUnitLabels: Record<string, string> = { MILES: milesLabel, HOURS: "Hours" }
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -167,9 +167,9 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
                 <FormItem>
                   <FormLabel>Tracked In</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: string) => METER_UNIT_LABELS[v] ?? v}</SelectValue></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: string) => meterUnitLabels[v] ?? v}</SelectValue></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="MILES">Miles</SelectItem>
+                      <SelectItem value="MILES">{milesLabel}</SelectItem>
                       <SelectItem value="HOURS">Hours</SelectItem>
                     </SelectContent>
                   </Select>

@@ -30,7 +30,7 @@ const columnsFor = (fmt: Formatter): AssetColumn<Vehicle>[] => [
   { key: "name", label: "Name", cell: (v) => <span className="font-medium">{v.name}</span> },
   { key: "year", label: "Year", className: "text-muted-foreground whitespace-nowrap", cell: (v) => v.year },
   { key: "make", label: "Make / Model", className: "text-muted-foreground", cell: (v) => `${v.make} ${v.model}` },
-  { key: "currentMileage", label: "Mileage", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (v) => (v.currentMileage != null ? `${v.currentMileage.toLocaleString()} ${fmt.meterShort(v.meterUnit)}` : "—") },
+  { key: "currentMileage", label: fmt.distanceNoun, className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (v) => (v.currentMileage != null ? `${v.currentMileage.toLocaleString()} ${fmt.meterShort(v.meterUnit)}` : "—") },
   { key: "color", label: "Color", className: "text-muted-foreground", cell: (v) => v.color ?? "—" },
   { key: "vin", label: "VIN", className: "text-muted-foreground font-mono text-xs max-w-[180px] truncate", cell: (v) => v.vin ?? "—" },
 ]
