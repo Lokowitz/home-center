@@ -690,6 +690,38 @@ model FeatureSettings {
   updatedAt     DateTime @updatedAt
 }
 
+/// How money, distances, areas and dates are written for this household.
+/// Label only: switching a unit relabels stored numbers, it never converts them.
+model RegionalSettings {
+  id           String       @id @default("singleton")
+  /// ISO 4217 code.
+  currency     String       @default("USD")
+  distanceUnit DistanceUnit @default(MILES)
+  areaUnit     AreaUnit     @default(SQFT)
+  dateFormat   DateFormat   @default(MDY_SHORT)
+  hour12       Boolean      @default(true)
+  updatedAt    DateTime     @updatedAt
+}
+
+enum DistanceUnit {
+  MILES
+  KM
+}
+
+enum AreaUnit {
+  SQFT
+  SQM
+}
+
+/// MDY_SHORT "Jan 5, 2026", DMY_SHORT "5 Jan 2026", MDY_NUM "01/05/2026", DMY_NUM "05/01/2026", ISO "2026-01-05".
+enum DateFormat {
+  MDY_SHORT
+  DMY_SHORT
+  MDY_NUM
+  DMY_NUM
+  ISO
+}
+
 // ─── Backup ──────────────────────────────────────────────────────────────────
 
 enum BackupSchedule {
