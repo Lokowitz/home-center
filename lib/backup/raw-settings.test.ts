@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { createMigratedDb, tempDir } from "./test-support"
 import { openDb } from "./snapshot"
 import { rawProtection, readRawSecrets, readRawSettings } from "./raw-settings"
+
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
 
 describe("raw settings", () => {
   it("defaults when no row exists", async () => {

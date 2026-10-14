@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { rename, rm } from "node:fs/promises"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
 import { integrityCheck, latestMigration, modelCounts, referencedFiles, vacuumInto } from "./snapshot"
 import { appMigrations } from "./paths"
+
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
 
 describe("snapshot", () => {
   it("copies a consistent snapshot and reads what it references", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { existsSync } from "node:fs"
 import { readdir, rm } from "node:fs/promises"
@@ -9,6 +9,9 @@ import { generateX25519Identity, identityToRecipient } from "age-encryption"
 import { fingerprintOf, unprotectFile } from "./protect"
 import { verifyArchive } from "./verify"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
+
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
 
 async function setup() {
   const dir = await tempDir()

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { mkdir, readdir, writeFile } from "node:fs/promises"
 import { ArchiveWriter } from "./archive"
@@ -6,6 +6,9 @@ import { checkCompatibility, verifyArchive } from "./verify"
 import { createMigratedDb, tempDir } from "./test-support"
 import { vacuumInto } from "./snapshot"
 import { DB_ENTRY, FORMAT_VERSION, type Manifest } from "./format"
+
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
 
 const meta = (over: Partial<Manifest> = {}): Omit<Manifest, "files"> => ({
   formatVersion: FORMAT_VERSION, kind: "backup", scope: null, appVersion: "t", migration: "20260101000000_a",

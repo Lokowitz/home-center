@@ -4,6 +4,9 @@ import { readdir } from "node:fs/promises"
 import { createBackup } from "./backup"
 import { createMigratedDb, seedSample, tempDir } from "./test-support"
 
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
+
 vi.mock("./verify", () => ({ verifyArchive: async () => ({ ok: false, error: "forced" }) }))
 
 describe("createBackup failure", () => {

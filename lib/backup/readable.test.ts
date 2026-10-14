@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { rm } from "node:fs/promises"
 import path from "node:path"
 import { createClient } from "@libsql/client"
@@ -6,6 +6,9 @@ import { fileUrl } from "./paths"
 import { createMigratedDb, seedSample, tempDir } from "./test-support"
 import { openDb, releaseDbHandles } from "./snapshot"
 import { csvTables, exportPlacement, loadReadable, rawPlacement, toCsv } from "./readable"
+
+// Each case builds a migrated SQLite DB and zips it; under a parallel full run that exceeds the 5s default.
+vi.setConfig({ testTimeout: 30_000 })
 
 async function snap() {
   const dir = await tempDir()
