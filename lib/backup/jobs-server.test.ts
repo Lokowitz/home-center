@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const create = vi.fn()
+const update = vi.fn().mockResolvedValue({})
 const settings = { protection: "NONE", folder: null, keep: 14 }
 vi.mock("@/lib/prisma", () => ({
-  prisma: { backupRun: { create: (a: unknown) => create(a), findUniqueOrThrow: vi.fn().mockRejectedValue(new Error("gone")), update: vi.fn().mockResolvedValue({}), findMany: vi.fn().mockResolvedValue([]) } },
+  prisma: { backupRun: { create: (a: unknown) => create(a), findUniqueOrThrow: vi.fn().mockRejectedValue(new Error("gone")), update: (a: unknown) => update(a), findMany: vi.fn().mockResolvedValue([]) } },
 }))
 vi.mock("./settings-server", () => ({
   loadBackupSettings: async () => settings, backupFolder: () => "x", loadSecrets: vi.fn(), protectionConfig: vi.fn(), appVersion: async () => "t",
@@ -50,6 +51,9 @@ describe("backup job lock", () => {
     const r = await startExportJob({ scope: { kind: "all", includeHealth: false }, password: "abc", userId: "u1" })
     expect(r).toEqual({ runId: "r3" })
     expect(JSON.stringify(create.mock.calls)).not.toContain("abc")
+    await vi.waitFor(() => expect(isJobRunning()).toBe(false))
+    expect(JSON.stringify(update.mock.calls)).not.toContain("abc")
+    expect(update.mock.calls.some(([a]) => (a as { data: { status?: string } }).data.status === "FAILED")).toBe(true)
     await vi.waitFor(() => expect(isJobRunning()).toBe(false))
   })
 })

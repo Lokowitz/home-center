@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   // One download per export: the file holds everything, so it doesn't linger on disk.
   // Only a download that was read to the end deletes it; an aborted one can be retried.
   stream.on("close", () => {
-    if (stream.readableEnded) void rm(dir, { recursive: true, force: true })
+    if (stream.readableEnded) void rm(dir, { recursive: true, force: true }).catch(() => undefined)
   })
   const name = path.basename(run.file)
   return new NextResponse(Readable.toWeb(stream) as ReadableStream, {

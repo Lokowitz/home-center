@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { uploadDir, dbPathFromUrl, workDir } from "./paths"
 import { createBackup } from "./backup"
 import { createExport } from "./export"
+import { sweepOldExports } from "./export-limits-server"
 import type { ExportScope } from "./format"
 import { backupReadable } from "./viewer"
 import { cleanupPartials, pruneBackups } from "./store"
@@ -68,6 +69,7 @@ export async function startExportJob(input: ExportJobInput): Promise<{ runId: st
     state.running = null
     throw e
   }
+  void sweepOldExports(runId).catch(() => undefined)
   void runExportJob(runId, input)
     .catch((e) => console.error("[export] job crashed:", e))
     .finally(() => {
@@ -79,8 +81,9 @@ export async function startExportJob(input: ExportJobInput): Promise<{ runId: st
 /** Never rejects past its own bookkeeping: the row ends FAILED if any update is still possible. */
 export async function runExportJob(runId: string, input: ExportJobInput): Promise<void> {
   let last = 0
-  const outDir = exportDir(runId)
+  let outDir: string | null = null
   try {
+    outDir = exportDir(runId)
     const out = await createExport({
       dbPath: dbPathFromUrl(process.env.DATABASE_URL), uploadDir: uploadDir(), outDir, workDir: workDir(),
       appVersion: await appVersion(), scope: input.scope, password: input.password,
@@ -101,7 +104,7 @@ export async function runExportJob(runId: string, input: ExportJobInput): Promis
     const message = e instanceof Error ? e.message : String(e)
     console.error("[export] failed:", message)
     // The run folder is this run's alone.
-    await rm(outDir, { recursive: true, force: true }).catch(() => undefined)
+    if (outDir) await rm(outDir, { recursive: true, force: true }).catch(() => undefined)
     try {
       await prisma.backupRun.update({ where: { id: runId }, data: { status: "FAILED", finishedAt: new Date(), error: message } })
     } catch (e2) {

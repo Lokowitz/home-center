@@ -65,12 +65,16 @@ export function ExportPanel({ data }: { data: BackupOverview }) {
   function go() {
     start(async () => {
       const [type, id] = scope.split(":")
-      const r = await startExport({
-        scope: scope === "all" ? "all" : { assetType: type as AssetKind, assetId: id },
-        includeHealth, password: protect ? pw : "",
-      })
-      if ("error" in r) return void toast.error(r.error)
-      setRunId(r.runId)
+      try {
+        const r = await startExport({
+          scope: scope === "all" ? "all" : { assetType: type as AssetKind, assetId: id },
+          includeHealth, password: protect ? pw : "",
+        })
+        if ("error" in r) return void toast.error(r.error)
+        setRunId(r.runId)
+      } catch {
+        toast.error("Couldn't start the export. Try again.")
+      }
     })
   }
 
