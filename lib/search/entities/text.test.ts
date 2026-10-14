@@ -3,6 +3,7 @@ import {
   ageWords, allergyDoc, compose, INLINE_NOTE_CHARS, intervalWords, maintenanceDoc, medicationDoc, observationDoc, personDoc,
   propertyDoc, sentences, serviceDoc, vehicleDoc, warrantyDoc,
 } from "./text"
+import { createFormatter, DEFAULT_REGIONAL } from "@/lib/regional"
 
 const now = new Date("2026-10-01T12:00:00Z")
 const day = (s: string) => new Date(`${s}T00:00:00Z`)
@@ -135,5 +136,20 @@ describe("record text", () => {
     }).chunks[0]).toBe(
       "Observation about Sam on September 30, 2026 at 17:30: Meltdown. Severity 4 of 5 (severe). Lasted about 20 minutes. Tags: school, tired."
     )
+  })
+})
+
+describe("household units", () => {
+  const metric = createFormatter({ ...DEFAULT_REGIONAL, currency: "EUR", distanceUnit: "KM", areaUnit: "SQM" })
+
+  it("writes metric units and the household currency", () => {
+    expect(intervalWords(90, 5000, "MILES", metric)).toBe("Repeats every 3 months or every 5,000 kilometres")
+    const doc = vehicleDoc({
+      id: "v1", name: "Commuter", make: "Honda", model: "Civic Sport", year: 2021, color: "Blue",
+      purchaseDate: day("2022-03-01"), purchasePrice: 20000, currentMileage: 28900, meterUnit: "MILES", notes: null,
+    }, now, metric)
+    expect(doc.chunks[0]).toContain("About 28,900 kilometres on it")
+    expect(doc.chunks[0]).toContain(metric.moneyWhole(20000))
+    expect(doc.chunks[0]).not.toContain("$")
   })
 })

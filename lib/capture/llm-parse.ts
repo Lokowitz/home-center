@@ -5,12 +5,17 @@ import { LlmError } from "@/lib/llm/errors"
 import type { ChatFn } from "@/lib/llm/types"
 import type { ParseNote } from "@/lib/inbox"
 import type { ParsedReceipt } from "./parse"
+import { DEFAULT_REGIONAL } from "@/lib/regional"
+import { parseAmount } from "./amount"
 
-export const PROMPT = `You read one household document (receipt, invoice, estimate or similar).
+export function receiptPrompt(currency: string): string {
+  return `You read one household document (receipt, invoice, estimate or similar).
 Reply with JSON only: {"date": "YYYY-MM-DD" or null, "total": number or null, "vendor": string or null}
 date: the date the purchase, service, visit or test happened (not a due date, print date or date of birth).
-total: the final amount charged (grand total incl. tax; negative for a refund). null if the document shows no charge.
+total: the final amount charged as a plain number with a dot for decimals (grand total incl. tax; negative for a refund). The household's currency is ${currency}. null if the document shows no charge.
 vendor: the business, clinic or provider that issued it.`
+}
+export const PROMPT = receiptPrompt(DEFAULT_REGIONAL.currency)
 
 export const MAX_TEXT_CHARS = 12000
 const MAX_VENDOR_CHARS = 80
@@ -36,9 +41,9 @@ function validDate(v: unknown): string | null {
 function validTotal(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null
   if (typeof v !== "string") return null
-  const s = v.replace(/[$,\s]/g, "")
-  if (!/^-?\d+(\.\d+)?$/.test(s)) return null
-  return Number(s)
+  // The prompt asks for a dot decimal, so "12.500" is 12.5, not twelve thousand five hundred.
+  if (/^-?\d+\.\d+$/.test(v.trim())) return Number(v.trim())
+  return parseAmount(v)
 }
 
 function validVendor(v: unknown): string | null {
@@ -108,10 +113,10 @@ export function llmFailureDetail(error: unknown): string {
 
 export type LlmReceiptRead = { parsed: ParsedReceipt } | { note: Extract<ParseNote, "llm-failed" | "llm-no-answer">; detail: string }
 
-async function ask(chat: ChatFn, text: string, signal: AbortSignal) {
+async function ask(chat: ChatFn, text: string, signal: AbortSignal, currency: string) {
   let streamed = ""
   const result = await chat(
-    { messages: [{ role: "system", content: PROMPT }, { role: "user", content: text.slice(0, MAX_TEXT_CHARS) }] },
+    { messages: [{ role: "system", content: receiptPrompt(currency) }, { role: "user", content: text.slice(0, MAX_TEXT_CHARS) }] },
     (t) => {
       streamed += t
     },
@@ -130,14 +135,15 @@ export async function readReceiptByLlm(
   text: string,
   makeChat: (opts: { thinkingOff: boolean }) => ChatFn,
   signal: AbortSignal = new AbortController().signal,
+  currency: string = DEFAULT_REGIONAL.currency,
 ): Promise<LlmReceiptRead> {
   let answer: { reply: string; finishReason: string | null }
   try {
     try {
-      answer = await ask(makeChat({ thinkingOff: true }), text, signal)
+      answer = await ask(makeChat({ thinkingOff: true }), text, signal, currency)
     } catch (error) {
       if (!(error instanceof LlmError && error.status === 400)) throw error
-      answer = await ask(makeChat({ thinkingOff: false }), text, signal)
+      answer = await ask(makeChat({ thinkingOff: false }), text, signal, currency)
     }
   } catch (error) {
     return { note: "llm-failed", detail: llmFailureDetail(error) }

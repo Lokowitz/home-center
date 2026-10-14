@@ -19,7 +19,8 @@ import { MedicationsSection } from "@/components/health/medications-section"
 import { ObservationsSection } from "@/components/health/observations-section"
 import { LogObservationButton } from "@/components/health/observation-form"
 import { byNewest, typeSuggestions } from "@/lib/observations"
-import { ageFrom, formatDay, INSURANCE_KINDS, labelFor, RELATIONSHIPS } from "@/lib/health"
+import { getFormat } from "@/lib/regional-server"
+import { ageFrom, INSURANCE_KINDS, labelFor, RELATIONSHIPS } from "@/lib/health"
 
 export default async function PersonDetailPage({
   params,
@@ -29,6 +30,7 @@ export default async function PersonDetailPage({
   searchParams: Promise<{ tab?: string; open?: string }>
 }) {
   await requireHealth()
+  const fmt = await getFormat()
   const { id } = await params
   const { tab, open } = await searchParams
   const person = await prisma.person.findUnique({
@@ -80,7 +82,7 @@ export default async function PersonDetailPage({
         <div className="space-y-2">
           <Stat icon={Users} label="Relationship" value={labelFor(RELATIONSHIPS, person.relationship)} />
           {person.dateOfBirth && (
-            <Stat icon={Cake} label="Born" value={`${formatDay(person.dateOfBirth)} (${age})`} />
+            <Stat icon={Cake} label="Born" value={`${fmt.date(person.dateOfBirth, { utc: true })} (${age})`} />
           )}
           {person.sex && <Stat icon={User} label="Sex" value={person.sex} />}
           {person.bloodType && <Stat icon={Droplet} label="Blood type" value={person.bloodType} />}

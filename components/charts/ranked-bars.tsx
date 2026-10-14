@@ -5,7 +5,8 @@ import { ChartTable } from "./primitives/chart-table"
 import { TooltipCard, useChartTooltip } from "./primitives/tooltip"
 import { Sparkline } from "./sparkline"
 import { niceMax, niceTicks } from "./primitives/scale"
-import { formatMoney, formatMoneyCompact, type RankedEntry } from "@/lib/costs"
+import { type RankedEntry } from "@/lib/costs"
+import { useFormat } from "@/components/regional-provider"
 
 // Nominal categories — assets, vendors — so every bar wears the same hue. Bar
 // length already encodes magnitude; colouring each one differently would spend
@@ -40,6 +41,7 @@ export function RankedBars({
   caption?: string
   size?: "default" | "compact"
 }) {
+  const fmt = useFormat()
   const { containerRef, cardRef, tip, offset, anchorProps } = useChartTooltip()
 
   if (entries.length === 0) {
@@ -63,10 +65,10 @@ export function RankedBars({
             const content = {
               title: entry.label,
               rows: [
-                { label: valueLabel, value: formatMoney(entry.total) },
+                { label: valueLabel, value: fmt.money(entry.total) },
                 {
                   label: entry.count === 1 ? "1 record" : entry.count + " records",
-                  value: formatMoney(entry.count > 0 ? entry.total / entry.count : 0) + " avg",
+                  value: fmt.money(entry.count > 0 ? entry.total / entry.count : 0) + " avg",
                   muted: true,
                 },
               ],
@@ -81,7 +83,7 @@ export function RankedBars({
                     {entry.label}
                   </span>
                   <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                    {formatMoney(entry.total)}
+                    {fmt.money(entry.total)}
                   </span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
@@ -161,7 +163,7 @@ export function RankedBars({
             className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums text-muted-foreground"
             style={{ left: (tick / domainMax) * 100 + "%" }}
           >
-            {formatMoneyCompact(tick)}
+            {fmt.moneyCompact(tick)}
           </span>
         ))}
       </div>
@@ -175,7 +177,7 @@ export function RankedBars({
         ]}
         rows={entries.map((entry) => ({
           label: entry.depth ? "  " + entry.label : entry.label,
-          total: formatMoney(entry.total),
+          total: fmt.money(entry.total),
           count: entry.count,
         }))}
       />

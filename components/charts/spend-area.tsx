@@ -5,7 +5,8 @@ import { XLabels } from "./primitives/axis"
 import { ChartTable } from "./primitives/chart-table"
 import { TooltipCard, useChartTooltip } from "./primitives/tooltip"
 import { niceMax, niceTicks } from "./primitives/scale"
-import { formatMoney, formatMoneyCompact, type BucketPoint } from "@/lib/costs"
+import { type BucketPoint } from "@/lib/costs"
+import { useFormat } from "@/components/regional-provider"
 
 const PLOT_HEIGHT = 116
 
@@ -26,6 +27,7 @@ export function SpendArea({
   prior: number[]
   priorLabel: string
 }) {
+  const fmt = useFormat()
   const { containerRef, cardRef, tip, offset, anchorProps } = useChartTooltip()
 
   if (points.length < 2) return null
@@ -50,7 +52,7 @@ export function SpendArea({
         plotHeight={PLOT_HEIGHT}
         ticks={ticks}
         domainMax={domainMax}
-        formatTick={formatMoneyCompact}
+        formatTick={fmt.moneyCompact}
         yAxisWidth={38}
         xAxis={<XLabels labels={points.map((p) => p.label)} maxLabels={6} highlightIndex={points.length - 1} />}
       >
@@ -118,14 +120,14 @@ export function SpendArea({
                 key={point.key}
                 tabIndex={0}
                 role="img"
-                aria-label={point.fullLabel + ": " + formatMoney(point.total)}
+                aria-label={point.fullLabel + ": " + fmt.money(point.total)}
                 className="min-w-0 flex-1 rounded-sm outline-none transition-colors hover:bg-muted/40 focus-visible:bg-muted/50"
                 {...anchorProps({
                   title: point.fullLabel,
                   rows: [
-                    { label: "Spend", value: formatMoney(point.total), color: "var(--cost-bar)" },
+                    { label: "Spend", value: fmt.money(point.total), color: "var(--cost-bar)" },
                     ...(hasPrior
-                      ? [{ label: priorLabel, value: formatMoney(prior[i]), color: "var(--chart-ghost)", muted: true }]
+                      ? [{ label: priorLabel, value: fmt.money(prior[i]), color: "var(--chart-ghost)", muted: true }]
                       : []),
                   ],
                 })}
@@ -160,8 +162,8 @@ export function SpendArea({
         ]}
         rows={points.map((point, i) => ({
           month: point.fullLabel,
-          total: formatMoney(point.total),
-          prior: formatMoney(prior[i]),
+          total: fmt.money(point.total),
+          prior: fmt.money(prior[i]),
         }))}
       />
     </div>

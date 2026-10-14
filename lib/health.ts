@@ -44,14 +44,6 @@ export function toDateInput(d: Date | null | undefined): string {
   return d ? new Date(d).toISOString().split("T")[0] : ""
 }
 
-/// Display form of a stored day. Formatted in UTC because that is the day that
-/// was typed — local time would show a US user their birthday a day early.
-export function formatDay(d: Date | null | undefined): string {
-  return d
-    ? new Date(d).toLocaleDateString(undefined, { timeZone: "UTC", year: "numeric", month: "short", day: "numeric" })
-    : "—"
-}
-
 export function ageFrom(dob: Date, now: Date): number {
   let age = now.getUTCFullYear() - dob.getUTCFullYear()
   const m = now.getUTCMonth() - dob.getUTCMonth()

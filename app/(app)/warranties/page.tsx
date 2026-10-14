@@ -1,3 +1,4 @@
+import { getFormat } from "@/lib/regional-server"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +45,7 @@ export default async function WarrantiesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
+  const fmt = await getFormat()
   const params = await searchParams
   const q = typeof params.q === "string" ? params.q : undefined
   const status = typeof params.status === "string" ? params.status : undefined
@@ -155,7 +157,7 @@ export default async function WarrantiesPage({
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{w.vendor ?? "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {w.expirationDate ? new Date(w.expirationDate).toLocaleDateString() : "—"}
+                        {w.expirationDate ? fmt.date(w.expirationDate) : "—"}
                       </td>
                       <td className="px-4 py-3">
                         {st ? <Badge variant={st.variant}>{st.label}</Badge> : <span className="text-muted-foreground">—</span>}

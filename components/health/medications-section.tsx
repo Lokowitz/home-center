@@ -11,22 +11,26 @@ import { AttachmentCount } from "@/components/attachments/attachment-count"
 import {
   createMedication, deleteMedication, markMedicationRefilled, updateMedication,
 } from "@/lib/actions/health"
-import { daysUntil, formatDay, isMedicationActive, refillDue, toDateInput } from "@/lib/health"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
+import { daysUntil, isMedicationActive, refillDue, toDateInput } from "@/lib/health"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
 import type { Attachment, Medication } from "@/app/generated/prisma/client"
 
 export type MedicationRow = Medication & { attachments: Attachment[]; prescriber: { name: string } | null; condition: { name: string } | null }
 
 function RefillCell({ m }: { m: MedicationRow }) {
+  const fmt = useFormat()
   if (!m.nextRefillDate) return <span className="text-muted-foreground">—</span>
+  const shown = fmt.date(m.nextRefillDate, { utc: true })
   const now = new Date()
-  if (!refillDue(m, now)) return <span className="text-muted-foreground">{formatDay(m.nextRefillDate)}</span>
+  if (!refillDue(m, now)) return <span className="text-muted-foreground">{shown}</span>
   return daysUntil(m.nextRefillDate, now) < 0
-    ? <Badge variant="destructive">Overdue · {formatDay(m.nextRefillDate)}</Badge>
-    : <Badge variant="secondary">Due {formatDay(m.nextRefillDate)}</Badge>
+    ? <Badge variant="destructive">Overdue · {shown}</Badge>
+    : <Badge variant="secondary">Due {shown}</Badge>
 }
 
-const COLUMNS: EntityColumn<MedicationRow>[] = [
+const columnsFor = (fmt: Formatter): EntityColumn<MedicationRow>[] => [
   {
     key: "name", label: "Medication",
     cell: (m) => (
@@ -38,20 +42,23 @@ const COLUMNS: EntityColumn<MedicationRow>[] = [
       </div>
     ),
   },
-  { key: "started", label: "Started", className: "whitespace-nowrap text-muted-foreground", cell: (m) => formatDay(m.startDate) },
+  { key: "started", label: "Started", className: "whitespace-nowrap text-muted-foreground", cell: (m) => (m.startDate ? fmt.date(m.startDate, { utc: true }) : "—") },
   { key: "for", label: "For", className: "text-muted-foreground", cell: (m) => m.condition?.name ?? "—" },
   { key: "prescriber", label: "Prescriber", className: "text-muted-foreground", cell: (m) => m.prescriber?.name ?? "—" },
   { key: "refill", label: "Next refill", className: "whitespace-nowrap", cell: (m) => <RefillCell m={m} /> },
   { key: "files", label: "Files", cell: (m) => <AttachmentCount attachments={m.attachments} /> },
 ]
 
-const PAST_COLUMNS: EntityColumn<MedicationRow>[] = [
+const pastColumnsFor = (fmt: Formatter): EntityColumn<MedicationRow>[] => {
+  const COLUMNS = columnsFor(fmt)
+  return [
   COLUMNS[0],
   COLUMNS[1],
-  { key: "ended", label: "Stopped", className: "whitespace-nowrap text-muted-foreground", cell: (m) => formatDay(m.endDate) },
+  { key: "ended", label: "Stopped", className: "whitespace-nowrap text-muted-foreground", cell: (m) => (m.endDate ? fmt.date(m.endDate, { utc: true }) : "—") },
   COLUMNS[2],
   COLUMNS[COLUMNS.length - 1],
-]
+  ]
+}
 
 function initialFor(m: MedicationRow | null): FormValues {
   return {
@@ -78,6 +85,7 @@ interface Props {
 }
 
 export function MedicationsSection({ personId, medications, providers, conditions, openId }: Props) {
+  const fmt = useFormat()
   const [editing, setEditing] = useState<MedicationRow | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -130,7 +138,7 @@ export function MedicationsSection({ personId, medications, providers, condition
 
       <EntityTable
         rows={active}
-        columns={COLUMNS}
+        columns={columnsFor(fmt)}
         describe={(m) => m.name}
         onEdit={openEdit}
         onDelete={handleDelete}
@@ -146,7 +154,7 @@ export function MedicationsSection({ personId, medications, providers, condition
       {past.length > 0 && (
         <div className="mt-6 space-y-2">
           <h3 className="text-sm font-medium text-muted-foreground">Past medications</h3>
-          <EntityTable rows={past} columns={PAST_COLUMNS} describe={(m) => m.name} onEdit={openEdit} onDelete={handleDelete} empty="" renderExpanded={(m) => <AttachmentList recordId={m.id} recordType="MEDICATION" attachments={m.attachments} />} />
+          <EntityTable rows={past} columns={pastColumnsFor(fmt)} describe={(m) => m.name} onEdit={openEdit} onDelete={handleDelete} empty="" renderExpanded={(m) => <AttachmentList recordId={m.id} recordType="MEDICATION" attachments={m.attachments} />} />
         </div>
       )}
 

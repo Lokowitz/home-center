@@ -16,12 +16,12 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createServiceRecord, updateServiceRecord } from "@/lib/actions/service-records"
 import { deleteAttachment } from "@/lib/actions/attachments"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import { matchingReminder } from "@/lib/maintenance-match"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { ASSET_TYPES } from "@/lib/assets"
 import { BellRing, Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
 const NO_CATEGORY = "__none__"
@@ -87,6 +87,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const fmt = useFormat()
 
   function openFilePicker() {
     // The native OS file picker moves focus outside the dialog's DOM, which would
@@ -335,7 +336,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="cost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cost ($)</FormLabel>
+                  <FormLabel>{`Cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="89.99" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -404,7 +405,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{meterUnitNoun(meterUnit)} at Service</FormLabel>
+                    <FormLabel>{fmt.meterNoun(meterUnit)} at Service</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

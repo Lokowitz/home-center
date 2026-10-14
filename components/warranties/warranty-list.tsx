@@ -1,5 +1,6 @@
 "use client"
 
+import { useFormat } from "@/components/regional-provider"
 import { Fragment, useCallback, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -55,6 +56,7 @@ function warrantyStatus(expirationDate: Date | null) {
 }
 
 export function WarrantyList({ warranties: initialWarranties, assetId, assetType, equipment, propertyName, openId }: Props) {
+  const fmt = useFormat()
   const [warranties, setWarranties] = useState(initialWarranties)
   const [prevInitialWarranties, setPrevInitialWarranties] = useState(initialWarranties)
   const [editing, setEditing] = useState<WarrantyWithAttachments | null>(null)
@@ -171,10 +173,10 @@ export function WarrantyList({ warranties: initialWarranties, assetId, assetType
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {w.purchaseDate ? new Date(w.purchaseDate).toLocaleDateString() : <span>—</span>}
+                        {w.purchaseDate ? fmt.date(w.purchaseDate) : <span>—</span>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {w.expirationDate ? new Date(w.expirationDate).toLocaleDateString() : <span>—</span>}
+                        {w.expirationDate ? fmt.date(w.expirationDate) : <span>—</span>}
                       </TableCell>
                       <TableCell>
                         {status && <Badge variant={status.variant}>{status.label}</Badge>}

@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button, buttonVariants } from "@/components/ui/button"
 import { removeBackup, verifyBackup } from "@/lib/actions/backup"
 import type { BackupOverview, BackupRow } from "@/lib/backup/overview-server"
-import { formatBytes, formatWhen, PROTECTION_LABEL } from "./format"
+import { formatBytes, PROTECTION_LABEL } from "./format"
+import { useFormat } from "@/components/regional-provider"
 
 export function BackupList({ data, onChanged, onRestore }: { data: BackupOverview; onChanged: () => Promise<void>; onRestore?: (b: BackupRow) => void }) {
+  const fmt = useFormat()
   const [pending, start] = useTransition()
   // A failed call (server restarting, network gone) shows a toast instead of an unhandled error.
   const act = (fn: () => Promise<void>) => start(async () => {
@@ -32,7 +34,7 @@ export function BackupList({ data, onChanged, onRestore }: { data: BackupOvervie
           {data.backups.map((b) => (
             <li key={b.file} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{formatWhen(b.createdAt)}</p>
+                <p className="truncate text-sm font-medium">{fmt.dateTime(b.createdAt)}</p>
                 <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                   {formatBytes(b.size)}
                   <span className="inline-flex items-center gap-1">
@@ -54,7 +56,7 @@ export function BackupList({ data, onChanged, onRestore }: { data: BackupOvervie
                 {onRestore && <Button variant="outline" size="sm" onClick={() => onRestore(b)}>Restore</Button>}
                 <Button variant="ghost" size="sm" disabled={pending} aria-label="Delete this backup"
                   onClick={() => act(async () => {
-                    if (!window.confirm(`Delete the backup from ${formatWhen(b.createdAt)}? This can't be undone.`)) return
+                    if (!window.confirm(`Delete the backup from ${fmt.dateTime(b.createdAt)}? This can't be undone.`)) return
                     const r = await removeBackup(b.file)
                     if ("error" in r) toast.error(r.error)
                     await onChanged()

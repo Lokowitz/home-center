@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { InboxDropZone } from "@/components/inbox/inbox-drop-zone"
 import { IntakeTip } from "@/components/dashboard/intake-tip"
-import { formatMoney } from "@/lib/costs"
-import { formatDay } from "@/lib/health"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 import { inboxHeadline, inboxReadiness, readFields, type InboxReadiness } from "@/lib/inbox-form"
 import { intakeSummary } from "@/lib/intake-ui"
 import type { InboxListItem } from "@/lib/inbox-server"
@@ -18,22 +18,23 @@ const CHIP: Record<InboxReadiness, { label: string; className: string }> = {
   check: { label: "Needs a look", className: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300" },
 }
 
-function headlineOf(item: InboxListItem, householdNames: string[]) {
+function headlineOf(item: InboxListItem, householdNames: string[], fmt: Formatter) {
   const first = item.attachments[0]
   const fileName = first ? (item.attachments.length > 1 ? `${first.originalName} +${item.attachments.length - 1}` : first.originalName) : "Uploading…"
   const fields = readFields(item, householdNames)
   return inboxHeadline(
     {
-      total: item.parsedTotal != null ? formatMoney(item.parsedTotal) : null,
+      total: item.parsedTotal != null ? fmt.money(item.parsedTotal) : null,
       vendor: fields.vendor.state === "found" ? item.parsedVendor : null,
-      date: item.parsedDate ? formatDay(item.parsedDate) : null,
+      date: item.parsedDate ? fmt.date(item.parsedDate, { utc: true }) : null,
     },
     fileName
   )
 }
 
 /** Dashboard card: what's waiting in Intake, and a place to drop more. */
-export function IntakeCard({ items, householdNames }: { items: InboxListItem[]; householdNames: string[] }) {
+export async function IntakeCard({ items, householdNames }: { items: InboxListItem[]; householdNames: string[] }) {
+  const fmt = await getFormat()
   const { count, newest } = intakeSummary(items)
   return (
     <Card className="py-5">
@@ -64,7 +65,7 @@ export function IntakeCard({ items, householdNames }: { items: InboxListItem[]; 
                       href="/intake"
                       className="flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors duration-150 hover:bg-muted/60"
                     >
-                      <span className="min-w-0 flex-1 truncate">{headlineOf(item, householdNames)}</span>
+                      <span className="min-w-0 flex-1 truncate">{headlineOf(item, householdNames, fmt)}</span>
                       <Badge className={`h-5 shrink-0 px-1.5 text-[11px] ${chip.className}`}>
                         {readiness === "reading" && <Loader2 className="animate-spin" />}
                         {readiness === "failed" && <AlertTriangle />}

@@ -9,9 +9,10 @@ import { EntityTable, type EntityColumn } from "@/components/forms/entity-table"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
 import { deleteObservation } from "@/lib/actions/health"
-import { formatDay } from "@/lib/health"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
 import {
-  filterObservations, formatDuration, formatTime, RANGES, summarizeObservations, typeSuggestions, weeklyCounts,
+  filterObservations, formatDuration, RANGES, summarizeObservations, typeSuggestions, weeklyCounts,
   type RangeValue,
 } from "@/lib/observations"
 import { cn } from "@/lib/utils"
@@ -20,13 +21,13 @@ import { ObservationPattern } from "./observation-pattern"
 
 const ALL = "__all__"
 
-const COLUMNS: EntityColumn<ObservationRow>[] = [
+const columnsFor = (fmt: Formatter): EntityColumn<ObservationRow>[] => [
   {
     key: "when", label: "When", className: "whitespace-nowrap",
     cell: (o) => (
       <span>
-        {formatDay(o.date)}
-        {o.time && <span className="text-muted-foreground"> · {formatTime(o.time)}</span>}
+        {fmt.date(o.date, { utc: true })}
+        {o.time && <span className="text-muted-foreground"> · {fmt.clock(o.time)}</span>}
       </span>
     ),
   },
@@ -49,6 +50,7 @@ interface Props {
 }
 
 export function ObservationsSection({ personId, observations, conditions, openId }: Props) {
+  const fmt = useFormat()
   const [editing, setEditing] = useState<ObservationRow | null>(null)
   const [open, setOpen] = useState(false)
   const [type, setType] = useState<string>(ALL)
@@ -72,7 +74,7 @@ export function ObservationsSection({ personId, observations, conditions, openId
   const linkedConditions = conditions.filter((c) => observations.some((o) => o.conditionId === c.id))
 
   async function handleDelete(o: ObservationRow) {
-    if (!confirm(`Delete this "${o.type}" observation from ${formatDay(o.date)} and its files?`)) return
+    if (!confirm(`Delete this "${o.type}" observation from ${fmt.date(o.date, { utc: true })} and its files?`)) return
     const result = await deleteObservation(o.id)
     if (result.error) { toast.error("Delete failed."); return }
     toast.success("Observation deleted.")
@@ -143,8 +145,8 @@ export function ObservationsSection({ personId, observations, conditions, openId
 
       <EntityTable
         rows={shown}
-        columns={COLUMNS}
-        describe={(o) => `${o.type} on ${formatDay(o.date)}`}
+        columns={columnsFor(fmt)}
+        describe={(o) => `${o.type} on ${fmt.date(o.date, { utc: true })}`}
         onEdit={(o) => { setEditing(o); setOpen(true) }}
         onDelete={handleDelete}
         empty={observations.length ? "Nothing matches these filters." : "No observations yet. Use “Log observation” when something happens."}

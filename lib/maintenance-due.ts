@@ -1,16 +1,5 @@
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
-
-export function meterUnitShort(unit: MeterUnit) {
-  return unit === "HOURS" ? "hrs" : "mi"
-}
-
-export function meterUnitNoun(unit: MeterUnit) {
-  return unit === "HOURS" ? "Hours" : "Mileage"
-}
-
-export function meterUnitWord(unit: MeterUnit) {
-  return unit === "HOURS" ? "hour" : "mile"
-}
+import type { Formatter } from "@/lib/regional"
 
 // A schedule can come due two ways: by date, or — for vehicles — by odometer.
 // The rule used to live only in the asset-detail list, with the mileage warning
@@ -77,11 +66,11 @@ export function scheduleDue(s: DueInput, mileage: MileageIndex, now: Date = new 
 }
 
 /** Badge wording shared by the maintenance page and the asset-detail list. */
-export function dueBadge(due: Due, hasSchedule: boolean) {
+export function dueBadge(due: Due, hasSchedule: boolean, fmt: Pick<Formatter, "meterShort">) {
   if (due.overdue) return { label: "Overdue", variant: "destructive" as const }
   if (due.dueSoon) {
     if (due.reason === "mileage" && due.milesLeft != null) {
-      return { label: `${due.milesLeft.toLocaleString()} ${meterUnitShort(due.meterUnit ?? "MILES")}`, variant: "secondary" as const }
+      return { label: `${due.milesLeft.toLocaleString()} ${fmt.meterShort(due.meterUnit ?? "MILES")}`, variant: "secondary" as const }
     }
     return { label: due.daysLeft != null ? `${due.daysLeft}d` : "Due soon", variant: "secondary" as const }
   }

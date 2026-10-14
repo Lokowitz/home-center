@@ -9,6 +9,7 @@ import {
   allergyDoc, conditionDoc, equipmentDoc, immunizationDoc, insuranceDoc, maintenanceDoc, medicationDoc, observationDoc,
   personDoc, propertyDoc, providerDoc, serviceDoc, vehicleDoc, warrantyDoc, type EntityDoc, type OwnerRef,
 } from "./text"
+import { getFormat } from "@/lib/regional-server"
 import { onEntitiesChanged } from "./changes"
 
 // Keeps the record half of search-index.db in step with the database: build
@@ -22,6 +23,7 @@ const OWNER_KIND: Record<AssetType, NonNullable<OwnerRef>["kind"]> = {
 }
 
 export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc[]> {
+  const fmt = await getFormat()
   const [
     properties, vehicles, equipment, people, services, schedules, warranties, policies, providers,
     conditions, medications, allergies, immunizations, observations,
@@ -66,11 +68,11 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
   return [
     ...properties.map((p) => propertyDoc({
       ...p, equipment: p.equipment.map((e) => ({ name: e.name, category: equipmentCategoryLabel(e.category) })),
-    }, now)),
-    ...vehicles.map((v) => vehicleDoc(v, now)),
+    }, now, fmt)),
+    ...vehicles.map((v) => vehicleDoc(v, now, fmt)),
     ...equipment.map((e) => equipmentDoc({
       ...e, category: equipmentCategoryLabel(e.category), propertyName: e.property?.name ?? null,
-    }, now)),
+    }, now, fmt)),
     ...people.map((p) => personDoc({
       ...p,
       medications: p.medications.filter((m) => !m.endDate || m.endDate.getTime() >= now.getTime()).map((m) => m.name),
@@ -83,12 +85,12 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
       isPerson: r.assetType === "PERSON",
       owner: ownerOf(r.assetType, r.assetId),
       condition: r.condition?.name ?? null,
-    })),
+    }, fmt)),
     ...schedules.map((m) => maintenanceDoc({
       ...m, owner: ownerOf(m.assetType, m.assetId), isPerson: m.assetType === "PERSON", meterUnit: meterUnit(m.assetType, m.assetId),
-    }, now)),
+    }, now, fmt)),
     ...warranties.map((w) => warrantyDoc({ ...w, owner: ownerOf(w.assetType, w.assetId) }, now)),
-    ...policies.map((p) => insuranceDoc({ ...p, members: p.members.map((m) => m.name) }, now)),
+    ...policies.map((p) => insuranceDoc({ ...p, members: p.members.map((m) => m.name) }, now, fmt)),
     ...providers.map((p) => providerDoc({ ...p, primaryFor: p.primaryFor.map((x) => x.name) })),
     ...conditions.map((c) => conditionDoc({ ...c, person: c.person.name, provider: c.provider?.name ?? null })),
     ...medications.map((m) => medicationDoc({

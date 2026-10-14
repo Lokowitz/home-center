@@ -15,6 +15,8 @@ import { setMaintenanceScheduleActive, skipMaintenanceSchedule, snoozeMaintenanc
 import { canSkip } from "@/lib/maintenance-complete"
 import { SNOOZE_OPTIONS, isSnoozed, type SnoozeFor } from "@/lib/maintenance-due"
 import { cn } from "@/lib/utils"
+import type { Formatter } from "@/lib/regional"
+import { useFormat } from "@/components/regional-provider"
 
 interface Props {
   schedule: {
@@ -41,6 +43,7 @@ type ScheduleRef = Props["schedule"]
  */
 export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, onDone?: () => void) {
   const router = useRouter()
+  const fmt = useFormat()
   const [pending, startTransition] = useTransition()
 
   function run(action: () => Promise<{ error?: string } | undefined>, done: string) {
@@ -65,7 +68,7 @@ export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, 
       startTransition(async () => {
         const result = await skipMaintenanceSchedule(schedule.id)
         if (!result || "error" in result) { toast.error(result?.error ?? "Something went wrong."); return }
-        toast.success(`"${schedule.title}" skipped. ${nextDueText(result)}`)
+        toast.success(`"${schedule.title}" skipped. ${nextDueText(result, fmt)}`)
         onDone?.()
         router.refresh()
       }),
@@ -73,9 +76,9 @@ export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, 
 }
 
 /** "Next due Nov 19, 2026." / "…or at 55,000." for the skip toast. */
-function nextDueText(next: { nextDueDate: Date | null; nextDueMileage: number | null }) {
+function nextDueText(next: { nextDueDate: Date | null; nextDueMileage: number | null }, fmt: Formatter) {
   const parts = [
-    next.nextDueDate ? new Date(next.nextDueDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null,
+    next.nextDueDate ? fmt.date(next.nextDueDate) : null,
     next.nextDueMileage != null ? `at ${next.nextDueMileage.toLocaleString()}` : null,
   ].filter(Boolean)
   return parts.length ? `Next due ${parts.join(" or ")}.` : ""

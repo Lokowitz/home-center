@@ -1,18 +1,21 @@
 import { AssetImage } from "@/components/asset-image"
 import { assetLabel } from "@/lib/assets"
-import { averagePerMonth, categoryLabel, costPerMeter, formatMoney, sum, UNCATEGORIZED } from "@/lib/costs"
-import { meterUnitShort, meterUnitWord, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
+import { averagePerMonth, categoryLabel, costPerMeter, sum, UNCATEGORIZED } from "@/lib/costs"
+import { scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
 import type { ReportData, ReportSchedule, ReportService, ReportWarranty } from "@/lib/report-server"
 import type { ServiceCategory } from "@/app/generated/prisma/client"
 import { Empty, SectionTitle } from "./report-parts"
 import { HealthSummary } from "./health-summary"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 
 // The printable asset report. A document, not a screen: one column, real
 // headings, tables where things line up, and no interactive affordance anywhere
 // inside it — the only control lives outside the sheet and is hidden in print.
 
 /** Days of observations to print on a medical summary; null leaves them out. */
-export function AssetReport({ data, observationDays = 90 }: { data: ReportData; observationDays?: number | null }) {
+export async function AssetReport({ data, observationDays = 90 }: { data: ReportData; observationDays?: number | null }) {
+  const fmt = await getFormat()
   const { asset, services, warranties, schedules, costRows, generatedAt } = data
   const isPerson = asset.type === "PERSON"
 
@@ -40,6 +43,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
         subtitle={asset.subtitle}
         kind={isPerson ? "Medical summary" : assetLabel[asset.type]}
         generatedAt={generatedAt}
+        fmt={fmt}
       />
 
       <section className="report-section mt-7 grid grid-cols-[1.6fr_1fr] gap-7">
@@ -76,7 +80,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           ) : null}
         </div>
       </section>
-      {data.health && <HealthSummary health={data.health} now={now} observationDays={observationDays} />}
+      {data.health && <HealthSummary health={data.health} now={now} observationDays={observationDays} fmt={fmt} />}
 
       <section className="report-section mt-7">
         <SectionTitle>Summary</SectionTitle>
@@ -85,7 +89,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           style={{ borderColor: "var(--rule-strong)", background: "var(--rule)" }}
           data-print-color=""
         >
-          <Stat label={isPerson ? "Medical spend to date" : "Service cost to date"} value={formatMoney(lifetime)} />
+          <Stat label={isPerson ? "Medical spend to date" : "Service cost to date"} value={fmt.money(lifetime)} />
           <Stat
             label={isPerson ? "Visits" : "Service records"}
             value={String(services.length)}
@@ -109,19 +113,19 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           )}
           {perMeter != null ? (
             <Stat
-              label={`Cost per ${meterUnitWord(asset.meterUnit!)}`}
-              value={formatMoney(perMeter)}
+              label={`Cost per ${fmt.meterWord(asset.meterUnit!)}`}
+              value={fmt.money(perMeter)}
             />
           ) : asset.purchasePrice != null ? (
             <Stat
               label="Total owned cost"
-              value={formatMoney(asset.purchasePrice + lifetime)}
+              value={fmt.money(asset.purchasePrice + lifetime)}
               note="purchase + service"
             />
           ) : (
             <Stat
               label="Average per month"
-              value={formatMoney(averagePerMonth(costRows, now))}
+              value={fmt.money(averagePerMonth(costRows, now))}
               note="since first record"
             />
           )}
@@ -137,9 +141,9 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
         </section>
       ) : null}
 
-      <ServiceHistory services={services} asset={data.asset} total={lifetime} />
-      {!isPerson && <Warranties warranties={warranties} now={now} />}
-      <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} />
+      <ServiceHistory services={services} asset={data.asset} total={lifetime} fmt={fmt} />
+      {!isPerson && <Warranties warranties={warranties} now={now} fmt={fmt} />}
+      <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} fmt={fmt} />
 
       <footer
         className="mt-9 border-t pt-3 text-[8.5pt]"
@@ -149,7 +153,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
         <div className="flex justify-between gap-6">
           <span>
             {asset.name} · {isPerson ? "medical summary" : `${assetLabel[asset.type]} report`} · generated{" "}
-            {generatedAt.toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })}
+            {`${fmt.date(generatedAt, { long: true })} ${fmt.time(generatedAt)}`}
           </span>
           <span>HomeCenter</span>
         </div>
@@ -178,11 +182,13 @@ function Masthead({
   subtitle,
   kind,
   generatedAt,
+  fmt,
 }: {
   title: string
   subtitle: string | null
   kind: string
   generatedAt: Date
+  fmt: Formatter
 }) {
   return (
     <header>
@@ -192,7 +198,7 @@ function Masthead({
         data-print-color=""
       >
         <span>HomeCenter · {kind} report</span>
-        <span>{generatedAt.toLocaleDateString(undefined, { dateStyle: "long" })}</span>
+        <span>{fmt.date(generatedAt, { long: true })}</span>
       </div>
       <h1 className="font-heading mt-5 text-[26pt] font-semibold leading-none">{title}</h1>
       {subtitle ? (
@@ -251,13 +257,15 @@ function ServiceHistory({
   services,
   asset,
   total,
+  fmt,
 }: {
   services: ReportService[]
   asset: ReportData["asset"]
   total: number
+  fmt: Formatter
 }) {
   const showMeter = asset.type === "VEHICLE" && services.some((s) => s.mileageAtService != null)
-  const unit = meterUnitShort(asset.meterUnit ?? "MILES")
+  const unit = fmt.meterShort(asset.meterUnit ?? "MILES")
 
   return (
     <section className="report-section mt-7">
@@ -286,12 +294,7 @@ function ServiceHistory({
             <tbody key={s.id} className="report-break-avoid">
               <tr className="border-t align-top" style={{ borderColor: "var(--rule)" }}>
                 <td className="whitespace-nowrap py-2.5 pr-3 tabular-nums" style={{ color: "var(--ink-soft)" }}>
-                  {new Date(s.date).toLocaleDateString(undefined, {
-                    timeZone: "UTC",
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {fmt.date(s.date, { utc: true })}
                 </td>
                 <td className="py-2.5 pr-3">
                   <div className="font-semibold">{s.title}</div>
@@ -316,7 +319,7 @@ function ServiceHistory({
                   </td>
                 ) : null}
                 <td className="py-2.5 text-right font-medium tabular-nums">
-                  {s.cost != null ? formatMoney(s.cost) : "—"}
+                  {s.cost != null ? fmt.money(s.cost) : "—"}
                 </td>
               </tr>
             </tbody>
@@ -326,7 +329,7 @@ function ServiceHistory({
               <td className="py-2.5 text-[9pt] font-semibold uppercase tracking-wide" colSpan={showMeter ? 4 : 3}>
                 Total
               </td>
-              <td className="py-2.5 text-right font-semibold tabular-nums">{formatMoney(total)}</td>
+              <td className="py-2.5 text-right font-semibold tabular-nums">{fmt.money(total)}</td>
             </tr>
           </tfoot>
         </table>
@@ -335,7 +338,7 @@ function ServiceHistory({
   )
 }
 
-function Warranties({ warranties, now }: { warranties: ReportWarranty[]; now: Date }) {
+function Warranties({ warranties, now, fmt }: { warranties: ReportWarranty[]; now: Date; fmt: Formatter }) {
   return (
     <section className="report-section mt-7">
       <SectionTitle>Warranties</SectionTitle>
@@ -372,12 +375,12 @@ function Warranties({ warranties, now }: { warranties: ReportWarranty[]; now: Da
                   <span>
                     Purchased{" "}
                     {w.purchaseDate
-                      ? new Date(w.purchaseDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(w.purchaseDate, { utc: true })
                       : "—"}
                   </span>
                   <span>
                     Expires{" "}
-                    {expires ? expires.toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" }) : "—"}
+                    {expires ? fmt.date(expires, { utc: true }) : "—"}
                   </span>
                 </div>
                 {contact ? (
@@ -405,13 +408,15 @@ function Maintenance({
   mileage,
   asset,
   now,
+  fmt,
 }: {
   schedules: ReportSchedule[]
   mileage: MileageIndex
   asset: ReportData["asset"]
   now: Date
+  fmt: Formatter
 }) {
-  const unit = meterUnitShort(asset.meterUnit ?? "MILES")
+  const unit = fmt.meterShort(asset.meterUnit ?? "MILES")
 
   return (
     <section className="report-section mt-7">
@@ -471,7 +476,7 @@ function Maintenance({
                   <span>
                     Last completed{" "}
                     {m.lastCompletedDate
-                      ? new Date(m.lastCompletedDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(m.lastCompletedDate, { utc: true })
                       : "—"}
                     {m.lastCompletedMileage != null
                       ? ` at ${m.lastCompletedMileage.toLocaleString()} ${unit}`
@@ -480,7 +485,7 @@ function Maintenance({
                   <span>
                     Next due{" "}
                     {m.nextDueDate
-                      ? new Date(m.nextDueDate).toLocaleDateString(undefined, { timeZone: "UTC", dateStyle: "medium" })
+                      ? fmt.date(m.nextDueDate, { utc: true })
                       : "—"}
                     {m.nextDueMileage != null ? ` / ${m.nextDueMileage.toLocaleString()} ${unit}` : ""}
                   </span>

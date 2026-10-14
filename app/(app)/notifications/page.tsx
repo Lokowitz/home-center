@@ -1,3 +1,4 @@
+import { getFormat } from "@/lib/regional-server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
@@ -26,6 +27,7 @@ export default async function NotificationsPage({
 }: {
   searchParams: Promise<{ hidden?: string }>
 }) {
+  const fmt = await getFormat()
   const session = await auth()
   if (!session) redirect("/login")
   const showHidden = (await searchParams).hidden === "1"
@@ -99,7 +101,7 @@ export default async function NotificationsPage({
                       {dismissed && <Badge variant="outline" className="h-4 px-1.5 text-xs">Dismissed</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{fmt.dateTime(n.createdAt)}</p>
                   </Link>
                 </div>
                 {/* A due reminder is dealt with by completing or snoozing it, which

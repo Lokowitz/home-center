@@ -4,10 +4,10 @@ import { assetHref } from "@/lib/assets"
 import { categoryLabel as equipmentCategoryLabel } from "@/components/equipment/categories"
 import { categoryLabel as serviceCategoryLabel } from "@/lib/costs"
 import {
-  ageFrom, ALLERGY_SEVERITIES, CONDITION_STATUSES, formatDay, INSURANCE_KINDS, insuranceExpiring, isMedicationActive,
+  ageFrom, ALLERGY_SEVERITIES, CONDITION_STATUSES, INSURANCE_KINDS, insuranceExpiring, isMedicationActive,
   labelFor, RELATIONSHIPS,
 } from "@/lib/health"
-import { dueBadge, meterUnitShort, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
+import { dueBadge, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
 import { warrantyState } from "@/lib/llm/warranty-status"
 import { observationHref } from "@/lib/observations"
 import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
@@ -17,6 +17,8 @@ import { passage } from "@/lib/documents/passage"
 import { groupHits } from "@/lib/documents/tool-helpers"
 import { healthAttachmentIds, loadDocumentRefs } from "@/lib/documents/scope"
 import { loadFeatures } from "@/lib/features-server"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 import type { Features } from "@/lib/features"
 import type { Hit } from "@/lib/documents/index-db"
 import {
@@ -40,9 +42,10 @@ const WARRANTY_WINDOW_DAYS = 60
 const ENTITY_POOL = 80
 const SEMANTIC_RECORD_LIMIT = 24
 
-const money = (n: number | null | undefined) =>
-  n == null ? null : `$${n.toLocaleString(undefined, { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`
-const day = (d: Date | null | undefined) => (d ? formatDay(d) : null)
+const moneyWith = (fmt: Formatter) => (n: number | null | undefined) =>
+  n == null ? null : Number.isInteger(n) ? fmt.moneyWhole(n) : fmt.money(n)
+/** Stored days are shown in UTC: that is the day that was typed. */
+const dayWith = (fmt: Formatter) => (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : null)
 const clip = (s: string | null | undefined, n = 160) => {
   if (!s) return null
   const flat = s.replace(/\s+/g, " ").trim()
@@ -276,6 +279,9 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
 
 /** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
 async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<Section[]> {
+  const fmt = await getFormat()
+  const money = moneyWith(fmt)
+  const day = dayWith(fmt)
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)
   const [properties, vehicles, equipment, people] = await Promise.all([
@@ -332,7 +338,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
     subtitle: r.address,
     facts: facts([
       ["Built", r.yearBuilt],
-      ["Size", r.sqFt ? `${r.sqFt.toLocaleString()} sq ft` : null],
+      ["Size", r.sqFt ? fmt.area(r.sqFt) : null],
       ["Purchased", money(r.purchasePrice)],
       ["Equipment", r._count.equipment || null],
       ["Last service", last(r.id)],
@@ -345,7 +351,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
     badge: String(r.year),
     subtitle: `${r.year} ${r.make} ${r.model}`,
     facts: facts([
-      [r.meterUnit === "HOURS" ? "Hours" : "Mileage", r.currentMileage != null ? `${r.currentMileage.toLocaleString()} ${meterUnitShort(r.meterUnit)}` : null],
+      [fmt.meterNoun(r.meterUnit), r.currentMileage != null ? `${r.currentMileage.toLocaleString()} ${fmt.meterShort(r.meterUnit)}` : null],
       ["Color", r.color],
       ["VIN", r.vin ? `…${r.vin.slice(-6)}` : null],
       ["Last service", last(r.id)],
@@ -391,6 +397,9 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
 
 /** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
 async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[]): Promise<Section[]> {
+  const fmt = await getFormat()
+  const money = moneyWith(fmt)
+  const day = dayWith(fmt)
   const thumb = (id: string) => owners.thumbs.get(id) ?? null
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)
@@ -475,7 +484,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
       ["Vendor", r.vendor],
       ["Category", r.category ? serviceCategoryLabel(r.category) : null],
       [r.assetType === "VEHICLE" && unitOf(r.assetId) === "HOURS" ? "Hours" : "Odometer",
-        r.mileageAtService != null ? `${r.mileageAtService.toLocaleString()} ${meterUnitShort(unitOf(r.assetId))}` : null],
+        r.mileageAtService != null ? `${r.mileageAtService.toLocaleString()} ${fmt.meterShort(unitOf(r.assetId))}` : null],
     ]),
     owner: thumb(r.assetId), people: null,
   }))
@@ -496,8 +505,8 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
   const m = page(kinds.rank(schedules, (r) => textsOf(r, FIELDS.maintenance, assetName(r.assetId))))
   const maintenanceCards: RecordResult[] = m.items.map((r) => {
     const due = scheduleDue(r, mileageIndex, now)
-    const badge = dueBadge(due, Boolean(r.nextDueDate || r.nextDueMileage))
-    const unit = meterUnitShort(unitOf(r.assetId))
+    const badge = dueBadge(due, Boolean(r.nextDueDate || r.nextDueMileage), fmt)
+    const unit = fmt.meterShort(unitOf(r.assetId))
     const every = [
       r.intervalDays ? `${r.intervalDays} days` : null,
       r.intervalMiles ? `${r.intervalMiles.toLocaleString()} ${unit}` : null,

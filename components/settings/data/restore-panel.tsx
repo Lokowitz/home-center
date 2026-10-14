@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { dismissRestoreNotice, restoreCancel, restoreCancelStaged, restoreConfirm, restoreDryRun, restoreRestart, restoreUndo } from "@/lib/actions/backup"
 import type { BackupOverview } from "@/lib/backup/overview-server"
 import type { DryRun, RestoreResult } from "@/lib/backup/restore"
-import { formatWhen } from "./format"
+import { useFormat } from "@/components/regional-provider"
 
 export type RestoreSource = { upload: string } | { file: string }
 
@@ -36,6 +36,7 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
   setSource: (s: RestoreSource | null) => void
   onChanged: () => Promise<void>
 }) {
+  const fmt = useFormat()
   const input = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const [pending, start] = useTransition()
@@ -127,7 +128,7 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
             </Button>
           )}
         </div>
-        {r?.undoAvailableUntil && !r.pending && <p className="text-xs text-muted-foreground">You can undo the last restore until {formatWhen(r.undoAvailableUntil)}.</p>}
+        {r?.undoAvailableUntil && !r.pending && <p className="text-xs text-muted-foreground">You can undo the last restore until {fmt.dateTime(r.undoAvailableUntil)}.</p>}
         <p className="text-xs text-muted-foreground">Or use Restore on a backup in the list above.</p>
       </CardContent>
       {source && (
@@ -143,6 +144,7 @@ export function RestorePanel({ data, source, setSource, onChanged }: {
 }
 
 function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?: () => void }) {
+  const fmt = useFormat()
   const close = (
     <button type="button" className="ml-auto shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-50" aria-label="Dismiss this notice" disabled={!onDismiss} onClick={onDismiss}>
       <X className="h-4 w-4" aria-hidden="true" />
@@ -151,7 +153,7 @@ function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?
   if (result.status === "ok") {
     return (
       <div className="flex items-start gap-2 text-sm">
-        <p>{result.source === "undo" ? "Undid the restore" : `Restored from the backup of ${result.backupCreatedAt ? formatWhen(result.backupCreatedAt) : "an earlier state"}`} on {formatWhen(result.appliedAt)}.</p>
+        <p>{result.source === "undo" ? "Undid the restore" : `Restored from the backup of ${result.backupCreatedAt ? fmt.dateTime(result.backupCreatedAt) : "an earlier state"}`} on {fmt.dateTime(result.appliedAt)}.</p>
         {close}
       </div>
     )
@@ -159,7 +161,7 @@ function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?
   if (result.rolledBack) {
     return (
       <div className="flex items-start gap-2 text-sm">
-        <p className="text-destructive">The last restore didn&apos;t finish ({formatWhen(result.appliedAt)}): {result.error} Nothing was changed.</p>
+        <p className="text-destructive">The last restore didn&apos;t finish ({fmt.dateTime(result.appliedAt)}): {result.error} Nothing was changed.</p>
         {close}
       </div>
     )
@@ -167,7 +169,7 @@ function ResultNotice({ result, onDismiss }: { result: RestoreResult; onDismiss?
   return (
     <div className="space-y-2 rounded-md border border-destructive p-3 text-sm" role="alert">
       <div className="flex items-start gap-2">
-        <p className="flex items-center gap-2 font-medium text-destructive"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />The last restore failed part-way ({formatWhen(result.appliedAt)}).</p>
+        <p className="flex items-center gap-2 font-medium text-destructive"><TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />The last restore failed part-way ({fmt.dateTime(result.appliedAt)}).</p>
         {/* Only once someone has dealt with the displaced data (npm run restore -- --ack). */}
         {result.acknowledgedAt && close}
       </div>
@@ -204,6 +206,7 @@ function RestoreDialog({ source, onClose, onStaged, restart }: {
   onStaged: () => Promise<void>
   restart: () => Promise<void>
 }) {
+  const fmt = useFormat()
   const [report, setReport] = useState<DryRun | null>(null)
   const [key, setKey] = useState("")
   const [password, setPassword] = useState("")
@@ -257,7 +260,7 @@ function RestoreDialog({ source, onClose, onStaged, restart }: {
 
         {report?.ok && (
           <div className="space-y-3 text-sm">
-            <p>Backup from <strong>{formatWhen(report.manifest.createdAt)}</strong> (HomeCenter {report.manifest.appVersion}).</p>
+            <p>Backup from <strong>{fmt.dateTime(report.manifest.createdAt)}</strong> (HomeCenter {report.manifest.appVersion}).</p>
             <table className="w-full text-xs">
               <thead><tr className="text-muted-foreground"><th className="text-left font-normal">What</th><th className="text-right font-normal">Now</th><th className="text-right font-normal">After restore</th></tr></thead>
               <tbody>

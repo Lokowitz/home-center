@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  ageFrom, daysUntil, formatDay, immunizationDue, insuranceExpiring, isMedicationActive,
+  ageFrom, daysUntil, immunizationDue, insuranceExpiring, isMedicationActive,
   isSupersededImmunization, labelFor, nextRefillFrom, refillDue, RELATIONSHIPS, toDateInput,
 } from "./health"
 
@@ -101,13 +101,6 @@ describe("helpers", () => {
   it("formats dates for <input type=date>", () => {
     expect(toDateInput(d("2026-09-25T00:00:00Z"))).toBe("2026-09-25")
     expect(toDateInput(null)).toBe("")
-  })
-  it("displays the stored UTC day, whatever the local zone", () => {
-    const shown = formatDay(d("2026-01-05"))
-    expect(shown).toContain("2026")
-    expect(shown).toContain("5")
-    expect(shown).not.toContain("4,")
-    expect(formatDay(null)).toBe("—")
   })
   it("labels enum values and falls back to the raw value", () => {
     expect(labelFor(RELATIONSHIPS, "SPOUSE")).toBe("Spouse")

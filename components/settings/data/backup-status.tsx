@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { backUpNow, dismissBackupHint } from "@/lib/actions/backup"
 import type { BackupOverview } from "@/lib/backup/overview-server"
-import { formatBytes, formatWhen, PROTECTION_LABEL } from "./format"
+import { formatBytes, PROTECTION_LABEL } from "./format"
+import { useFormat } from "@/components/regional-provider"
 
 const TONE = {
   ok: { icon: CheckCircle2, text: "Backups are up to date", cls: "text-emerald-600 dark:text-emerald-400" },
@@ -18,6 +19,7 @@ const TONE = {
 } as const
 
 export function BackupStatus({ data, onStarted }: { data: BackupOverview; onStarted: () => Promise<void> }) {
+  const fmt = useFormat()
   const [pending, start] = useTransition()
   const tone = TONE[data.tone]
   const newest = data.backups[0]
@@ -56,9 +58,9 @@ export function BackupStatus({ data, onStarted }: { data: BackupOverview; onStar
         </CardTitle>
         <CardDescription>
           {newest
-            ? `Last backup ${formatWhen(newest.createdAt)} · ${formatBytes(newest.size)} · ${PROTECTION_LABEL[newest.protection]}`
+            ? `Last backup ${fmt.dateTime(newest.createdAt)} · ${formatBytes(newest.size)} · ${PROTECTION_LABEL[newest.protection]}`
             : "Make your first backup now, or turn on a schedule below."}
-          {data.nextRunAt && data.settings.schedule !== "OFF" ? ` · Next ${formatWhen(data.nextRunAt)}` : ""}
+          {data.nextRunAt && data.settings.schedule !== "OFF" ? ` · Next ${fmt.dateTime(data.nextRunAt)}` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 px-5">

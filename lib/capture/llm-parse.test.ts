@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { ChatFn, ChatRequest, ChatResult } from "@/lib/llm/types"
 import { LlmError } from "@/lib/llm/errors"
 import {
-  MAX_TEXT_CHARS, PROMPT, RECEIPT_MAX_TOKENS, fillFromBasic, llmFailureDetail, parseLlmReply, readReceiptByLlm, receiptChatOptions,
+  MAX_TEXT_CHARS, PROMPT, RECEIPT_MAX_TOKENS, receiptPrompt, fillFromBasic, llmFailureDetail, parseLlmReply, readReceiptByLlm, receiptChatOptions,
 } from "./llm-parse"
 
 describe("fillFromBasic", () => {
@@ -25,6 +25,18 @@ describe("PROMPT", () => {
   it("asks for the date things happened, not a print date or date of birth", () => {
     expect(PROMPT).toMatch(/visit or test/)
     expect(PROMPT).toMatch(/date of birth/)
+  })
+})
+
+describe("receiptPrompt", () => {
+  it("names the household currency", () => {
+    expect(receiptPrompt("EUR")).toContain("currency is EUR")
+  })
+  it("accepts a European total string", () => {
+    expect(parseLlmReply('{"date":null,"total":"1.234,56","vendor":null}')?.total).toBe(1234.56)
+  })
+  it("reads a dot-decimal string as a decimal, not thousands", () => {
+    expect(parseLlmReply('{"date":null,"total":"12.500","vendor":null}')?.total).toBe(12.5)
   })
 })
 

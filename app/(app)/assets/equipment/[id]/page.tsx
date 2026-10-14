@@ -12,6 +12,7 @@ import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { EquipmentEditButton } from "@/components/equipment/equipment-edit-button"
 import { categoryLabel } from "@/components/equipment/categories"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
+import { getFormat } from "@/lib/regional-server"
 
 export default async function EquipmentDetailPage({
   params,
@@ -21,6 +22,7 @@ export default async function EquipmentDetailPage({
   searchParams: Promise<{ tab?: string; open?: string }>
 }) {
   const { id } = await params
+  const fmt = await getFormat()
   const { tab, open } = await searchParams
   const equipment = await prisma.equipment.findUnique({
     where: { id },
@@ -60,10 +62,10 @@ export default async function EquipmentDetailPage({
               }
             />
           )}
-          {equipment.installDate && <Stat icon={Calendar} label="Installed" value={new Date(equipment.installDate).toLocaleDateString()} />}
-          {equipment.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(equipment.purchaseDate).toLocaleDateString()} />}
+          {equipment.installDate && <Stat icon={Calendar} label="Installed" value={fmt.date(equipment.installDate)} />}
+          {equipment.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(equipment.purchaseDate)} />}
           {equipment.purchasePrice != null && (
-            <Stat icon={DollarSign} label="Price" value={`$${equipment.purchasePrice.toLocaleString()}`} />
+            <Stat icon={DollarSign} label="Price" value={fmt.moneyWhole(equipment.purchasePrice)} />
           )}
         </div>
 

@@ -2,7 +2,9 @@ import { prisma } from "@/lib/prisma"
 import { categoryLabel as equipmentCategoryLabel } from "@/components/equipment/categories"
 import type { AssetType, MeterUnit, Prisma, Provider } from "@/app/generated/prisma/client"
 import type { CostRow } from "@/lib/costs"
-import { ageFrom, formatDay, labelFor, RELATIONSHIPS } from "@/lib/health"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
+import { ageFrom, labelFor, RELATIONSHIPS } from "@/lib/health"
 
 // Everything the printable asset report needs, in one place.
 //
@@ -76,13 +78,9 @@ export type ReportData = {
   generatedAt: Date
 }
 
-function formatDate(date: Date | null | undefined): string {
+function formatDate(date: Date | null | undefined, fmt: Formatter): string {
   if (!date) return "—"
-  return new Date(date).toLocaleDateString(undefined, { timeZone: "UTC", year: "numeric", month: "long", day: "numeric" })
-}
-
-function formatMoneyPlain(n: number): string {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+  return fmt.date(date, { utc: true, long: true })
 }
 
 const PROPERTY_TYPE_LABELS: Record<string, string> = {
@@ -157,6 +155,7 @@ async function loadHealth(personId: string): Promise<ReportHealth | null> {
 }
 
 async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportAsset | null> {
+  const fmt = await getFormat()
   if (assetType === "PERSON") {
     const p = await prisma.person.findUnique({
       where: { id: assetId },
@@ -178,7 +177,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       currentMeter: null,
       details: [
         { label: "Relationship", value: relationship },
-        ...(p.dateOfBirth ? [{ label: "Date of birth", value: formatDay(p.dateOfBirth) }] : []),
+        ...(p.dateOfBirth ? [{ label: "Date of birth", value: fmt.date(p.dateOfBirth, { utc: true }) }] : []),
         ...(p.sex ? [{ label: "Sex", value: p.sex }] : []),
         ...(p.bloodType ? [{ label: "Blood type", value: p.bloodType }] : []),
         ...(p.primaryProvider ? [{ label: "Primary care", value: p.primaryProvider.name }] : []),
@@ -207,10 +206,10 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
         { label: "Type", value: PROPERTY_TYPE_LABELS[p.type] ?? "Other" },
         { label: "Address", value: p.address },
         ...(p.yearBuilt ? [{ label: "Year built", value: String(p.yearBuilt) }] : []),
-        ...(p.sqFt ? [{ label: "Square feet", value: p.sqFt.toLocaleString() }] : []),
-        { label: "Purchased", value: formatDate(p.purchaseDate) },
+        ...(p.sqFt ? [{ label: fmt.areaWords.replace(/^./, (c) => c.toUpperCase()), value: p.sqFt.toLocaleString() }] : []),
+        { label: "Purchased", value: formatDate(p.purchaseDate, fmt) },
         ...(p.purchasePrice != null
-          ? [{ label: "Purchase price", value: formatMoneyPlain(p.purchasePrice) }]
+          ? [{ label: "Purchase price", value: fmt.moneyWhole(p.purchasePrice) }]
           : []),
         ...(p.equipment.length > 0
           ? [{ label: "Equipment on site", value: p.equipment.map((e) => e.name).join(", ") }]
@@ -222,7 +221,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
   if (assetType === "VEHICLE") {
     const v = await prisma.vehicle.findUnique({ where: { id: assetId } })
     if (!v) return null
-    const unit = v.meterUnit === "HOURS" ? "hours" : "miles"
+    const unit = v.meterUnit === "HOURS" ? "hours" : fmt.distanceWords
     return {
       type: "VEHICLE",
       id: v.id,
@@ -243,9 +242,9 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
         ...(v.currentMileage != null
           ? [{ label: `Current ${unit}`, value: v.currentMileage.toLocaleString() }]
           : []),
-        { label: "Purchased", value: formatDate(v.purchaseDate) },
+        { label: "Purchased", value: formatDate(v.purchaseDate, fmt) },
         ...(v.purchasePrice != null
-          ? [{ label: "Purchase price", value: formatMoneyPlain(v.purchasePrice) }]
+          ? [{ label: "Purchase price", value: fmt.moneyWhole(v.purchasePrice) }]
           : []),
       ],
     }
@@ -274,10 +273,10 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       ...(e.serialNumber ? [{ label: "Serial number", value: e.serialNumber }] : []),
       ...(e.location ? [{ label: "Location", value: e.location }] : []),
       ...(e.property ? [{ label: "Property", value: e.property.name }] : []),
-      ...(e.installDate ? [{ label: "Installed", value: formatDate(e.installDate) }] : []),
-      { label: "Purchased", value: formatDate(e.purchaseDate) },
+      ...(e.installDate ? [{ label: "Installed", value: formatDate(e.installDate, fmt) }] : []),
+      { label: "Purchased", value: formatDate(e.purchaseDate, fmt) },
       ...(e.purchasePrice != null
-        ? [{ label: "Purchase price", value: formatMoneyPlain(e.purchasePrice) }]
+        ? [{ label: "Purchase price", value: fmt.moneyWhole(e.purchasePrice) }]
         : []),
     ],
   }

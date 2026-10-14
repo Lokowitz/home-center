@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button"
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog"
 import { EntityTable, type EntityColumn } from "@/components/forms/entity-table"
 import { createProvider, deleteProvider, updateProvider } from "@/lib/actions/providers"
-import { formatMoney } from "@/lib/costs"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
 import type { Provider } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 const FIELDS: FieldConfig[] = [
   { name: "name", label: "Name", kind: "text", required: true, placeholder: "Dr. Maria Chen", wide: true },
@@ -33,6 +33,7 @@ interface Props {
 }
 
 export function ProvidersTable({ providers, stats }: Props) {
+  const fmt = useFormat()
   const [editing, setEditing] = useState<Provider | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -52,7 +53,7 @@ export function ProvidersTable({ providers, stats }: Props) {
       cell: (p) => (p.phone ? <a href={`tel:${p.phone}`} onClick={(e) => e.stopPropagation()} className="hover:underline">{p.phone}</a> : "—"),
     },
     { key: "visits", label: "Visits", className: "text-right text-muted-foreground", cell: (p) => stats[p.id]?.visits ?? 0 },
-    { key: "spend", label: "Spend", className: "text-right whitespace-nowrap", cell: (p) => formatMoney(stats[p.id]?.spend ?? 0) },
+    { key: "spend", label: "Spend", className: "text-right whitespace-nowrap", cell: (p) => fmt.money(stats[p.id]?.spend ?? 0) },
   ]
 
   async function handleDelete(p: Provider) {

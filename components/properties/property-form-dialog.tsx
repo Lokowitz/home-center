@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useFormat } from "@/components/regional-provider"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -41,6 +42,7 @@ interface Props {
 
 export function PropertyFormDialog({ open, onClose, property }: Props) {
   const router = useRouter()
+  const fmt = useFormat()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -149,7 +151,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="sqFt" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Square Footage</FormLabel>
+                  <FormLabel>{fmt.areaLabel}</FormLabel>
                   <FormControl><Input type="number" placeholder="2000" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

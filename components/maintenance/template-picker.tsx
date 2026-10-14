@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { addTemplateSchedules } from "@/lib/actions/maintenance"
 import { assetHref } from "@/lib/assets"
-import { meterUnitShort } from "@/lib/maintenance-due"
+import { useFormat } from "@/components/regional-provider"
 import type { MaintenanceTemplate } from "@/lib/maintenance-templates"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { cn } from "@/lib/utils"
@@ -28,6 +28,7 @@ interface Props {
 
 export function TemplatePicker({ assetType, assetId, templates, existingTitles, meterUnit }: Props) {
   const router = useRouter()
+  const fmt = useFormat()
   const [pending, start] = useTransition()
   const [rows, setRows] = useState<Record<string, Row>>(() =>
     Object.fromEntries(
@@ -110,13 +111,13 @@ export function TemplatePicker({ assetType, assetId, templates, existingTitles, 
                       type="number"
                       min={1}
                       inputMode="numeric"
-                      aria-label={`${t.title}: ${meterUnitShort(meterUnit)} between`}
+                      aria-label={`${t.title}: ${fmt.meterShort(meterUnit)} between`}
                       className="h-8 w-24"
                       value={row.miles}
                       disabled={!row.checked}
                       onChange={(e) => set(t.key, { miles: e.target.value })}
                     />
-                    <span>{meterUnitShort(meterUnit)}</span>
+                    <span>{fmt.meterShort(meterUnit)}</span>
                   </>
                 )}
               </div>

@@ -15,11 +15,11 @@ import { AssetSelect, type InboxAssetOption, type InboxReminderOption } from "@/
 import { fileInboxItem } from "@/lib/actions/inbox"
 import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { BellRing } from "lucide-react"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import { matchingReminder } from "@/lib/maintenance-match"
 import { NO_CATEGORY, fieldErrorTarget, fileFormPayload, parseAssetKey, type FileFormValues } from "@/lib/inbox-form"
 // Type only: service-record-server reaches Prisma.
 import type { ServiceRecordInput } from "@/lib/service-record-server"
+import { useFormat } from "@/components/regional-provider"
 
 const NO_LINK = "__none__"
 
@@ -55,6 +55,7 @@ export function FileInboxDialog({
   onClose: () => void
 }) {
   const router = useRouter()
+  const fmt = useFormat()
   const form = useForm<FileFormValues>({ resolver: zodResolver(schema), defaultValues: defaults })
 
   const key = useWatch({ control: form.control, name: "assetKey" })
@@ -177,7 +178,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="cost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cost ($)</FormLabel>
+                  <FormLabel>{`Cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" inputMode="decimal" placeholder="89.99" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -216,7 +217,7 @@ export function FileInboxDialog({
               {asset?.assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{meterUnitNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
+                    <FormLabel>{fmt.meterNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
                     <FormControl><Input type="number" inputMode="numeric" placeholder={chosen?.meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

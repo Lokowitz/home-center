@@ -12,8 +12,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { completeMaintenanceSchedule } from "@/lib/actions/maintenance"
 import { uploadAll } from "@/lib/upload-client"
-import { meterUnitNoun } from "@/lib/maintenance-due"
 import type { MaintenanceSchedule, MeterUnit } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 /** Marks a reminder done and, unless unticked, logs it in the service history. */
 export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }: {
@@ -23,6 +23,7 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
   onClose: () => void
 }) {
   const router = useRouter()
+  const fmt = useFormat()
   const [files, setFiles] = useState<File[]>([])
   const { register, handleSubmit, watch, formState: { isSubmitting } } = useForm({
     defaultValues: {
@@ -71,7 +72,7 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
             </div>
             {schedule.assetType === "VEHICLE" && (
               <div className="space-y-1.5">
-                <label htmlFor="complete-mileage" className="text-sm font-medium">{meterUnitNoun(meterUnit)} at Completion</label>
+                <label htmlFor="complete-mileage" className="text-sm font-medium">{fmt.meterNoun(meterUnit)} at Completion</label>
                 <Input id="complete-mileage" type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...register("completedMileage")} />
               </div>
             )}
@@ -89,7 +90,7 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
                 <Input id="complete-vendor" placeholder={isPerson ? "City Medical Center" : "Jiffy Lube"} {...register("vendor")} />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="complete-cost" className="text-sm font-medium">Cost ($)</label>
+                <label htmlFor="complete-cost" className="text-sm font-medium">{`Cost (${fmt.currencySymbol})`}</label>
                 <Input id="complete-cost" type="number" step="0.01" min="0" placeholder="89.99" {...register("cost")} />
               </div>
               <div className="col-span-2 space-y-1.5">

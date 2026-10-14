@@ -49,13 +49,6 @@ export function formatDuration(minutes: number | null | undefined): string {
   return m ? `${h} h ${m} min` : `${h} h`
 }
 
-/** "14:30" → "2:30 PM"; null → "". */
-export function formatTime(time: string | null | undefined): string {
-  if (!time) return ""
-  const [h, m] = time.split(":").map(Number)
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`
-}
-
 /** Types used before, most frequent first — the form offers these as you type. */
 export function typeSuggestions(rows: { type: string }[]): string[] {
   const counts = new Map<string, { label: string; n: number }>()

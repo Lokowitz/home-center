@@ -2,6 +2,7 @@ import { z } from "zod/v4"
 import { prisma } from "@/lib/prisma"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { assetHref } from "@/lib/assets"
+import { loadRegionalSettings } from "@/lib/regional-server"
 import { loadReport } from "@/lib/report-server"
 import { loadCostRecords } from "@/lib/costs-server"
 import { cents, sum } from "@/lib/costs"
@@ -224,7 +225,7 @@ export const costSummaryTool = defineTool({
 
     return {
       ...(found.length ? { assets: found.map(assetLinkRef) } : {}),
-      currency: "USD",
+      currency: (await loadRegionalSettings()).currency,
       ...(rows.some((r) => r.viaEquipmentId) ? { note: "Property totals include spending on equipment at the property." } : {}),
       ...aggregateRows(
         rows,

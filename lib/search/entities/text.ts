@@ -1,3 +1,4 @@
+import { DEFAULT_FORMAT, type Formatter } from "@/lib/regional"
 import { chunkPages } from "@/lib/documents/chunk"
 
 // The text each database record is embedded as, so global search can find
@@ -54,7 +55,6 @@ export function ageWords(from: Date, now: Date): string {
 }
 
 export const num = (n: number) => Math.round(n).toLocaleString("en-US")
-export const dollars = (n: number) => `$${num(n)}`
 
 const clean = (s: string | null | undefined) => (s ?? "").replace(/\s+/g, " ").trim()
 
@@ -102,15 +102,15 @@ export type PropertyInput = {
   equipment: { name: string; category: string }[]
 }
 
-export function propertyDoc(p: PropertyInput, now: Date): EntityDoc {
+export function propertyDoc(p: PropertyInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const age = p.yearBuilt ? now.getUTCFullYear() - p.yearBuilt : null
   const summary = sentences([
     `Property: ${clean(p.name)}`,
     `A ${p.type.toLowerCase()} at ${clean(p.address)}`,
     p.yearBuilt && `Built in ${p.yearBuilt}${age != null && age >= 0 ? ` (about ${age} years old)` : ""}`,
-    p.sqFt && `${num(p.sqFt)} square feet`,
-    p.purchaseDate && `Purchased ${monthYear(p.purchaseDate)}${p.purchasePrice ? ` for about ${dollars(p.purchasePrice)}` : ""}`,
-    !p.purchaseDate && p.purchasePrice && `Purchased for about ${dollars(p.purchasePrice)}`,
+    p.sqFt && `${num(p.sqFt)} ${fmt.areaWords}`,
+    p.purchaseDate && `Purchased ${monthYear(p.purchaseDate)}${p.purchasePrice ? ` for about ${fmt.moneyWhole(p.purchasePrice)}` : ""}`,
+    !p.purchaseDate && p.purchasePrice && `Purchased for about ${fmt.moneyWhole(p.purchasePrice)}`,
     p.equipment.length > 0 && `Equipment here: ${list(p.equipment.map((e) => `${e.name} (${e.category.toLowerCase()})`))}`,
   ])
   return { kind: "PROPERTY", id: p.id, chunks: compose(summary, [{ label: "Notes", text: p.notes, of: `property ${clean(p.name)}` }]) }
@@ -121,15 +121,15 @@ export type VehicleInput = {
   purchaseDate: Date | null; purchasePrice: number | null; currentMileage: number | null; meterUnit: "MILES" | "HOURS"; notes: string | null
 }
 
-export function vehicleDoc(v: VehicleInput, now: Date): EntityDoc {
+export function vehicleDoc(v: VehicleInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const age = now.getUTCFullYear() - v.year
   const meter = v.currentMileage == null ? null
-    : v.meterUnit === "HOURS" ? `About ${num(v.currentMileage)} engine hours on it` : `About ${num(v.currentMileage)} miles on it`
+    : v.meterUnit === "HOURS" ? `About ${num(v.currentMileage)} engine hours on it` : `About ${num(v.currentMileage)} ${fmt.distanceWords} on it`
   const summary = sentences([
     `Vehicle: ${clean(v.name)}`,
     `A ${v.year} ${clean(v.make)} ${clean(v.model)}${v.color ? `, ${clean(v.color).toLowerCase()}` : ""}${age >= 0 ? ` (about ${age} years old)` : ""}`,
     meter,
-    v.purchaseDate && `Purchased ${monthYear(v.purchaseDate)}${v.purchasePrice ? ` for about ${dollars(v.purchasePrice)}` : ""}`,
+    v.purchaseDate && `Purchased ${monthYear(v.purchaseDate)}${v.purchasePrice ? ` for about ${fmt.moneyWhole(v.purchasePrice)}` : ""}`,
   ])
   return { kind: "VEHICLE", id: v.id, chunks: compose(summary, [{ label: "Notes", text: v.notes, of: `vehicle ${clean(v.name)}` }]) }
 }
@@ -140,7 +140,7 @@ export type EquipmentInput = {
   propertyName: string | null
 }
 
-export function equipmentDoc(e: EquipmentInput, now: Date): EntityDoc {
+export function equipmentDoc(e: EquipmentInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const since = e.installDate ?? e.purchaseDate
   const summary = sentences([
     `Equipment: ${clean(e.name)}`,
@@ -148,7 +148,7 @@ export function equipmentDoc(e: EquipmentInput, now: Date): EntityDoc {
     e.manufacturer && `Made by ${clean(e.manufacturer)}`,
     (e.location || e.propertyName) && `Located ${[e.location && `in the ${clean(e.location).toLowerCase()}`, e.propertyName && `at ${clean(e.propertyName)}`].filter(Boolean).join(" ")}`,
     e.installDate && `Installed ${monthYear(e.installDate)}`,
-    e.purchaseDate && `Purchased ${monthYear(e.purchaseDate)}${e.purchasePrice ? ` for about ${dollars(e.purchasePrice)}` : ""}`,
+    e.purchaseDate && `Purchased ${monthYear(e.purchaseDate)}${e.purchasePrice ? ` for about ${fmt.moneyWhole(e.purchasePrice)}` : ""}`,
     since && `It is ${ageWords(since, now)}`,
   ])
   return { kind: "EQUIPMENT", id: e.id, chunks: compose(summary, [{ label: "Notes", text: e.notes, of: `equipment ${clean(e.name)}` }]) }
@@ -186,7 +186,7 @@ export type ServiceInput = {
   condition: string | null
 }
 
-export function serviceDoc(r: ServiceInput): EntityDoc {
+export function serviceDoc(r: ServiceInput, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const what = r.isPerson ? "Health visit" : "Service record"
   const of = r.isPerson ? `${what} for ${r.owner?.name ?? "someone"}` : `${what} for ${ownerPhrase(r.owner) ?? "an asset"}`
   const summary = sentences([
@@ -195,8 +195,8 @@ export function serviceDoc(r: ServiceInput): EntityDoc {
     r.vendor && (r.isPerson ? `Facility: ${clean(r.vendor)}` : `Done by ${clean(r.vendor)}`),
     r.category && `Type: ${r.category}`,
     r.condition && `For the condition ${clean(r.condition)}`,
-    r.cost != null && r.cost > 0 && `Cost about ${dollars(r.cost)}`,
-    r.mileageAtService != null && `At about ${num(r.mileageAtService)} ${r.meterUnit === "HOURS" ? "engine hours" : "miles"}`,
+    r.cost != null && r.cost > 0 && `Cost about ${fmt.moneyWhole(r.cost)}`,
+    r.mileageAtService != null && `At about ${num(r.mileageAtService)} ${r.meterUnit === "HOURS" ? "engine hours" : fmt.distanceWords}`,
   ])
   return { kind: "SERVICE", id: r.id, chunks: compose(summary, [{ label: "Details", text: r.description, of: `${of.toLowerCase()} "${clean(r.title)}"` }]) }
 }
@@ -207,7 +207,7 @@ export type MaintenanceInput = {
   lastCompletedDate: Date | null; nextDueDate: Date | null; nextDueMileage: number | null; isActive: boolean
 }
 
-export function intervalWords(days: number | null, miles: number | null, unit: "MILES" | "HOURS" | null): string | null {
+export function intervalWords(days: number | null, miles: number | null, unit: "MILES" | "HOURS" | null, fmt: Formatter = DEFAULT_FORMAT): string | null {
   const parts: string[] = []
   if (days) {
     if (days % 365 === 0) parts.push(days === 365 ? "every year" : `every ${days / 365} years`)
@@ -215,19 +215,19 @@ export function intervalWords(days: number | null, miles: number | null, unit: "
     else if (days % 7 === 0) parts.push(days === 7 ? "every week" : `every ${days / 7} weeks`)
     else parts.push(`every ${days} days`)
   }
-  if (miles) parts.push(`every ${num(miles)} ${unit === "HOURS" ? "engine hours" : "miles"}`)
+  if (miles) parts.push(`every ${num(miles)} ${unit === "HOURS" ? "engine hours" : fmt.distanceWords}`)
   return parts.length ? `Repeats ${parts.join(" or ")}` : null
 }
 
-export function maintenanceDoc(m: MaintenanceInput, now: Date): EntityDoc {
+export function maintenanceDoc(m: MaintenanceInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const what = m.isPerson ? "Health reminder" : "Maintenance reminder"
   const overdue = m.isActive && m.nextDueDate != null && m.nextDueDate.getTime() < now.getTime()
   const summary = sentences([
     `${what} for ${ownerPhrase(m.owner) ?? "an asset"}: ${clean(m.title)}`,
-    intervalWords(m.intervalDays, m.intervalMiles, m.meterUnit),
+    intervalWords(m.intervalDays, m.intervalMiles, m.meterUnit, fmt),
     m.lastCompletedDate && `Last done ${fullDay(m.lastCompletedDate)}`,
     m.nextDueDate && `Next due ${fullDay(m.nextDueDate)}${overdue ? " (overdue)" : ""}`,
-    m.nextDueMileage != null && `Due at about ${num(m.nextDueMileage)} ${m.meterUnit === "HOURS" ? "engine hours" : "miles"}`,
+    m.nextDueMileage != null && `Due at about ${num(m.nextDueMileage)} ${m.meterUnit === "HOURS" ? "engine hours" : fmt.distanceWords}`,
     !m.isActive && "Paused, not currently scheduled",
   ])
   return { kind: "MAINTENANCE", id: m.id, chunks: compose(summary, [{ label: "Details", text: m.description, of: `reminder "${clean(m.title)}"` }]) }
@@ -256,13 +256,13 @@ export type InsuranceInput = {
   notes: string | null; members: string[]
 }
 
-export function insuranceDoc(p: InsuranceInput, now: Date): EntityDoc {
+export function insuranceDoc(p: InsuranceInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const ended = p.endDate != null && p.endDate.getTime() < now.getTime()
   const summary = sentences([
     `${p.kind.charAt(0) + p.kind.slice(1).toLowerCase()} insurance policy from ${clean(p.carrier)}${p.planName ? `, plan ${clean(p.planName)}` : ""}`,
     p.members.length > 0 && `Covers ${list(p.members)}`,
-    p.deductible != null && `Deductible about ${dollars(p.deductible)}`,
-    p.outOfPocketMax != null && `Out-of-pocket maximum about ${dollars(p.outOfPocketMax)}`,
+    p.deductible != null && `Deductible about ${fmt.moneyWhole(p.deductible)}`,
+    p.outOfPocketMax != null && `Out-of-pocket maximum about ${fmt.moneyWhole(p.outOfPocketMax)}`,
     p.startDate && `Started ${fullDay(p.startDate)}`,
     p.endDate && (ended ? `Ended ${fullDay(p.endDate)}` : `Runs until ${fullDay(p.endDate)}`),
   ])

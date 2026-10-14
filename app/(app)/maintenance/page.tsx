@@ -8,7 +8,9 @@ import { loadAssetIndex } from "@/lib/assets-server"
 import { assetHref, assetIcon } from "@/lib/assets"
 import { UrlSortHead, UrlPaginationBar } from "@/components/ui/url-table"
 import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/table-params"
-import { scheduleDue, dueBadge, isSnoozed, meterUnitShort, type Due } from "@/lib/maintenance-due"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
+import { scheduleDue, dueBadge, isSnoozed, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
@@ -30,11 +32,11 @@ const SORTABLE: SortMap<Prisma.MaintenanceScheduleOrderByWithRelationInput> = {
   status: (dir) => [{ nextDueDate: { sort: dir, nulls: "last" } }],
 }
 
-function statusOf(due: Due, snoozedUntil: Date | null, now: Date) {
+function statusOf(due: Due, snoozedUntil: Date | null, now: Date, fmt: Formatter) {
   if (isSnoozed({ snoozedUntil }, now)) {
-    return { label: `Snoozed to ${snoozedUntil!.toLocaleDateString()}`, variant: "outline" as const, icon: AlarmClockOff }
+    return { label: `Snoozed to ${fmt.date(snoozedUntil!)}`, variant: "outline" as const, icon: AlarmClockOff }
   }
-  const badge = dueBadge(due, true)!
+  const badge = dueBadge(due, true, fmt)!
   const icon = due.overdue ? AlertTriangle : due.dueSoon ? Clock : CheckCircle2
   return { ...badge, label: badge.label === "OK" ? "Active" : badge.label, icon }
 }
@@ -45,6 +47,7 @@ export default async function MaintenancePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
+  const fmt = await getFormat()
   const now = new Date()
 
   const { page, per, skip, take, orderBy } = parseTableParams({
@@ -130,7 +133,7 @@ export default async function MaintenancePage({
                 {schedules.map((s) => {
                   const assetName = assets.assetName(s.assetType, s.assetId)
                   const AssetIcon = assetIcon[s.assetType]
-                  const status = statusOf(scheduleDue(s, mileage, now), s.snoozedUntil, now)
+                  const status = statusOf(scheduleDue(s, mileage, now), s.snoozedUntil, now, fmt)
                   const StatusIcon = status.icon
 
                   return (
@@ -153,11 +156,11 @@ export default async function MaintenancePage({
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {s.nextDueDate ? new Date(s.nextDueDate).toLocaleDateString() : "—"}
-                        {s.nextDueMileage != null && <span className="block text-xs">{s.nextDueMileage.toLocaleString()} {meterUnitShort(mileage.get(s.assetId)?.unit ?? "MILES")}</span>}
+                        {s.nextDueDate ? fmt.date(s.nextDueDate) : "—"}
+                        {s.nextDueMileage != null && <span className="block text-xs">{s.nextDueMileage.toLocaleString()} {fmt.meterShort(mileage.get(s.assetId)?.unit ?? "MILES")}</span>}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                        {s.lastCompletedDate ? new Date(s.lastCompletedDate).toLocaleDateString() : "Never"}
+                        {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "Never"}
                       </td>
                     </tr>
                   )

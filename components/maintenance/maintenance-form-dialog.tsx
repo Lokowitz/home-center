@@ -15,8 +15,8 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDes
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createMaintenanceSchedule, updateMaintenanceSchedule } from "@/lib/actions/maintenance"
 import { deleteAttachment } from "@/lib/actions/attachments"
-import { meterUnitNoun, meterUnitShort } from "@/lib/maintenance-due"
 import { ASSET_TYPES } from "@/lib/assets"
+import { useFormat } from "@/components/regional-provider"
 import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
@@ -66,6 +66,7 @@ function formatBytes(bytes: number) {
 }
 
 export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES" }: Props) {
+  const fmt = useFormat()
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [createdScheduleId, setCreatedScheduleId] = useState<string | null>(null)
@@ -243,7 +244,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="intervalMiles" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Repeat Every ({meterUnitShort(meterUnit)})</FormLabel>
+                    <FormLabel>Repeat Every ({fmt.meterShort(meterUnit)})</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "50" : "5000"} {...field} /></FormControl>
                     <FormDescription className="text-xs">{meterUnit === "HOURS" ? "e.g. 50 for an oil change" : "e.g. 5000 for oil change"}</FormDescription>
                     <FormMessage />
@@ -262,7 +263,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="nextDueMileage" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Next Due {meterUnitNoun(meterUnit)}</FormLabel>
+                    <FormLabel>Next Due {fmt.meterNoun(meterUnit)}</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "1300" : "50000"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -280,9 +281,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="reminderMilesBefore" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Remind ({meterUnitShort(meterUnit)} before)</FormLabel>
+                    <FormLabel>Remind ({fmt.meterShort(meterUnit)} before)</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "10" : "500"} {...field} /></FormControl>
-                    <FormDescription className="text-xs">How close to the due {meterUnit === "HOURS" ? "hour count" : "mileage"} to start warning</FormDescription>
+                    <FormDescription className="text-xs">How close to the due {meterUnit === "HOURS" ? "hour count" : fmt.distanceNoun.toLowerCase()} to start warning</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />

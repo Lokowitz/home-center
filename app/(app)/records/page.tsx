@@ -14,6 +14,7 @@ import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
 import { RecordsAddButton } from "@/components/service-records/records-add-button"
 import { emptyStateCopy } from "@/lib/intake-ui"
+import { getFormat } from "@/lib/regional-server"
 
 const DEFAULT_SORT = "date"
 const DEFAULT_DIR = "desc"
@@ -36,6 +37,7 @@ export default async function RecordsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
+  const fmt = await getFormat()
   const q = typeof params.q === "string" ? params.q : undefined
   const assetId = typeof params.assetId === "string" ? params.assetId : undefined
 
@@ -88,7 +90,7 @@ export default async function RecordsPage({
           <h1 className="font-heading text-2xl font-semibold">Records</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {total} record{total !== 1 ? "s" : ""}
-            {totalCost > 0 && ` · $${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total`}
+            {totalCost > 0 && ` · ${fmt.money(totalCost)} total`}
           </p>
         </div>
         <RecordsAddButton assets={assetOptions} />
@@ -141,7 +143,7 @@ export default async function RecordsPage({
                   return (
                     <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                        {new Date(r.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
+                        {fmt.date(r.date, { utc: true })}
                       </td>
                       <td className="px-4 py-3">
                         <Link href={assetHref(r.assetType, r.assetId)} className="flex items-center gap-1.5 hover:underline">
@@ -163,7 +165,7 @@ export default async function RecordsPage({
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{r.vendor}</td>
                       <td className="px-4 py-3 text-right tabular-nums">
-                        {r.cost != null ? `$${r.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
+                        {r.cost != null ? fmt.money(r.cost) : "—"}
                       </td>
                     </tr>
                   )

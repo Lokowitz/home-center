@@ -36,7 +36,7 @@ export async function createExport(i: ExportInput): Promise<{ path: string; file
   let writer: ArchiveWriter | null = null
   try {
     await vacuumInto(i.dbPath, snap)
-    const { data, files } = await loadReadable(snap, i.scope, exportPlacement())
+    const { data, files, regional } = await loadReadable(snap, i.scope, exportPlacement())
     const warnings: string[] = []
     writer = await ArchiveWriter.create(plainPath)
     let done = 0
@@ -46,7 +46,7 @@ export async function createExport(i: ExportInput): Promise<{ path: string; file
       else warnings.push(`Missing file: ${f.rel}`)
       i.onProgress?.(++done, files.length)
     }
-    await writeReadableLayer(writer, data)
+    await writeReadableLayer(writer, data, regional)
     const counts = {
       assets: data.assets.length, serviceRecords: data.serviceRecords.length, warranties: data.warranties.length,
       reminders: data.reminders.length, documents: data.documents.length, files: files.length,

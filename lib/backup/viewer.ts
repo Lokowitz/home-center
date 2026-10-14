@@ -3,7 +3,7 @@
 // so names and notes from the data can never become markup.
 import type { ArchiveWriter } from "./archive"
 import { READABLE_PREFIX } from "./format"
-import { csvTables, loadReadable, rawPlacement, type ReadableData } from "./readable"
+import { csvTables, loadReadable, rawPlacement, type ReadableData, type ReadableRegional } from "./readable"
 
 export function dataJs(data: ReadableData): string {
   // <, >, & and the two JS line separators are escaped so no data can close the script or end a string early.
@@ -11,8 +11,8 @@ export function dataJs(data: ReadableData): string {
   return `window.HC_DATA = ${safe};\n`
 }
 
-export async function writeReadableLayer(w: ArchiveWriter, data: ReadableData): Promise<void> {
-  await w.addBytes(`${READABLE_PREFIX}index.html`, viewerHtml())
+export async function writeReadableLayer(w: ArchiveWriter, data: ReadableData, regional?: ReadableRegional): Promise<void> {
+  await w.addBytes(`${READABLE_PREFIX}index.html`, viewerHtml(regional?.currency))
   await w.addBytes(`${READABLE_PREFIX}data.js`, dataJs(data))
   const json: Record<string, unknown> = {
     "assets.json": data.assets, "service-records.json": data.serviceRecords, "warranties.json": data.warranties,
@@ -24,11 +24,15 @@ export async function writeReadableLayer(w: ArchiveWriter, data: ReadableData): 
 
 /** createBackup's readable hook: everything, linked to the files already stored under files/<rel>. */
 export async function backupReadable(snapshot: string, w: ArchiveWriter): Promise<void> {
-  const { data } = await loadReadable(snapshot, { kind: "all", includeHealth: true }, rawPlacement)
-  await writeReadableLayer(w, data)
+  const { data, regional } = await loadReadable(snapshot, { kind: "all", includeHealth: true }, rawPlacement)
+  await writeReadableLayer(w, data, regional)
 }
 
-export function viewerHtml(): string {
+/** Only a plain ISO 4217 code is ever placed in the page; anything else falls back to USD. */
+// eslint-disable-next-line no-restricted-syntax -- offline standalone viewer; default currency literal
+export function viewerHtml(currency = "USD"): string {
+  // eslint-disable-next-line no-restricted-syntax -- offline standalone viewer; fallback currency literal
+  const code = /^[A-Z]{3}$/.test(currency) ? currency : "USD"
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -86,7 +90,12 @@ dt { color:var(--muted); }
     return n;
   }
   function day(s) { return s ? new Date(s).toLocaleDateString() : ""; }
-  function money(v) { return v == null ? "" : "$" + Number(v).toFixed(2); }
+  var CURRENCY = "${code}";
+  function money(v) {
+    if (v == null) return "";
+    try { return new Intl.NumberFormat(undefined, { style: "currency", currency: CURRENCY }).format(Number(v)); }
+    catch (e) { return CURRENCY + " " + Number(v).toFixed(2); }
+  }
   function files(list) { return el("span", {}, (list || []).map(function (f) { return el("a", { href: f.path, text: f.name, style: "margin-right:8px" }); })); }
   function table(cols, rows) {
     return el("table", {}, [el("thead", {}, [el("tr", {}, cols.map(function (c) { return el("th", { text: c[0] }); }))]),

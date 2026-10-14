@@ -10,6 +10,7 @@ import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { deleteServiceRecord } from "@/lib/actions/service-records"
 import { ServiceRecordFormDialog } from "./service-record-form-dialog"
 import { AddSplitButton } from "@/components/inbox/add-split-button"
+import { useFormat } from "@/components/regional-provider"
 import { emptyStateCopy } from "@/lib/intake-ui"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
@@ -17,7 +18,6 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import { meterUnitShort, meterUnitNoun } from "@/lib/maintenance-due"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
 type RecordWithAttachments = ServiceRecord & { attachments: Attachment[] }
@@ -50,6 +50,7 @@ interface Props {
 }
 
 export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
+  const fmt = useFormat()
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
   const [records, setRecords] = useState(initialRecords)
@@ -126,7 +127,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                 {showSource && <TableHead>Source</TableHead>}
                 <SortableTableHead column="cost" label="Cost" sortState={table.sortState} onToggle={table.toggleSort} />
                 {assetType === "VEHICLE" && (
-                  <SortableTableHead column="mileage" label={meterUnitNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
+                  <SortableTableHead column="mileage" label={fmt.meterNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
                 )}
                 <TableHead>Files</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -143,7 +144,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                       onClick={() => { setEditingId(record.id); setDialogOpen(true) }}
                     >
                       <TableCell className="text-muted-foreground whitespace-nowrap">
-                        {new Date(record.date).toLocaleDateString(undefined, { timeZone: "UTC" })}
+                        {fmt.date(record.date, { utc: true })}
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{record.title}</div>
@@ -176,11 +177,11 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap">
-                        {record.cost != null ? `${record.cost < 0 ? "-$" : "$"}${Math.abs(record.cost).toLocaleString()}` : <span className="text-muted-foreground">—</span>}
+                        {record.cost != null ? fmt.money(record.cost) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       {assetType === "VEHICLE" && (
                         <TableCell className="whitespace-nowrap">
-                          {record.mileageAtService != null ? `${record.mileageAtService.toLocaleString()} ${meterUnitShort(meterUnit)}` : <span className="text-muted-foreground">—</span>}
+                          {record.mileageAtService != null ? `${record.mileageAtService.toLocaleString()} ${fmt.meterShort(meterUnit)}` : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                       )}
                       <TableCell onClick={(e) => e.stopPropagation()}>

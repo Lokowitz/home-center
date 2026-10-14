@@ -1,5 +1,6 @@
 "use client"
 
+import { useFormat } from "@/components/regional-provider"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
@@ -45,6 +46,7 @@ const typeIcon: Record<string, React.ElementType> = {
 }
 
 export function NotificationBell({ notifications }: { notifications: NotificationItem[] }) {
+  const fmt = useFormat()
   const router = useRouter()
   const [items, setItems] = useState(notifications)
   const [open, setOpen] = useState(false)
@@ -141,7 +143,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
                       <Link href={n.href} onClick={() => openItem(n)} className="block">
                         <p className={cn("font-medium leading-snug", !n.isRead && "text-foreground")}>{n.title}</p>
                         <p className="text-muted-foreground text-xs mt-0.5 leading-snug">{n.message}</p>
-                        <p className="text-muted-foreground/70 text-[11px] mt-1">{n.createdAt.toLocaleString()}</p>
+                        <p className="text-muted-foreground/70 text-[11px] mt-1">{fmt.dateTime(n.createdAt)}</p>
                       </Link>
                     </div>
                     {/* A due reminder is completed or snoozed instead of dismissed. */}
