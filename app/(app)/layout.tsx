@@ -56,7 +56,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <RegionalProvider value={regional}>
     <ChatProvider userId={session.user.id} available={llm.available} isAdmin={isAdmin} model={llm.model}>
       <DropProvider healthEnabled={features.health}>
-      <div className="flex h-svh overflow-hidden">
+      {/* h-screen first: a browser without svh units would otherwise let the shell grow
+          to the page's height, pushing the sidebar's Settings link off screen. */}
+      <div className="flex h-screen overflow-hidden supports-[height:100svh]:h-svh">
         <Sidebar showAssistant={showAssistant} showHealth={features.health} intakeCount={sidebarIntake} initialCollapsed={sidebarCollapsed} />
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
