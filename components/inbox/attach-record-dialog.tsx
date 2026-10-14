@@ -11,8 +11,8 @@ import { AssetSelect, type InboxAssetOption } from "@/components/inbox/asset-sel
 import { attachToRecord, listAttachCandidates } from "@/lib/actions/inbox"
 import { bestAttachMatch, type AttachCandidate } from "@/lib/inbox"
 import { parseAssetKey } from "@/lib/inbox-form"
-import { formatMoney } from "@/lib/costs"
 import { formatDay } from "@/lib/health"
+import { useFormat } from "@/components/regional-provider"
 
 export type AttachChoices = {
   assetKey: string
@@ -55,6 +55,7 @@ export function AttachRecordDialog({
   assets: InboxAssetOption[]
   onClose: () => void
 }) {
+  const fmt = useFormat()
   const router = useRouter()
   const [choices, setChoices] = useState(initial)
   const [loading, startLoading] = useTransition()
@@ -125,7 +126,7 @@ export function AttachRecordDialog({
                           <span className="w-24 shrink-0 text-muted-foreground">{c.date ? formatDay(c.date) : "No date"}</span>
                           <span className="min-w-0 flex-1 truncate font-medium">{c.title}</span>
                           <span className="shrink-0 text-xs text-muted-foreground">
-                            {c.kind === "WARRANTY" ? "Warranty" : c.cost != null ? formatMoney(c.cost) : "—"}
+                            {c.kind === "WARRANTY" ? "Warranty" : c.cost != null ? fmt.money(c.cost) : "—"}
                           </span>
                         </label>
                       </li>

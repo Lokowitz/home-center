@@ -1,18 +1,21 @@
 import { AssetImage } from "@/components/asset-image"
 import { assetLabel } from "@/lib/assets"
-import { averagePerMonth, categoryLabel, costPerMeter, formatMoney, sum, UNCATEGORIZED } from "@/lib/costs"
+import { averagePerMonth, categoryLabel, costPerMeter, sum, UNCATEGORIZED } from "@/lib/costs"
 import { meterUnitShort, meterUnitWord, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
 import type { ReportData, ReportSchedule, ReportService, ReportWarranty } from "@/lib/report-server"
 import type { ServiceCategory } from "@/app/generated/prisma/client"
 import { Empty, SectionTitle } from "./report-parts"
 import { HealthSummary } from "./health-summary"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 
 // The printable asset report. A document, not a screen: one column, real
 // headings, tables where things line up, and no interactive affordance anywhere
 // inside it — the only control lives outside the sheet and is hidden in print.
 
 /** Days of observations to print on a medical summary; null leaves them out. */
-export function AssetReport({ data, observationDays = 90 }: { data: ReportData; observationDays?: number | null }) {
+export async function AssetReport({ data, observationDays = 90 }: { data: ReportData; observationDays?: number | null }) {
+  const fmt = await getFormat()
   const { asset, services, warranties, schedules, costRows, generatedAt } = data
   const isPerson = asset.type === "PERSON"
 
@@ -76,7 +79,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           ) : null}
         </div>
       </section>
-      {data.health && <HealthSummary health={data.health} now={now} observationDays={observationDays} />}
+      {data.health && <HealthSummary health={data.health} now={now} observationDays={observationDays} fmt={fmt} />}
 
       <section className="report-section mt-7">
         <SectionTitle>Summary</SectionTitle>
@@ -85,7 +88,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           style={{ borderColor: "var(--rule-strong)", background: "var(--rule)" }}
           data-print-color=""
         >
-          <Stat label={isPerson ? "Medical spend to date" : "Service cost to date"} value={formatMoney(lifetime)} />
+          <Stat label={isPerson ? "Medical spend to date" : "Service cost to date"} value={fmt.money(lifetime)} />
           <Stat
             label={isPerson ? "Visits" : "Service records"}
             value={String(services.length)}
@@ -110,18 +113,18 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
           {perMeter != null ? (
             <Stat
               label={`Cost per ${meterUnitWord(asset.meterUnit!)}`}
-              value={formatMoney(perMeter)}
+              value={fmt.money(perMeter)}
             />
           ) : asset.purchasePrice != null ? (
             <Stat
               label="Total owned cost"
-              value={formatMoney(asset.purchasePrice + lifetime)}
+              value={fmt.money(asset.purchasePrice + lifetime)}
               note="purchase + service"
             />
           ) : (
             <Stat
               label="Average per month"
-              value={formatMoney(averagePerMonth(costRows, now))}
+              value={fmt.money(averagePerMonth(costRows, now))}
               note="since first record"
             />
           )}
@@ -137,7 +140,7 @@ export function AssetReport({ data, observationDays = 90 }: { data: ReportData; 
         </section>
       ) : null}
 
-      <ServiceHistory services={services} asset={data.asset} total={lifetime} />
+      <ServiceHistory services={services} asset={data.asset} total={lifetime} fmt={fmt} />
       {!isPerson && <Warranties warranties={warranties} now={now} />}
       <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} />
 
@@ -251,10 +254,12 @@ function ServiceHistory({
   services,
   asset,
   total,
+  fmt,
 }: {
   services: ReportService[]
   asset: ReportData["asset"]
   total: number
+  fmt: Formatter
 }) {
   const showMeter = asset.type === "VEHICLE" && services.some((s) => s.mileageAtService != null)
   const unit = meterUnitShort(asset.meterUnit ?? "MILES")
@@ -316,7 +321,7 @@ function ServiceHistory({
                   </td>
                 ) : null}
                 <td className="py-2.5 text-right font-medium tabular-nums">
-                  {s.cost != null ? formatMoney(s.cost) : "—"}
+                  {s.cost != null ? fmt.money(s.cost) : "—"}
                 </td>
               </tr>
             </tbody>
@@ -326,7 +331,7 @@ function ServiceHistory({
               <td className="py-2.5 text-[9pt] font-semibold uppercase tracking-wide" colSpan={showMeter ? 4 : 3}>
                 Total
               </td>
-              <td className="py-2.5 text-right font-semibold tabular-nums">{formatMoney(total)}</td>
+              <td className="py-2.5 text-right font-semibold tabular-nums">{fmt.money(total)}</td>
             </tr>
           </tfoot>
         </table>

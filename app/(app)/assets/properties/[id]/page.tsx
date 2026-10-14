@@ -11,6 +11,7 @@ import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
+import { getFormat } from "@/lib/regional-server"
 
 const typeLabel: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
@@ -24,6 +25,7 @@ export default async function PropertyDetailPage({
   searchParams: Promise<{ tab?: string; open?: string }>
 }) {
   const { id } = await params
+  const fmt = await getFormat()
   const { tab, open } = await searchParams
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
@@ -74,7 +76,7 @@ export default async function PropertyDetailPage({
           <Stat icon={MapPin} label="Address" value={property.address} />
           {property.yearBuilt && <Stat icon={Calendar} label="Year Built" value={property.yearBuilt.toString()} />}
           {property.sqFt && <Stat icon={Maximize} label="Sq Footage" value={`${property.sqFt.toLocaleString()} ft²`} />}
-          {property.purchasePrice && <Stat icon={DollarSign} label="Purchase Price" value={`$${property.purchasePrice.toLocaleString()}`} />}
+          {property.purchasePrice && <Stat icon={DollarSign} label="Purchase Price" value={fmt.moneyWhole(property.purchasePrice)} />}
           {property.purchaseDate && <Stat icon={Calendar} label="Purchased" value={new Date(property.purchaseDate).toLocaleDateString()} />}
         </div>
 

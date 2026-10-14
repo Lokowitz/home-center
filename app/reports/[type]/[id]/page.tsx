@@ -5,6 +5,8 @@ import { ArrowLeft } from "lucide-react"
 import { AssetReport } from "@/components/report/asset-report"
 import { PrintButton } from "@/components/report/print-button"
 import { assetHref } from "@/lib/assets"
+import { RegionalProvider } from "@/components/regional-provider"
+import { loadRegionalSettings } from "@/lib/regional-server"
 import { loadReport, parseAssetSegment } from "@/lib/report-server"
 
 // Deliberately outside the (app) route group. That layout is a fixed-height
@@ -48,8 +50,10 @@ export default async function ReportPage({
 
   const data = await loadReport(assetType, id)
   if (!data) notFound()
+  const regional = await loadRegionalSettings()
 
   return (
+    <RegionalProvider value={regional}>
     <div className="min-h-svh bg-muted/40 py-8 print:bg-white print:py-0">
       <div className="no-print mx-auto mb-5 flex w-full max-w-[8.5in] items-center justify-between gap-4 px-10">
         <Link
@@ -85,5 +89,6 @@ export default async function ReportPage({
 
       <AssetReport data={data} observationDays={obsChoice === "none" ? null : Number(obsChoice)} />
     </div>
+    </RegionalProvider>
   )
 }

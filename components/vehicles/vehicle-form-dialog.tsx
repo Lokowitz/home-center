@@ -16,6 +16,7 @@ import { createVehicle, updateVehicle } from "@/lib/actions/vehicles"
 import { meterUnitNoun } from "@/lib/maintenance-due"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 import type { Vehicle } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 const METER_UNIT_LABELS: Record<string, string> = { MILES: "Miles", HOURS: "Hours" }
 
@@ -43,6 +44,7 @@ interface Props {
 
 export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
   const router = useRouter()
+  const fmt = useFormat()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -148,7 +150,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Price ($)</FormLabel>
+                  <FormLabel>{`Purchase Price (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="28500" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

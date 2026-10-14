@@ -15,6 +15,8 @@ import { useAssetView } from "@/components/assets/use-asset-view"
 import type { Accessor } from "@/lib/use-client-table"
 import type { AssetView } from "@/lib/asset-view"
 import type { Property } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
+import type { Formatter } from "@/lib/regional"
 
 const typeLabel: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
@@ -29,18 +31,18 @@ const ACCESSORS: Record<string, Accessor<Property>> = {
   purchasePrice: (p) => p.purchasePrice,
 }
 
-const COLUMNS: AssetColumn<Property>[] = [
+const columnsFor = (fmt: Formatter): AssetColumn<Property>[] => [
   { key: "name", label: "Name", cell: (p) => <span className="font-medium">{p.name}</span> },
   { key: "type", label: "Type", cell: (p) => <Badge variant="secondary" className="text-xs">{typeLabel[p.type]}</Badge> },
   { key: "address", label: "Address", className: "text-muted-foreground max-w-[280px] truncate", cell: (p) => p.address },
   { key: "sqFt", label: "Sq Ft", className: "text-muted-foreground whitespace-nowrap", cell: (p) => (p.sqFt ? p.sqFt.toLocaleString() : "—") },
   { key: "yearBuilt", label: "Built", className: "text-muted-foreground whitespace-nowrap", cell: (p) => p.yearBuilt ?? "—" },
-  { key: "purchasePrice", label: "Price", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (p) => (p.purchasePrice ? `$${p.purchasePrice.toLocaleString()}` : "—") },
+  { key: "purchasePrice", label: "Price", className: "text-muted-foreground whitespace-nowrap tabular-nums", cell: (p) => (p.purchasePrice ? fmt.moneyWhole(p.purchasePrice) : "—") },
 ]
 
 const INITIAL_DIRS = { sqFt: "desc" as const, yearBuilt: "desc" as const, purchasePrice: "desc" as const }
 
-function toCard(p: Property) {
+function toCard(p: Property, fmt: Formatter) {
   return {
     name: p.name,
     badge: typeLabel[p.type],
@@ -48,7 +50,7 @@ function toCard(p: Property) {
       { icon: MapPin, text: p.address, clamp: true },
       ...(p.sqFt ? [{ text: `${p.sqFt.toLocaleString()} sq ft` }] : []),
       ...(p.yearBuilt ? [{ text: `Built ${p.yearBuilt}` }] : []),
-      ...(p.purchasePrice ? [{ text: `$${p.purchasePrice.toLocaleString()}` }] : []),
+      ...(p.purchasePrice ? [{ text: fmt.moneyWhole(p.purchasePrice) }] : []),
     ],
   }
 }
@@ -59,6 +61,7 @@ interface Props {
 }
 
 export function PropertyList({ properties, initialView }: Props) {
+  const fmt = useFormat()
   const router = useRouter()
   const [view, setView] = useAssetView("properties", initialView)
   const [editing, setEditing] = useState<Property | null>(null)
@@ -121,8 +124,8 @@ export function PropertyList({ properties, initialView }: Props) {
           view={view}
           assetType="PROPERTY"
           imageFilenameOf={(p) => p.imageFilename}
-          toCard={toCard}
-          columns={COLUMNS}
+          toCard={(p) => toCard(p, fmt)}
+          columns={columnsFor(fmt)}
           accessors={ACCESSORS}
           defaultSort="name"
           defaultDir="asc"

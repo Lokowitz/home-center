@@ -9,9 +9,9 @@ import { ChartTable } from "./primitives/chart-table"
 import { TooltipCard, useChartTooltip, type TooltipContent } from "./primitives/tooltip"
 import { niceMax, niceTicks } from "./primitives/scale"
 import {
-  CATEGORY_ORDER, categoryColor, categoryLabel, formatMoney, formatMoneyCompact,
-  type CategoryKey, type StackedBucket,
+  CATEGORY_ORDER, categoryColor, categoryLabel, type CategoryKey, type StackedBucket,
 } from "@/lib/costs"
+import { useFormat } from "@/components/regional-provider"
 
 const PLOT_HEIGHT = 240
 /// Bars are capped rather than filling their slot — the leftover is the air that
@@ -44,6 +44,7 @@ export function TrendChart({
   /// full-height version would dominate the page it is a sidebar on.
   plotHeight?: number
 }) {
+  const fmt = useFormat()
   const [muted, setMuted] = useState<Set<string>>(new Set())
   const { containerRef, cardRef, tip, offset, anchorProps } = useChartTooltip()
 
@@ -115,7 +116,7 @@ export function TrendChart({
         plotHeight={plotHeight}
         ticks={ticks}
         domainMax={domainMax}
-        formatTick={formatMoneyCompact}
+        formatTick={fmt.moneyCompact}
         xAxis={<XLabels labels={buckets.map((b) => b.label)} maxLabels={maxLabels} />}
       >
         <div ref={containerRef} className="absolute inset-0">
@@ -128,25 +129,25 @@ export function TrendChart({
                 .reverse()
                 .map((segment) => ({
                   label: segment.label,
-                  value: formatMoney(segment.total),
+                  value: fmt.money(segment.total),
                   color: segment.color,
                 }))
               const trendValue = showTrend ? trend[i] : null
               if (trendValue != null) {
                 rows.push({
                   label: trendWindow + "-period average",
-                  value: formatMoney(trendValue),
+                  value: fmt.money(trendValue),
                   color: "var(--chart-trend)",
                 })
               }
               const content: TooltipContent = {
                 title: bucket.fullLabel,
-                rows: rows.length > 0 ? rows : [{ label: "No spending", value: formatMoney(0) }],
-                total: formatMoney(bucket.visibleTotal),
+                rows: rows.length > 0 ? rows : [{ label: "No spending", value: fmt.money(0) }],
+                total: fmt.money(bucket.visibleTotal),
               }
 
               const href = bucketHrefs?.[i] ?? null
-              const ariaLabel = bucket.fullLabel + ": " + formatMoney(bucket.visibleTotal)
+              const ariaLabel = bucket.fullLabel + ": " + fmt.money(bucket.visibleTotal)
 
               // The hit area is the whole column, not the drawn bar: a thin bar in
               // a dense chart is well below a comfortable target, and the reader
@@ -259,10 +260,10 @@ export function TrendChart({
           ...Object.fromEntries(
             present.map((key: CategoryKey) => {
               const segment = bucket.segments.find((s) => s.key === key)
-              return [key, segment ? formatMoney(segment.total) : "—"]
+              return [key, segment ? fmt.money(segment.total) : "—"]
             })
           ),
-          total: formatMoney(bucket.total),
+          total: fmt.money(bucket.total),
         }))}
       />
     </div>

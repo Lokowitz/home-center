@@ -114,22 +114,6 @@ export function cents(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-export function formatMoney(n: number): string {
-  return n.toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-}
-
-/// For column captions and axis ticks, where "$12,480.00" is more precision than
-/// the reader needs and wider than the space available.
-export function formatMoneyCompact(n: number): string {
-  if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`
-  return `$${Math.round(n)}`
-}
-
 /// The one primitive every grouping is built from. Returning `null` from `keyFn`
 /// drops the row, which is how records with no vendor stay out of vendor
 /// rankings without a separate filtering pass.

@@ -2,11 +2,13 @@ import { TrendChart } from "@/components/charts/trend-chart"
 import { Meter } from "@/components/charts/meter"
 import { loadCostRecords } from "@/lib/costs-server"
 import {
-  costPerMeter, costRange, formatMoney, stackedBuckets, sum, yearToDate,
+  costPerMeter, costRange, stackedBuckets, sum, yearToDate,
   type Granularity,
 } from "@/lib/costs"
 import { meterUnitWord } from "@/lib/maintenance-due"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 
 /// Below this many years of history, yearly columns would be one or two marks —
 /// not a chart, just a number drawn tall. Short histories get quarters instead.
@@ -29,6 +31,7 @@ export async function AssetCostPanel({
   /// Vehicles only. Its presence is what turns on the cost-per-unit row.
   meterUnit?: MeterUnit
 }) {
+  const fmt = await getFormat()
   const rows = await loadCostRecords({ assetId, assetType })
   // An asset nobody has spent on gets no panel at all — an empty one would be a
   // row of dashes claiming to be information.
@@ -51,7 +54,7 @@ export async function AssetCostPanel({
       <div>
         {/* Proportional figures on the panel's headline number; tabular is for
             the aligned rows below it. */}
-        <div className="text-xl font-semibold leading-none">{formatMoney(lifetime)}</div>
+        <div className="text-xl font-semibold leading-none">{fmt.money(lifetime)}</div>
         <div className="mt-1 text-xs text-muted-foreground">
           Service, across {rows.length} record{rows.length === 1 ? "" : "s"}
         </div>
@@ -72,14 +75,14 @@ export async function AssetCostPanel({
       ) : null}
 
       <dl className="space-y-1.5 text-sm">
-        <Row label={`${now.getFullYear()} to date`} value={formatMoney(sum(yearToDate(rows, now)))} />
+        <Row label={`${now.getFullYear()} to date`} value={fmt.money(sum(yearToDate(rows, now)))} />
         {perMeter != null && (
-          <Row label={`Per ${meterUnitWord(meterUnit!)}`} value={formatMoney(perMeter)} />
+          <Row label={`Per ${meterUnitWord(meterUnit!)}`} value={fmt.money(perMeter)} />
         )}
         {purchasePrice != null && (
           <>
-            <Row label="Purchase" value={formatMoney(purchasePrice)} />
-            <Row label="Total owned cost" value={formatMoney(purchasePrice + lifetime)} strong />
+            <Row label="Purchase" value={fmt.money(purchasePrice)} />
+            <Row label="Total owned cost" value={fmt.money(purchasePrice + lifetime)} strong />
           </>
         )}
       </dl>
@@ -88,13 +91,13 @@ export async function AssetCostPanel({
           visible, which is the shape the question "is this still worth keeping"
           actually takes. */}
       {purchasePrice != null && purchasePrice > 0 ? (
-        <ServiceShare lifetime={lifetime} purchasePrice={purchasePrice} />
+        <ServiceShare lifetime={lifetime} purchasePrice={purchasePrice} fmt={fmt} />
       ) : null}
     </div>
   )
 }
 
-function ServiceShare({ lifetime, purchasePrice }: { lifetime: number; purchasePrice: number }) {
+function ServiceShare({ lifetime, purchasePrice, fmt }: { lifetime: number; purchasePrice: number; fmt: Formatter }) {
   const share = lifetime / purchasePrice
   // Severity is the caller's to decide, and here it is a judgement about money
   // rather than a fact about the data: service approaching what the thing cost is
@@ -113,7 +116,7 @@ function ServiceShare({ lifetime, purchasePrice }: { lifetime: number; purchaseP
       note={
         share >= 1
           ? "Service has cost more than the purchase price."
-          : `${formatMoney(purchasePrice - lifetime)} of the purchase price left to match.`
+          : `${fmt.money(purchasePrice - lifetime)} of the purchase price left to match.`
       }
     />
   )

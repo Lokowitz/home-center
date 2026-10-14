@@ -10,6 +10,7 @@ import { ChevronDown, Pencil, Trash2 } from "lucide-react"
 import { deleteServiceRecord } from "@/lib/actions/service-records"
 import { ServiceRecordFormDialog } from "./service-record-form-dialog"
 import { AddSplitButton } from "@/components/inbox/add-split-button"
+import { useFormat } from "@/components/regional-provider"
 import { emptyStateCopy } from "@/lib/intake-ui"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { AttachmentCount } from "@/components/attachments/attachment-count"
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
+  const fmt = useFormat()
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
   const [records, setRecords] = useState(initialRecords)
@@ -176,7 +178,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap">
-                        {record.cost != null ? `${record.cost < 0 ? "-$" : "$"}${Math.abs(record.cost).toLocaleString()}` : <span className="text-muted-foreground">—</span>}
+                        {record.cost != null ? fmt.moneyWhole(record.cost) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       {assetType === "VEHICLE" && (
                         <TableCell className="whitespace-nowrap">

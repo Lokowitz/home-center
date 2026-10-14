@@ -12,13 +12,14 @@ import { assetHref } from "@/lib/assets"
 import { scheduleDue, dueCandidateFilter, meterUnitShort, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { loadCostRecords } from "@/lib/costs-server"
-import { bucketed, formatMoney, priorPeriod, sum, yearToDate } from "@/lib/costs"
+import { bucketed, priorPeriod, sum, yearToDate } from "@/lib/costs"
 import { SpendArea } from "@/components/charts/spend-area"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
 import { listInboxItems } from "@/lib/inbox-server"
 import { IntakeCard } from "@/components/dashboard/intake-card"
 import { FreshStartCard } from "@/components/dashboard/fresh-start-card"
+import { getFormat } from "@/lib/regional-server"
 
 // Months of history in the dashboard's spending chart. Twelve rather than six:
 // six months cannot show a season, and a household's spending is seasonal.
@@ -30,6 +31,7 @@ const THUMBNAILS_LARGE = 7
 const THUMBNAILS_COMPACT = 18
 
 export default async function DashboardPage() {
+  const fmt = await getFormat()
   const session = await auth()
 
   const now = new Date()
@@ -240,7 +242,7 @@ export default async function DashboardPage() {
                   <div className="flex items-baseline gap-2">
                     {/* Proportional figures: tabular-nums gives every digit the
                         width of a zero, which reads loose at this size. */}
-                    <span className="text-2xl font-semibold leading-none">{formatMoney(spendThisYear)}</span>
+                    <span className="text-2xl font-semibold leading-none">{fmt.money(spendThisYear)}</span>
                     <span className="text-xs text-muted-foreground">in {now.getFullYear()}</span>
                     {spendDelta !== null && (
                       <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
@@ -251,7 +253,7 @@ export default async function DashboardPage() {
                   <p className="mt-2 text-xs text-muted-foreground">
                     {spendDelta === null
                       ? `Nothing recorded by this point in ${now.getFullYear() - 1}.`
-                      : `vs the same point last year (${formatMoney(spendLastYear)}).`}
+                      : `vs the same point last year (${fmt.money(spendLastYear)}).`}
                   </p>
                 </div>
                 <SpendArea

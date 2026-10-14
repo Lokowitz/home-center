@@ -22,6 +22,7 @@ import { SERVICE_CATEGORIES, categoriesFor } from "@/lib/costs"
 import { ASSET_TYPES } from "@/lib/assets"
 import { BellRing, Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
 const NO_CATEGORY = "__none__"
@@ -87,6 +88,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
   const [filePickerOpen, setFilePickerOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const fmt = useFormat()
 
   function openFilePicker() {
     // The native OS file picker moves focus outside the dialog's DOM, which would
@@ -335,7 +337,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="cost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cost ($)</FormLabel>
+                  <FormLabel>{`Cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="89.99" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

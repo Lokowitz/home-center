@@ -14,10 +14,12 @@ import { withParams } from "@/lib/table-params"
 import type { AssetType } from "@/app/generated/prisma/client"
 import {
   CATEGORY_ORDER, assetKey, averagePerMonth, nestedByAsset, bucketed, byAsset, byCategory, byVendor, categoryColor,
-  categoryLabel, costRange, formatMoney, inYear, isGranularity, parseAssetKey, ranked,
+  categoryLabel, costRange, inYear, isGranularity, parseAssetKey, ranked,
   rollingAverage, stackedBuckets, sum, yearToDate, type CategoryKey, type CostRow,
   type Granularity,
 } from "@/lib/costs"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 
 const TOP_ASSETS = 8
 const TOP_VENDORS = 6
@@ -49,6 +51,7 @@ export default async function CostsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const params = await searchParams
+  const fmt = await getFormat()
   const now = new Date()
   const [allRows, assets, features] = await Promise.all([loadCostRecords(), loadAssetIndex(), loadFeatures()])
   const typeFilters = features.health ? ASSET_TYPE_FILTERS : ASSET_TYPE_FILTERS.filter((t) => t.value !== "PERSON")
@@ -217,23 +220,23 @@ export default async function CostsPage({
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi
           label={`${thisYear} to date`}
-          value={formatMoney(ytd)}
+          value={fmt.money(ytd)}
           delta={ytdPrior > 0 ? (ytd - ytdPrior) / ytdPrior : null}
-          deltaNote={`vs ${formatMoney(ytdPrior)} by this point in ${thisYear - 1}`}
+          deltaNote={`vs ${fmt.money(ytdPrior)} by this point in ${thisYear - 1}`}
           history={tileHistory}
           historyLabel={`Monthly spending over the last ${TILE_MONTHS} months`}
         />
         <Kpi
           label={`All of ${thisYear - 1}`}
-          value={formatMoney(lastYear)}
+          value={fmt.money(lastYear)}
           delta={yearBefore > 0 ? (lastYear - yearBefore) / yearBefore : null}
-          deltaNote={`vs ${formatMoney(yearBefore)} in ${thisYear - 2}`}
+          deltaNote={`vs ${fmt.money(yearBefore)} in ${thisYear - 2}`}
         />
         {/* All-time and the monthly average carry no trend of their own: one is
             cumulative, so its sparkline could only ever rise, and the other is the
             same series the first tile already draws. */}
-        <Kpi label="All time" value={formatMoney(sum(typeRows))} />
-        <Kpi label="Average per month" value={formatMoney(averagePerMonth(typeRows, now))} />
+        <Kpi label="All time" value={fmt.money(sum(typeRows))} />
+        <Kpi label="Average per month" value={fmt.money(averagePerMonth(typeRows, now))} />
       </div>
 
       <Panel title={year != null ? `Spend through ${year}` : "Spend over time"}>
@@ -278,7 +281,7 @@ export default async function CostsPage({
         <Panel title="Biggest single expenses" className="lg:col-span-2">
           <ul className="space-y-0.5">
             {biggest.map((row, i) => (
-              <BiggestRow key={`${row.title}-${i}`} row={row} assets={assets} max={biggestMax} />
+              <BiggestRow key={`${row.title}-${i}`} row={row} assets={assets} max={biggestMax} fmt={fmt} />
             ))}
           </ul>
         </Panel>
@@ -375,10 +378,12 @@ function BiggestRow({
   row,
   assets,
   max,
+  fmt,
 }: {
   row: CostRow
   assets: Awaited<ReturnType<typeof loadAssetIndex>>
   max: number
+  fmt: Formatter
 }) {
   const AssetIcon = assetIcon[row.assetType]
   const name = assets.assetName(row.assetType, row.assetId)
@@ -403,7 +408,7 @@ function BiggestRow({
         <AssetIcon className="relative h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="relative flex-1 truncate">{row.title}</span>
         <span className="relative shrink-0 text-xs text-muted-foreground">{name ?? "Unknown"}</span>
-        <span className="relative shrink-0 tabular-nums">{formatMoney(row.cost)}</span>
+        <span className="relative shrink-0 tabular-nums">{fmt.money(row.cost)}</span>
       </Link>
     </li>
   )

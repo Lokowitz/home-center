@@ -4,7 +4,8 @@ import Link from "next/link"
 import { ChartTable } from "./primitives/chart-table"
 import { Legend, type LegendItem } from "./primitives/legend"
 import { TooltipCard, useChartTooltip } from "./primitives/tooltip"
-import { formatMoney, type RankedEntry } from "@/lib/costs"
+import { type RankedEntry } from "@/lib/costs"
+import { useFormat } from "@/components/regional-provider"
 
 /// Colour and link resolved by the caller, on the server. A client component
 /// cannot take a `colorFor(key)` or `hrefFor(entry)` callback across the RSC
@@ -28,6 +29,7 @@ export function CompositionBar({
   emptyMessage?: string
   caption?: string
 }) {
+  const fmt = useFormat()
   const { containerRef, cardRef, tip, offset, anchorProps } = useChartTooltip()
 
   const total = entries.reduce((sum, e) => sum + e.total, 0)
@@ -58,7 +60,7 @@ export function CompositionBar({
             const content = {
               title: entry.label,
               rows: [
-                { label: "Spend", value: formatMoney(entry.total), color },
+                { label: "Spend", value: fmt.money(entry.total), color },
                 { label: "Share", value: percent.toFixed(1) + "%", muted: true },
                 {
                   label: entry.count === 1 ? "1 record" : entry.count + " records",
@@ -101,7 +103,7 @@ export function CompositionBar({
               <Link
                 key={entry.key}
                 href={entry.href}
-                aria-label={entry.label + ": " + formatMoney(entry.total)}
+                aria-label={entry.label + ": " + fmt.money(entry.total)}
                 {...shared}
               >
                 {body}
@@ -111,7 +113,7 @@ export function CompositionBar({
                 key={entry.key}
                 tabIndex={0}
                 role="img"
-                aria-label={entry.label + ": " + formatMoney(entry.total)}
+                aria-label={entry.label + ": " + fmt.money(entry.total)}
                 {...shared}
               >
                 {body}
@@ -140,7 +142,7 @@ export function CompositionBar({
         ]}
         rows={entries.map((entry) => ({
           label: entry.label,
-          total: formatMoney(entry.total),
+          total: fmt.money(entry.total),
           share: ((entry.total / total) * 100).toFixed(1) + "%",
           count: entry.count,
         }))}

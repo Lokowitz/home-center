@@ -1,5 +1,5 @@
 import { Empty, SectionTitle } from "./report-parts"
-import { formatMoney } from "@/lib/costs"
+import type { Formatter } from "@/lib/regional"
 import {
   ALLERGY_SEVERITIES, CONDITION_STATUSES, formatDay, INSURANCE_KINDS, isMedicationActive, labelFor,
 } from "@/lib/health"
@@ -10,7 +10,7 @@ import {
 
 // Ordered the way a clinician reads a chart: what could hurt them, what they
 // have, what they take, what they've had, who pays, who treats them.
-export function HealthSummary({ health, now, observationDays }: { health: ReportHealth; now: Date; observationDays: number | null }) {
+export function HealthSummary({ health, now, observationDays, fmt }: { health: ReportHealth; now: Date; observationDays: number | null; fmt: Formatter }) {
   const { person, careTeam } = health
   const conditions = person.conditions.filter((c) => c.status !== "RESOLVED")
   const resolved = person.conditions.length - conditions.length
@@ -92,7 +92,7 @@ export function HealthSummary({ health, now, observationDays }: { health: Report
               p.memberId ?? "—",
               p.groupNumber ?? "—",
               p.phone ?? "—",
-              p.deductible != null ? formatMoney(p.deductible) : "—",
+              p.deductible != null ? fmt.money(p.deductible) : "—",
             ])}
           />
         )}

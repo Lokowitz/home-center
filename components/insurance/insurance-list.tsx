@@ -10,9 +10,9 @@ import { EntityFormDialog } from "@/components/forms/entity-form-dialog"
 import { AttachmentList } from "@/components/attachments/attachment-list"
 import { createInsurancePolicy, deleteInsurancePolicy, updateInsurancePolicy } from "@/lib/actions/insurance"
 import { daysUntil, formatDay, HEALTH_WINDOWS, INSURANCE_KINDS, labelFor, toDateInput } from "@/lib/health"
-import { formatMoney } from "@/lib/costs"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
 import type { Attachment, InsurancePolicy } from "@/app/generated/prisma/client"
+import { useFormat } from "@/components/regional-provider"
 
 export type PolicyRow = InsurancePolicy & { members: { id: string; name: string }[]; attachments: Attachment[] }
 
@@ -49,6 +49,7 @@ interface Props {
 }
 
 export function InsuranceList({ policies, people, openId }: Props) {
+  const fmt = useFormat()
   const [editing, setEditing] = useState<PolicyRow | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -69,8 +70,8 @@ export function InsuranceList({ policies, people, openId }: Props) {
     { name: "phone", label: "Member services phone", kind: "tel" },
     { name: "startDate", label: "Coverage starts", kind: "date" },
     { name: "endDate", label: "Coverage ends", kind: "date" },
-    { name: "deductible", label: "Deductible ($)", kind: "number" },
-    { name: "outOfPocketMax", label: "Out-of-pocket max ($)", kind: "number" },
+    { name: "deductible", label: `Deductible (${fmt.currencySymbol})`, kind: "number" },
+    { name: "outOfPocketMax", label: `Out-of-pocket max (${fmt.currencySymbol})`, kind: "number" },
     { name: "memberIds", label: "Covers", kind: "checkboxes", options: people.map((p) => ({ value: p.id, label: p.name })), wide: true },
     { name: "notes", label: "Notes", kind: "textarea", wide: true },
   ]
@@ -106,8 +107,8 @@ export function InsuranceList({ policies, people, openId }: Props) {
               ["Group", p.groupNumber],
               ["Policy", p.policyNumber],
               ["Phone", p.phone],
-              ["Deductible", p.deductible != null ? formatMoney(p.deductible) : null],
-              ["Out-of-pocket max", p.outOfPocketMax != null ? formatMoney(p.outOfPocketMax) : null],
+              ["Deductible", p.deductible != null ? fmt.money(p.deductible) : null],
+              ["Out-of-pocket max", p.outOfPocketMax != null ? fmt.money(p.outOfPocketMax) : null],
               ["Coverage", p.startDate || p.endDate ? `${formatDay(p.startDate)} – ${formatDay(p.endDate)}` : null],
               ["Covers", p.members.length > 0 ? p.members.map((m) => m.name).join(", ") : "Nobody yet"],
             ]

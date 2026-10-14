@@ -17,6 +17,8 @@ import { passage } from "@/lib/documents/passage"
 import { groupHits } from "@/lib/documents/tool-helpers"
 import { healthAttachmentIds, loadDocumentRefs } from "@/lib/documents/scope"
 import { loadFeatures } from "@/lib/features-server"
+import { getFormat } from "@/lib/regional-server"
+import type { Formatter } from "@/lib/regional"
 import type { Features } from "@/lib/features"
 import type { Hit } from "@/lib/documents/index-db"
 import {
@@ -40,8 +42,8 @@ const WARRANTY_WINDOW_DAYS = 60
 const ENTITY_POOL = 80
 const SEMANTIC_RECORD_LIMIT = 24
 
-const money = (n: number | null | undefined) =>
-  n == null ? null : `$${n.toLocaleString(undefined, { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`
+const moneyWith = (fmt: Formatter) => (n: number | null | undefined) =>
+  n == null ? null : Number.isInteger(n) ? fmt.moneyWhole(n) : fmt.money(n)
 const day = (d: Date | null | undefined) => (d ? formatDay(d) : null)
 const clip = (s: string | null | undefined, n = 160) => {
   if (!s) return null
@@ -276,6 +278,7 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
 
 /** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
 async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<Section[]> {
+  const money = moneyWith(await getFormat())
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)
   const [properties, vehicles, equipment, people] = await Promise.all([
@@ -391,6 +394,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
 
 /** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
 async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[]): Promise<Section[]> {
+  const money = moneyWith(await getFormat())
   const thumb = (id: string) => owners.thumbs.get(id) ?? null
   const take = terms.length ? KEYWORD_POOL : TAKE
   const kinds = matchKinds(terms)
