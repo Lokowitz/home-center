@@ -92,7 +92,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
     nameField: "name", searchFields: ["name", "address"], keys: [], assetType: "PROPERTY",
     fields: {
       name: s, type: enumOf(PropertyType), address: s, purchaseDate: date, purchasePrice: money,
-      yearBuilt: int, sqFt: int, notes: s,
+      yearBuilt: int, sqFt: { type: "int", description: "Floor area in the household area unit (field name is historical)" }, notes: s,
     },
     relations: { equipment: { kind: "many", entity: "equipment" }, ...assetChildren },
     defaultSort: { field: "name", dir: "asc" },
@@ -104,7 +104,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
     nameField: "name", searchFields: ["name", "make", "model"], keys: [], assetType: "VEHICLE",
     fields: {
       name: s, make: s, model: s, year: int, vin: s, color: s, purchaseDate: date, purchasePrice: money,
-      currentMileage: { type: "int", description: "Current odometer or hour-meter reading" },
+      currentMileage: { type: "int", description: "Current odometer (household distance unit) or hour-meter reading" },
       meterUnit: enumOf(MeterUnit), notes: s,
     },
     relations: { ...assetChildren },
@@ -165,7 +165,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
     ...polymorphic, keys: ["assetType", "assetId", "providerId", "conditionId"],
     fields: {
       date: date, title: s, description: s, vendor: s, cost: money, category: enumOf(ServiceCategory),
-      mileageAtService: { type: "int", description: "Odometer/hour meter at the time (vehicles)" },
+      mileageAtService: { type: "int", description: "Odometer (household distance unit) or hour meter at the time (vehicles)" },
       assetType: enumOf(AssetType, "Kind of asset this belongs to"),
     },
     relations: {

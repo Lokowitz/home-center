@@ -1,4 +1,5 @@
 import { describeOntology } from "./ontology"
+import { DEFAULT_FORMAT, type Formatter } from "@/lib/regional"
 import { toDay } from "./serialize"
 import { DEFAULT_TOOL_ROUNDS } from "./settings-schema"
 
@@ -34,7 +35,7 @@ const DOCUMENTS_SECTION = [
   "- If nothing matched and notIndexed is above 0, say some files couldn't be searched yet.",
 ]
 
-export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true }: { now: Date; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean }): string {
+export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true, fmt = DEFAULT_FORMAT }: { now: Date; fmt?: Formatter; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean }): string {
   return [
     health
       ? "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, people and their health records (including observations the family logs, like meltdowns or bad nights), care providers, insurance, service records and costs, warranties, and maintenance schedules."
@@ -55,7 +56,7 @@ export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS,
     "",
     "Answer format:",
     "- Concise markdown. Use a table when comparing more than two numbers.",
-    "- Money as $1,234.56.",
+    `- Money as ${fmt.money(1234.56)} (${fmt.currency}). Distances on odometers are in ${fmt.distanceWords}. Areas are in ${fmt.areaWords}. Stored numbers are already in these units: never convert them.`,
     "- Link records you mention by copying the exact href from the tool results, e.g. [2019 Civic](/assets/vehicles/abc123). Never build a link yourself: only properties, vehicles, equipment and people have their own pages; medications, providers, service records, warranties and the like link to the page in their href.",
     "",
     "Data model — every row also has an id (entity: description, fields, relations):",

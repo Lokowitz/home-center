@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { buildSystemPrompt } from "./prompt"
+import { createFormatter, DEFAULT_REGIONAL } from "@/lib/regional"
 
 describe("buildSystemPrompt", () => {
   const now = new Date("2026-09-26T18:00:00Z")
@@ -48,5 +49,18 @@ describe("buildSystemPrompt", () => {
   it("tells the model how many lookup rounds it has", () => {
     expect(buildSystemPrompt({ now })).toContain("at most 8 turns of tool calls")
     expect(buildSystemPrompt({ now, maxRounds: 4 })).toContain("at most 4 turns of tool calls")
+  })
+
+  it("writes money and units the household way", () => {
+    const fmt = createFormatter({ ...DEFAULT_REGIONAL, currency: "EUR", distanceUnit: "KM", areaUnit: "SQM" })
+    const p = buildSystemPrompt({ now, fmt })
+    expect(p).toContain(`Money as ${fmt.money(1234.56)}`)
+    expect(p).toContain("Distances on odometers are in kilometres")
+    expect(p).toContain("Areas are in square metres")
+    expect(p).not.toContain("$1,234.56")
+  })
+
+  it("defaults keep dollars and miles", () => {
+    expect(buildSystemPrompt({ now })).toContain(`Money as ${createFormatter(DEFAULT_REGIONAL).money(1234.56)}`)
   })
 })

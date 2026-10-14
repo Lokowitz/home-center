@@ -11,6 +11,7 @@ import { chatTools } from "@/lib/llm/tools"
 import { loadDocumentSettings } from "@/lib/documents/settings"
 import { documentAccess } from "@/lib/documents/tool-helpers"
 import type { AgentEvent } from "@/lib/llm/types"
+import { getFormat } from "@/lib/regional-server"
 import { loadFeatures } from "@/lib/features-server"
 
 export const runtime = "nodejs"
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
         const now = new Date()
         await runAgent({
           history: parsed.data.messages,
-          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health }),
+          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, fmt: await getFormat() }),
           chat,
           tools: chatTools(docs, health, config.healthDocumentsEnabled),
           ctx: { userId, now, health },
