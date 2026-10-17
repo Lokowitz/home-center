@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { ChartGantt, List } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,10 +15,49 @@ import {
 import { useFormat } from "@/components/regional-provider"
 import type { Formatter } from "@/lib/regional"
 import { daysUntil, isMedicationActive, refillDue, toDateInput } from "@/lib/health"
+import { MEDICATION_VIEW_COOKIE, sortChronologically, type MedicationView } from "@/lib/medication-timeline"
+import { ASSET_VIEW_COOKIE_MAX_AGE } from "@/lib/asset-view"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
+import { cn } from "@/lib/utils"
 import type { Attachment, Medication } from "@/app/generated/prisma/client"
+import { MedicationTimeline } from "./medication-timeline"
 
 export type MedicationRow = Medication & { attachments: Attachment[]; prescriber: { name: string } | null; condition: { name: string } | null }
+
+
+const VIEWS: { value: MedicationView; label: string; icon: React.ElementType }[] = [
+  { value: "list", label: "List", icon: List },
+  { value: "timeline", label: "Timeline", icon: ChartGantt },
+]
+
+function ViewToggle({ value, onChange }: { value: MedicationView; onChange: (v: MedicationView) => void }) {
+  return (
+    <div role="group" aria-label="Medications view" className="inline-flex items-center rounded-lg border bg-card p-0.5">
+      {VIEWS.map((option) => {
+        const Icon = option.icon
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            className={cn(
+              "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+              active
+                ? "bg-sidebar-primary/10 text-sidebar-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function RefillCell({ m }: { m: MedicationRow }) {
   const fmt = useFormat()
@@ -81,10 +121,14 @@ interface Props {
   medications: MedicationRow[]
   providers: { id: string; name: string }[]
   conditions: { id: string; name: string }[]
+  /// Observation dates for the same person, drawn under the timeline so dose
+  /// changes can be read against how often things were logged.
+  observationDates?: Date[]
+  initialView?: MedicationView
   openId?: string
 }
 
-export function MedicationsSection({ personId, medications, providers, conditions, openId }: Props) {
+export function MedicationsSection({ personId, medications, providers, conditions, observationDates = [], initialView = "list", openId }: Props) {
   const fmt = useFormat()
   const [editing, setEditing] = useState<MedicationRow | null>(null)
   const [open, setOpen] = useState(false)
@@ -96,9 +140,17 @@ export function MedicationsSection({ personId, medications, providers, condition
     if (match) { setEditing(match); setOpen(true) }
   }
 
+  // Seeded from the cookie the page already read, like the asset list layouts,
+  // so the first paint is the saved view and no effect has to correct it.
+  const [view, setView] = useState<MedicationView>(initialView)
+  function chooseView(v: MedicationView) {
+    setView(v)
+    document.cookie = `${MEDICATION_VIEW_COOKIE}=${v}; Path=/; Max-Age=${ASSET_VIEW_COOKIE_MAX_AGE}; SameSite=Lax`
+  }
+
   const now = new Date()
   const active = medications.filter((m) => isMedicationActive(m, now))
-  const past = medications.filter((m) => !isMedicationActive(m, now))
+  const past = sortChronologically(medications.filter((m) => !isMedicationActive(m, now)), "desc")
 
   const fields: FieldConfig[] = [
     { name: "name", label: "Medication", kind: "text", required: true, placeholder: "Metformin", wide: true },
@@ -131,11 +183,22 @@ export function MedicationsSection({ personId, medications, providers, condition
 
   return (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{active.length} current · {past.length} past</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <ViewToggle value={view} onChange={chooseView} />
+          <p className="whitespace-nowrap text-sm text-muted-foreground">{active.length} current · {past.length} past</p>
+        </div>
         <Button size="sm" onClick={() => { setEditing(null); setOpen(true) }}>Add Medication</Button>
       </div>
 
+      {view === "timeline" ? (
+        <MedicationTimeline
+          medications={medications}
+          observationDates={observationDates}
+          onSelect={(id) => { const m = medications.find((x) => x.id === id); if (m) openEdit(m) }}
+        />
+      ) : (
+      <>
       <EntityTable
         rows={active}
         columns={columnsFor(fmt)}
@@ -156,6 +219,8 @@ export function MedicationsSection({ personId, medications, providers, condition
           <h3 className="text-sm font-medium text-muted-foreground">Past medications</h3>
           <EntityTable rows={past} columns={pastColumnsFor(fmt)} describe={(m) => m.name} onEdit={openEdit} onDelete={handleDelete} empty="" renderExpanded={(m) => <AttachmentList recordId={m.id} recordType="MEDICATION" attachments={m.attachments} />} />
         </div>
+      )}
+      </>
       )}
 
       <EntityFormDialog
