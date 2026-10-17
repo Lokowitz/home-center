@@ -1,6 +1,9 @@
 // Wire types for OpenAI-compatible Chat Completions, plus the events /api/chat
 // streams to the browser. Type-only — safe to import from client components.
 
+import type { ObservationDraft } from "../observation-draft"
+import type { ChangeCard } from "../observation-cards"
+
 export type ToolCall = { id: string; name: string; arguments: string }
 
 export type ChatMessage =
@@ -44,3 +47,7 @@ export type AgentEvent =
   | { type: "delta"; text: string }
   | { type: "done"; rounds: number; model: string }
   | { type: "error"; message: string }
+  /** An observation the assistant drafted; the page shows it as a card with Save. */
+  | { type: "draft"; draft: ObservationDraft }
+  /** A proposed edit or delete of an existing observation; applied only from its card. */
+  | { type: "change"; card: ChangeCard }

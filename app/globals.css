@@ -598,6 +598,12 @@
     break-before: auto;
   }
 
+  /* The medication review opens on a fresh page: it is read as one piece. */
+  .report-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
   a[href] {
     text-decoration: none;
     color: inherit;

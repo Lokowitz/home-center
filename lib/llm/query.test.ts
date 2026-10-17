@@ -217,9 +217,15 @@ describe("compileInclude", () => {
   it("nests one/many relations and lists asset children for the executor", () => {
     const plan = compileInclude("person", ["medications", "primaryProvider", "serviceRecords"])
     expect(plan.select.primaryProvider).toEqual({ select: selectFor("provider") })
-    expect(plan.select.medications).toEqual({ select: selectFor("medication"), orderBy: { name: "asc" }, take: 50 })
+    expect(plan.select.medications).toEqual({ select: selectFor("medication"), orderBy: { startDate: "desc" }, take: 50 })
     expect(plan.children).toEqual([{ relation: "serviceRecords", entity: "serviceRecord" }])
   })
+  it("always says whose record a person's own row is", () => {
+    expect(compileInclude("medication").select.person).toEqual({ select: { id: true, name: true } })
+    expect(compileInclude("medication", ["person"]).select.person).toEqual({ select: selectFor("person") })
+    expect(compileInclude("vehicle").select.person).toBeUndefined()
+  })
+
   it("treats asset as always-on and rejects unknown relations", () => {
     expect(compileInclude("serviceRecord", ["asset"]).children).toEqual([])
     expect(() => compileInclude("vehicle", ["owner"])).toThrow(/Relations on vehicle: serviceRecords, warranties, maintenanceSchedules/)

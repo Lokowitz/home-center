@@ -161,13 +161,13 @@ export default async function PersonDetailPage({
             <ServiceRecordList records={visits} assetId={id} assetType="PERSON" providerOptions={providers} conditionOptions={conditionOptions} reminders={schedules} openId={tab === "visits" ? open : undefined} />
           </TabsContent>
           <TabsContent value="observations" className="mt-4">
-            <ObservationsSection personId={id} observations={observations} conditions={conditionOptions} openId={tab === "observations" ? open : undefined} />
+            <ObservationsSection personId={id} observations={observations} conditions={conditionOptions} medications={person.medications} openId={tab === "observations" ? open : undefined} />
           </TabsContent>
           <TabsContent value="conditions" className="mt-4">
             <ConditionsSection personId={id} conditions={person.conditions} providers={providers} observations={observations} />
           </TabsContent>
           <TabsContent value="medications" className="mt-4">
-            <MedicationsSection personId={id} medications={person.medications} providers={providers} conditions={conditionOptions} observationDates={observations.map((o) => o.date)} initialView={medicationView} openId={tab === "medications" ? open : undefined} />
+            <MedicationsSection personId={id} medications={person.medications} providers={providers} conditions={conditionOptions} observations={observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))} initialView={medicationView} openId={tab === "medications" ? open : undefined} />
           </TabsContent>
           <TabsContent value="immunizations" className="mt-4">
             <ImmunizationsSection personId={id} immunizations={person.immunizations} openId={tab === "immunizations" ? open : undefined} />

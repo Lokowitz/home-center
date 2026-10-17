@@ -2,14 +2,16 @@
 // midnight (see lib/health.ts), and an end date is taken through the whole of
 // that day, so a segment's drawn end is the day after its stored endDate.
 
+import { dailyRatings, ratingSummary, SEVERE_DAY, type DayRatings, type RatedObservation, type RatingSummary } from "./day-ratings"
+
 const DAY = 86_400_000
 
 /// The Medications tab's List / Timeline choice, kept in a cookie the page
 /// reads on the server (the same approach as the asset list layouts).
-export type MedicationView = "list" | "timeline"
+export type MedicationView = "list" | "timeline" | "effects"
 export const MEDICATION_VIEW_COOKIE = "hc-view-medications"
 export const parseMedicationView = (value: string | undefined | null): MedicationView =>
-  value === "timeline" ? "timeline" : "list"
+  value === "timeline" || value === "effects" ? value : "list"
 
 export type TimelineMedication = {
   id: string
@@ -186,20 +188,41 @@ export function axisTicks(from: number, to: number): AxisTick[] {
   return ticks
 }
 
-export type WeekCount = { start: number; count: number }
+export type WeekCount = { start: number; count: number; avg: number; severe: number }
 
-/// Observations per week across [from, to), weeks starting on Monday (UTC).
-export function weeklyObservationCounts(dates: Date[], from: number, to: number): WeekCount[] {
-  const first = new Date(from)
-  const monday = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), first.getUTCDate()) - ((first.getUTCDay() + 6) % 7) * DAY
+const mondayOf = (t: number) => {
+  const d = new Date(t)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - ((d.getUTCDay() + 6) % 7) * DAY
+}
+
+/// Each Monday-start week (UTC) across [from, to): how many entries, its
+/// average day rating (quiet days 0) and its severe days.
+export function weeklyObservationCounts(observations: RatedObservation[], from: number, to: number): WeekCount[] {
+  const monday = mondayOf(from)
   const weeks: WeekCount[] = []
-  for (let s = monday; s < to; s += 7 * DAY) weeks.push({ start: s, count: 0 })
-  for (const d of dates) {
-    const t = new Date(d).getTime()
-    const i = Math.floor((t - monday) / (7 * DAY))
+  for (let s = monday; s < to; s += 7 * DAY) weeks.push({ start: s, count: 0, avg: 0, severe: 0 })
+  const index = (t: number) => Math.floor((t - monday) / (7 * DAY))
+  for (const o of observations) {
+    const i = index(new Date(o.date).getTime())
     if (i >= 0 && i < weeks.length) weeks[i].count++
   }
+  for (const [day, r] of dailyRatings(observations)) {
+    const i = index(day)
+    if (i < 0 || i >= weeks.length) continue
+    weeks[i].avg += r / 7
+    if (r >= SEVERE_DAY) weeks[i].severe++
+  }
+  for (const w of weeks) w.avg = Math.round(w.avg * 10) / 10
   return weeks
+}
+
+/// How the days rated across the whole Monday-start weeks a period touches,
+/// from the week holding its first day to the week holding its last: the
+/// same buckets the timeline's weekly strip draws, so the two always agree.
+export function ratingsInWeeks(ratings: DayRatings, start: number, end: number): RatingSummary & { weeks: number } {
+  const from = mondayOf(start)
+  const to = mondayOf(Math.max(start, end - 1)) + 7 * DAY
+  return { ...ratingSummary(ratings, from, to), weeks: Math.round((to - from) / (7 * DAY)) }
 }
 
 export const daysBetween = (a: number, b: number) => Math.max(1, Math.round((b - a) / DAY))

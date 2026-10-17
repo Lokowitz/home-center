@@ -13,6 +13,9 @@ import { addFileToInbox } from "@/components/inbox/add-to-inbox"
 import { useDropZone } from "@/components/drop/drop-provider"
 import { useChat } from "./chat-provider"
 import { Markdown } from "./markdown"
+import { cardId, isChangeCard, type CardPatch, type ChatCard } from "@/lib/observation-cards"
+import { ObservationChangeCard } from "./observation-change-card"
+import { ObservationDraftCard } from "./observation-draft-card"
 import type { ChatNotice } from "./use-chat-thread"
 
 const ACCEPT = uploadAccept()
@@ -49,6 +52,12 @@ function DiscardedAnswer({ text, pending }: { text: string; pending: boolean }) 
       )}
     </div>
   )
+}
+
+function CardView({ card, onChange, live }: { card: ChatCard; onChange?: (p: CardPatch) => void; live?: boolean }) {
+  return isChangeCard(card)
+    ? <ObservationChangeCard card={card} onChange={onChange} live={live} />
+    : <ObservationDraftCard card={card} onChange={onChange} live={live} />
 }
 
 function Bubble({
@@ -145,7 +154,7 @@ export function ChatThread({ className }: { className?: string }) {
     setInput("")
   }
 
-  const empty = chat.messages.length === 0 && chat.notices.length === 0 && chat.draft === null && !chat.error
+  const empty = chat.messages.length === 0 && chat.notices.length === 0 && chat.draft === null && chat.liveCards.length === 0 && !chat.error
   const noticesAfter = (count: number) => chat.notices.filter((n) => n.after === count).map((n) => <Notice key={`n${n.id}`} notice={n} />)
 
   return (
@@ -174,9 +183,13 @@ export function ChatThread({ className }: { className?: string }) {
         {noticesAfter(0)}
         {chat.messages.map((m, i) => [
           <Bubble key={i} role={m.role} content={m.content} discarded={m.discarded} />,
+          ...(m.cards ?? []).map((c) => (
+            <CardView key={cardId(c)} card={c} onChange={chat.busy ? undefined : (p) => chat.updateCard(cardId(c), p)} />
+          )),
           ...noticesAfter(i + 1),
         ])}
         {chat.draft || chat.discarded ? <Bubble role="assistant" content={chat.draft ?? ""} discarded={chat.discarded} pending /> : null}
+        {chat.liveCards.map((c) => <CardView key={`live-${cardId(c)}`} card={c} live />)}
         {chat.busy && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

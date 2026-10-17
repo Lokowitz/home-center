@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
-import { clearThread, loadThread, requestMessages, saveThread, SEND_LIMIT, shouldPersist, threadKey } from "./thread-storage"
+import { CARD_LOCKED_TEXT, CARD_ONLY_TEXT, CARD_REVISED_TEXT, clearThread, loadThread, mergeCards, requestMessages, saveThread, SEND_LIMIT, shouldPersist, threadKey, updateCard } from "./thread-storage"
 import type { HistoryMessage } from "./types"
+import { draftSummaryLine, type DraftCard, type ObservationDraft } from "../observation-draft"
+import type { EditCard } from "../observation-cards"
+import { MAX_MESSAGE_CHARS } from "./request-schema"
 
 function memory(initial: Record<string, string> = {}) {
   const data = { ...initial }
@@ -123,5 +126,167 @@ describe("shouldPersist", () => {
   it("only persists a turn from the current thread generation", () => {
     expect(shouldPersist(3, 3)).toBe(true)
     expect(shouldPersist(3, 4)).toBe(false)
+  })
+})
+
+const d = (id: string, over: Partial<ObservationDraft> = {}): ObservationDraft => ({
+  draftId: id, personId: "p1", personName: "Avery", date: "2026-10-17", time: null, type: "Aggression",
+  severity: 3, severitySource: "estimated", durationMinutes: null, notes: null, tags: [], ...over,
+})
+const card = (id: string, over: Partial<DraftCard> = {}): DraftCard => ({ draft: d(id), state: "draft", ...over })
+
+describe("draft cards", () => {
+  const q = { role: "user" as const, content: "Avery hit her brother" }
+  const a1 = { role: "assistant" as const, content: "Drafted it.", cards: [card("obs-aaaaaa")] }
+
+  it("attach new cards to the answer, and keep a card-only answer", () => {
+    const t = mergeCards([q], { role: "assistant", content: "" }, [card("obs-aaaaaa")])
+    expect(t).toEqual([q, { role: "assistant", content: CARD_ONLY_TEXT, cards: [card("obs-aaaaaa")] }])
+  })
+  it("revise an earlier unsaved card in place instead of adding one", () => {
+    const revised = { draft: d("obs-aaaaaa", { severity: 4, severitySource: "stated" }), state: "draft" as const }
+    const t = mergeCards([q, a1, { role: "user", content: "make it a 4" }], { role: "assistant", content: "Changed." }, [revised])
+    expect(t[1].cards).toEqual([revised])
+    expect(t[3]).toEqual({ role: "assistant", content: "Changed." })
+  })
+  it("never revise a saved or discarded card", () => {
+    const saved = { ...a1, cards: [card("obs-aaaaaa", { state: "saved", savedId: "o1" })] }
+    const t = mergeCards([q, saved], { role: "assistant", content: "ok" }, [card("obs-aaaaaa", { draft: d("obs-aaaaaa", { severity: 5 }) })])
+    expect(t[1].cards![0]).toMatchObject({ state: "saved", draft: { severity: 3 } })
+    expect(t[2].cards).toBeUndefined()
+  })
+  it("updates a card's state by id", () => {
+    const t = updateCard([q, a1], "obs-aaaaaa", { state: "saved", savedId: "o9" })
+    expect(t[1].cards![0]).toMatchObject({ state: "saved", savedId: "o9" })
+  })
+  it("round-trips cards through storage and drops malformed ones", () => {
+    const store = new Map<string, string>()
+    const s = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) }
+    saveThread(s, "u", [q, { ...a1, cards: [card("obs-aaaaaa"), { junk: true } as unknown as DraftCard] }])
+    expect(loadThread(s, "u")[1].cards).toEqual([card("obs-aaaaaa")])
+  })
+  it("sends each card's summary with its message", () => {
+    const sent = requestMessages([q, a1])
+    expect(sent[1].content).toBe("Drafted it.\n\n[observation draft obs-aaaaaa, not saved: Avery · 2026-10-17 · Aggression · severityEstimate 3]")
+  })
+})
+
+describe("draft card fixes", () => {
+  const q = { role: "user" as const, content: "Avery hit her brother" }
+
+  it("keeps one card when the same draft id appears twice in one answer, the last one winning", () => {
+    const t = mergeCards([q], { role: "assistant", content: "Drafted" }, [card("obs-aaaaaa"), { draft: d("obs-aaaaaa", { severity: 5 }), state: "draft" }])
+    expect(t[1].cards).toHaveLength(1)
+    expect((t[1].cards![0] as DraftCard).draft.severity).toBe(5)
+  })
+
+  it("keeps the card summary when the answer is longer than the message cap", () => {
+    const thread = [q, { role: "assistant" as const, content: "x".repeat(MAX_MESSAGE_CHARS), cards: [card("obs-aaaaaa")] }]
+    const sent = requestMessages(thread)[1].content
+    expect(sent.endsWith("[observation draft obs-aaaaaa, not saved: Avery · 2026-10-17 · Aggression · severityEstimate 3]")).toBe(true)
+    expect(sent.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS)
+  })
+
+  it("says the draft was updated, not drafted, when an empty answer only revises a card", () => {
+    const a1 = { role: "assistant" as const, content: "Drafted it.", cards: [card("obs-aaaaaa")] }
+    const revised = { draft: d("obs-aaaaaa", { severity: 4 }), state: "draft" as const }
+    const t = mergeCards([q, a1], { role: "assistant", content: "" }, [revised])
+    expect(t[2]).toEqual({ role: "assistant", content: CARD_REVISED_TEXT })
+  })
+})
+
+describe("draft card round 2", () => {
+  const q = { role: "user" as const, content: "Avery hit her brother" }
+
+  it("keeps both summaries when adjacent assistant messages with cards merge", () => {
+    const a = { role: "assistant" as const, content: "x".repeat(7990), cards: [card("obs-aaaaaa")] }
+    const b = { role: "assistant" as const, content: "y".repeat(7990), cards: [card("obs-bbbbbb")] }
+    const sent = requestMessages([q, a, b, { role: "user", content: "ok" }])
+    expect(sent[1].role).toBe("assistant")
+    expect(sent[1].content.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS)
+    expect(sent[1].content).toContain("[observation draft obs-aaaaaa,")
+    expect(sent[1].content).toContain("[observation draft obs-bbbbbb,")
+  })
+
+  it("keeps the newest summaries when they alone exceed the cap", () => {
+    const cards = Array.from({ length: 60 }, (_, i) => card(`obs-${String(i).padStart(6, "0")}`, { draft: d(`obs-${String(i).padStart(6, "0")}`, { notes: "n".repeat(190) }) }))
+    const sent = requestMessages([q, { role: "assistant", content: "Many.", cards }])[1].content
+    expect(sent.length).toBeLessThanOrEqual(MAX_MESSAGE_CHARS)
+    expect(sent.endsWith(draftSummaryLine(cards[59]))).toBe(true)
+  })
+
+  it("says the draft is locked when the only card targets a saved card", () => {
+    const saved = { role: "assistant" as const, content: "Saved it.", cards: [card("obs-aaaaaa", { state: "saved", savedId: "o1" })] }
+    const t = mergeCards([q, saved], { role: "assistant", content: "" }, [card("obs-aaaaaa", { draft: d("obs-aaaaaa", { severity: 5 }) })])
+    expect(t[2]).toEqual({ role: "assistant", content: CARD_LOCKED_TEXT })
+    expect(t[1].cards![0]).toMatchObject({ state: "saved", draft: { severity: 3 } })
+  })
+})
+
+describe("draft card review fixes", () => {
+  const q = { role: "user" as const, content: "Avery hit her brother" }
+  it("treats a reused id for another person as a new card, not a revision", () => {
+    const a1 = { role: "assistant" as const, content: "Drafted it.", cards: [card("obs-aaaaaa")] }
+    const other = { draft: d("obs-aaaaaa", { personId: "p2", personName: "Sam" }), state: "draft" as const }
+    const t = mergeCards([q, a1], { role: "assistant", content: "Drafted Sam's." }, [other])
+    expect(t[1].cards).toEqual([card("obs-aaaaaa")])
+    expect(t[2].cards).toEqual([{ ...other, draft: { ...other.draft, draftId: "obs-aaaaaa-2" } }])
+  })
+})
+
+const editCard = (id: string, observationId = "o1", over: Partial<EditCard> = {}): EditCard => ({
+  kind: "edit", id, state: "draft",
+  target: { observationId, updatedAt: "2026-10-15T10:00:00.000Z", personId: "p1", personName: "Avery", attachments: 0,
+    before: { date: "2026-10-14", time: null, type: "Meltdown", severity: 3, durationMinutes: null, notes: null, tags: [], conditionId: null } },
+  after: { date: "2026-10-14", time: null, type: "Meltdown", severity: 4, durationMinutes: null, notes: null, tags: [], conditionId: null },
+  ...over,
+})
+
+describe("change cards", () => {
+  const q2 = { role: "user" as const, content: "make the meltdown a 4" }
+  it("store, revise in place and update by id", () => {
+    const t1 = mergeCards([q2], { role: "assistant", content: "Proposed." }, [editCard("chg-aaaaaa")])
+    expect(t1[1].cards).toEqual([editCard("chg-aaaaaa")])
+    const revised = editCard("chg-aaaaaa", "o1", { after: { ...editCard("x").after, severity: 5 } })
+    const t2 = mergeCards([...t1, { role: "user", content: "no, 5" }], { role: "assistant", content: "Changed." }, [revised])
+    expect(t2[1].cards).toEqual([revised])
+    expect(updateCard(t2, "chg-aaaaaa", { state: "saved" })[1].cards![0]).toMatchObject({ state: "saved" })
+  })
+  it("treat a reused id for another entry as a new card", () => {
+    const t1 = mergeCards([q2], { role: "assistant", content: "Proposed." }, [editCard("chg-aaaaaa", "o1")])
+    const t2 = mergeCards([...t1, { role: "user", content: "and the other" }], { role: "assistant", content: "Also." }, [editCard("chg-aaaaaa", "o2")])
+    expect(t2[1].cards![0]).toMatchObject({ kind: "edit" })
+    expect((t2[3].cards![0] as EditCard).target.observationId).toBe("o2")
+  })
+  it("gives a reused id for another entry a unique id", () => {
+    const t1 = mergeCards([q2], { role: "assistant", content: "Proposed." }, [editCard("chg-aaaaaa", "o1")])
+    const t2 = mergeCards([...t1, { role: "user", content: "and the other" }], { role: "assistant", content: "Also." }, [editCard("chg-aaaaaa", "o2")])
+    expect(t2[1].cards![0]).toMatchObject({ id: "chg-aaaaaa" })
+    expect(t2[3].cards![0]).toMatchObject({ id: "chg-aaaaaa-2", target: { observationId: "o2" } })
+    const t3 = mergeCards([...t2, { role: "user", content: "and a third" }], { role: "assistant", content: "Also." }, [editCard("chg-aaaaaa", "o3")])
+    expect(t3[5].cards![0]).toMatchObject({ id: "chg-aaaaaa-3" })
+  })
+  it("revising an applied edit makes a new draft card and leaves the applied one", () => {
+    const t1 = mergeCards([q2], { role: "assistant", content: "Proposed." }, [editCard("chg-aaaaaa")])
+    const applied = updateCard(t1, "chg-aaaaaa", { state: "saved" })
+    const t2 = mergeCards([...applied, { role: "user", content: "make it 5" }], { role: "assistant", content: "Again." }, [editCard("chg-aaaaaa")])
+    expect(t2[1].cards).toEqual([editCard("chg-aaaaaa", "o1", { state: "saved" })])
+    expect(t2[3].cards).toEqual([editCard("chg-aaaaaa-2")])
+  })
+  it("updates only the later of two cards that share an id", () => {
+    const t = updateCard(
+      [q2, { role: "assistant", content: "a", cards: [editCard("chg-aaaaaa")] }, { role: "user", content: "b" }, { role: "assistant", content: "c", cards: [editCard("chg-aaaaaa")] }],
+      "chg-aaaaaa", { state: "saved" },
+    )
+    expect(t[1].cards![0]).toMatchObject({ state: "draft" })
+    expect(t[3].cards![0]).toMatchObject({ state: "saved" })
+  })
+  it("round-trip mixed cards and send their summaries", () => {
+    const store = new Map<string, string>()
+    const s = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) }
+    saveThread(s, "u", [q2, { role: "assistant", content: "Two cards.", cards: [card("obs-aaaaaa"), editCard("chg-bbbbbb")] }])
+    const loaded = loadThread(s, "u")
+    expect(loaded[1].cards).toHaveLength(2)
+    expect(requestMessages(loaded)[1].content).toContain("[observation edit chg-bbbbbb, not applied:")
   })
 })

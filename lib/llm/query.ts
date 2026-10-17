@@ -1,5 +1,6 @@
 import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type Row } from "./ontology"
 import { HEALTH_NOTIFICATION_TYPES } from "@/lib/features"
+import type { AgentEvent } from "./types"
 
 // Compiles tool arguments into Prisma query fragments through the ontology.
 // Pure: no Prisma import. Every name the model sends is checked against the
@@ -16,8 +17,12 @@ export class ToolInputError extends Error {
 export const OPS = ["eq", "ne", "contains", "in", "gt", "gte", "lt", "lte", "isNull", "has", "hasNone"] as const
 export type Op = (typeof OPS)[number]
 export type Filter = { field: string; op: Op; value?: unknown }
-/** health: false while Health is off in Settings → Features; absent means on. */
-export type ToolContext = { userId: string; now: Date; health?: boolean }
+/**
+ * health: false while Health is off in Settings → Features; absent means on.
+ * today: the viewer's calendar day (YYYY-MM-DD), when the page sent it.
+ * emit: sends an event straight to the page (only draft tools use it).
+ */
+export type ToolContext = { userId: string; now: Date; health?: boolean; today?: string; emit?: (event: AgentEvent) => void }
 
 export const healthOn = (ctx?: Pick<ToolContext, "health">) => ctx?.health !== false
 
@@ -317,5 +322,9 @@ export function compileInclude(
         ? { select: selectFor(rel.entity) }
         : { select: selectFor(rel.entity), orderBy: compileSort(rel.entity), take: CHILD_LIMIT }
   }
+  // A person's own records always say whose they are. With only a personId a
+  // model can't tell one child's fluoxetine from another's, and won't think to
+  // ask for the person relation.
+  if (def.relations.person?.kind === "one" && !select.person) select.person = { select: { id: true, name: true } }
   return { select, children }
 }

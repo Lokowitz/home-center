@@ -275,4 +275,23 @@ describe("runAgent link check", () => {
     const events = await run(chat)
     expect(events.filter((e) => e.type === "reset")).toEqual([])
   })
+
+  it("lets a tool send its own event to the page", async () => {
+    const shout = defineTool({
+      name: "shout",
+      description: "Emits.",
+      schema: z.object({}),
+      label: () => "Shouting…",
+      run: async (_a, c) => {
+        c.emit?.({ type: "status", tool: "shout", label: "from the tool", round: 0 })
+        return { ok: true }
+      },
+    })
+    const { chat } = scripted([
+      { content: "", toolCalls: [{ id: "c1", name: "shout", arguments: "{}" }] },
+      { content: "Done", toolCalls: [] },
+    ])
+    const events = await run(chat, { tools: [shout] })
+    expect(events).toContainEqual({ type: "status", tool: "shout", label: "from the tool", round: 0 })
+  })
 })

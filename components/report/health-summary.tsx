@@ -1,4 +1,5 @@
 import { Empty, SectionTitle } from "./report-parts"
+import { MedicationReview, ObservationCalendarSection } from "./medication-review"
 import type { Formatter } from "@/lib/regional"
 import {
   ALLERGY_SEVERITIES, CONDITION_STATUSES, INSURANCE_KINDS, isMedicationActive, labelFor,
@@ -78,7 +79,6 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
         )}
       </section>
 
-      {observationDays != null && <Observations rows={person.observations} days={observationDays} now={now} fmt={fmt} />}
 
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Insurance</SectionTitle>
@@ -110,6 +110,27 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+
+      <MedicationReview
+        medications={person.medications}
+        observations={person.observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))}
+        now={now}
+        fmt={fmt}
+      />
+
+      {/* Observations come last: the year at a glance, then the entries
+          behind it. Both follow the summary's observations setting. */}
+      {observationDays != null && (
+        <>
+          <ObservationCalendarSection
+            observations={person.observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))}
+            medications={person.medications}
+            now={now}
+            fmt={fmt}
+          />
+          <Observations rows={person.observations} days={observationDays} now={now} fmt={fmt} />
+        </>
+      )}
     </>
   )
 }

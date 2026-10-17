@@ -161,9 +161,9 @@ function nameTokens(s: string): string[] {
 /**
  * True when a read vendor is probably the customer (someone in the household)
  * rather than the shop: it contains a household first name and a household
- * last name ("Mike & Jessi Dazzo" for "Mike Dazzo"), or is exactly a one-word
- * name. A shared first name alone ("Mike's Plumbing") or last name alone
- * ("Dazzo's Pizza") isn't enough.
+ * last name ("Sam & Dani Rivera" for "Sam Rivera"), or is exactly a one-word
+ * name. A shared first name alone ("Sam's Plumbing") or last name alone
+ * ("Rivera's Pizza") isn't enough.
  */
 export function looksLikeHouseholdName(vendor: string, householdNames: string[]): boolean {
   const words = new Set(nameTokens(vendor))

@@ -181,36 +181,36 @@ describe("vendorDoubt", () => {
 })
 
 describe("looksLikeHouseholdName", () => {
-  const names = ["Mike Dazzo", "Jessica Dazzo", "Grandma"]
+  const names = ["Sam Rivera", "Dana Rivera", "Grandma"]
   it("matches a household member's full name, however it's written", () => {
-    for (const v of ["Mike Dazzo", "MIKE DAZZO", "Dazzo, Mike", "mike  dazzo.", "Mike J. Dazzo", "Mr Mike Dazzo"]) {
+    for (const v of ["Sam Rivera", "SAM RIVERA", "Rivera, Sam", "sam  rivera.", "Sam J. Rivera", "Mr Sam Rivera"]) {
       expect(looksLikeHouseholdName(v, names), v).toBe(true)
     }
   })
   it("matches a shared last name with any household first name", () => {
-    expect(looksLikeHouseholdName("Mike & Jessi Dazzo", ["Mike Dazzo"])).toBe(true)
-    expect(looksLikeHouseholdName("Jessica and Mike Dazzo", ["Mike Dazzo"])).toBe(true)
-    expect(looksLikeHouseholdName("Jessica Dazzo", ["Mike Dazzo", "Jessica Smith"])).toBe(true)
+    expect(looksLikeHouseholdName("Sam & Dani Rivera", ["Sam Rivera"])).toBe(true)
+    expect(looksLikeHouseholdName("Dana and Sam Rivera", ["Sam Rivera"])).toBe(true)
+    expect(looksLikeHouseholdName("Dana Rivera", ["Sam Rivera", "Dana Smith"])).toBe(true)
   })
   it("ignores accents", () => {
     expect(looksLikeHouseholdName("Zoe Muller", ["Zoë Müller"])).toBe(true)
   })
   it("doesn't flag a business that only shares a first name, or only a last name", () => {
-    for (const v of ["Mike's Plumbing", "Mike's Auto Body", "Big Mike Towing", "Dazzo's Pizza", "Dazzo Brothers Paving", "Jessi Hair Studio"]) {
+    for (const v of ["Sam's Plumbing", "Sam's Auto Body", "Big Sam Towing", "Rivera's Pizza", "Rivera Brothers Paving", "Dani Hair Studio"]) {
       expect(looksLikeHouseholdName(v, names), v).toBe(false)
     }
-    expect(looksLikeHouseholdName("Mike's Plumbing", ["Mike Dazzo"])).toBe(false)
+    expect(looksLikeHouseholdName("Sam's Plumbing", ["Sam Rivera"])).toBe(false)
   })
   it("matches a single-word name only when the vendor is just that name", () => {
     expect(looksLikeHouseholdName("Grandma", names)).toBe(true)
     expect(looksLikeHouseholdName("grandma!", names)).toBe(true)
     expect(looksLikeHouseholdName("Grandma's Kitchen", names)).toBe(false)
-    expect(looksLikeHouseholdName("Mike", ["Mike"])).toBe(true)
-    expect(looksLikeHouseholdName("Mike's Plumbing", ["Mike"])).toBe(false)
+    expect(looksLikeHouseholdName("Sam", ["Sam"])).toBe(true)
+    expect(looksLikeHouseholdName("Sam's Plumbing", ["Sam"])).toBe(false)
   })
   it("has nothing to match without names or a vendor", () => {
-    expect(looksLikeHouseholdName("Mike Dazzo", [])).toBe(false)
-    expect(looksLikeHouseholdName("Mike Dazzo", ["", "  ", "&"])).toBe(false)
+    expect(looksLikeHouseholdName("Sam Rivera", [])).toBe(false)
+    expect(looksLikeHouseholdName("Sam Rivera", ["", "  ", "&"])).toBe(false)
     expect(looksLikeHouseholdName("", names)).toBe(false)
     expect(looksLikeHouseholdName("  ", names)).toBe(false)
   })
@@ -218,12 +218,12 @@ describe("looksLikeHouseholdName", () => {
 
 describe("vendorDoubt with household names", () => {
   it("doubts a vendor that looks like someone in the household", () => {
-    expect(vendorDoubt("Mike & Jessi Dazzo", ["Mike Dazzo"])).toBe("Looks like a household member's name, not a shop name.")
+    expect(vendorDoubt("Sam & Dani Rivera", ["Sam Rivera"])).toBe("Looks like a household member's name, not a shop name.")
   })
   it("leaves shops alone", () => {
-    expect(vendorDoubt("Mike's Plumbing", ["Mike Dazzo"])).toBeNull()
-    expect(vendorDoubt("Haley Mechanical", ["Mike Dazzo"])).toBeNull()
-    expect(vendorDoubt("Mike Dazzo")).toBeNull()
+    expect(vendorDoubt("Sam's Plumbing", ["Sam Rivera"])).toBeNull()
+    expect(vendorDoubt("Haley Mechanical", ["Sam Rivera"])).toBeNull()
+    expect(vendorDoubt("Sam Rivera")).toBeNull()
   })
 })
 
@@ -294,10 +294,10 @@ describe("readFields", () => {
     expect(f.date).toMatchObject({ state: "unsure", reason: expect.stringMatching(/after/i) })
   })
   it("marks a vendor that is a household member's name unsure", () => {
-    expect(readFields({ ...ready, parsedVendor: "Mike Dazzo" }, ["Mike Dazzo"]).vendor).toEqual({
+    expect(readFields({ ...ready, parsedVendor: "Sam Rivera" }, ["Sam Rivera"]).vendor).toEqual({
       state: "unsure", reason: "Looks like a household member's name, not a shop name.",
     })
-    expect(readFields({ ...ready, parsedVendor: "Mike Dazzo" }).vendor).toEqual({ state: "found" })
+    expect(readFields({ ...ready, parsedVendor: "Sam Rivera" }).vendor).toEqual({ state: "found" })
   })
   it("reads dates sent over the wire as strings", () => {
     expect(readFields({ ...ready, createdAt: "2026-10-10T15:00:00.000Z" as unknown as Date, parsedDate: "2024-04-30T00:00:00.000Z" as unknown as Date }).date).toEqual({ state: "found" })
@@ -323,7 +323,7 @@ describe("inboxReadiness", () => {
     expect(inboxReadiness({ ...ready, suggestedAsset: null })).toBe("check")
     expect(inboxReadiness({ ...ready, parsedVendor: ">. BELLE TIR" })).toBe("check")
     expect(inboxReadiness({ ...ready, parsedTotal: 0 })).toBe("check")
-    expect(inboxReadiness({ ...ready, parsedVendor: "Mike & Jessica Dazzo" }, ["Mike Dazzo"])).toBe("check")
+    expect(inboxReadiness({ ...ready, parsedVendor: "Sam & Dana Rivera" }, ["Sam Rivera"])).toBe("check")
   })
 })
 

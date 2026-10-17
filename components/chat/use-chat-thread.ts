@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createNdjsonReader } from "@/lib/llm/ndjson"
-import { clearThread, loadThread, requestMessages, saveThread, shouldPersist, type ThreadMessage } from "@/lib/llm/thread-storage"
+import { clearThread, loadThread, mergeCards, requestMessages, saveThread, shouldPersist, updateCard as updateThreadCard, type ThreadMessage } from "@/lib/llm/thread-storage"
 import type { AgentEvent } from "@/lib/llm/types"
+import { cardId, type CardPatch, type ChatCard } from "@/lib/observation-cards"
+import { localDay } from "@/lib/observation-draft"
 
 function storage() {
   try {
@@ -33,18 +35,25 @@ export function useChatThread(userId: string) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [notices, setNotices] = useState<ChatNotice[]>([])
+  /** Cards drafted during the running turn; saved into the thread when it ends. */
+  const [liveCards, setLiveCards] = useState<ChatCard[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const generation = useRef(0)
+  /** Latest thread, readable from async code that outlives a render. */
+  const messagesRef = useRef<ThreadMessage[]>([])
   const noticeId = useRef(0)
 
   // sessionStorage only exists in the browser, so the thread loads after mount.
   useEffect(() => {
+    const loaded = loadThread(storage(), userId)
+    messagesRef.current = loaded
     // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage is browser-only; reading it during render would break hydration
-    setMessages(loadThread(storage(), userId))
+    setMessages(loaded)
   }, [userId])
 
   const persist = useCallback(
     (next: ThreadMessage[]) => {
+      messagesRef.current = next
       setMessages(next)
       saveThread(storage(), userId, next)
     },
@@ -61,14 +70,19 @@ export function useChatThread(userId: string) {
       setDraft("")
       setDiscarded(null)
       setStatusLabel(null)
+      setLiveCards([])
 
-      const turn = { text: "", discarded: null as string | null, failure: null as string | null, done: false }
+      const turn = { text: "", discarded: null as string | null, failure: null as string | null, done: false, cards: [] as ChatCard[] }
+      const upsert = (c: ChatCard) => {
+        turn.cards = [...turn.cards.filter((x) => cardId(x) !== cardId(c)), c]
+        setLiveCards(turn.cards)
+      }
       const answer = (): ThreadMessage => ({ role: "assistant", content: turn.text, ...(turn.discarded ? { discarded: turn.discarded } : {}) })
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: requestMessages(thread) }),
+          body: JSON.stringify({ messages: requestMessages(thread), today: localDay() }),
           signal: controller.signal,
         })
         // First: a redirect to the login page can end on a non-OK response too.
@@ -89,6 +103,11 @@ export function useChatThread(userId: string) {
             }
             turn.text = ""
             setDraft("")
+          } else if (event.type === "draft") {
+            // A revision within the same turn replaces that card; text resets never drop cards.
+            upsert({ draft: event.draft, state: "draft" })
+          } else if (event.type === "change") {
+            upsert(event.card)
           } else if (event.type === "status") {
             setStatusLabel(event.label)
           } else if (event.type === "error") {
@@ -107,14 +126,14 @@ export function useChatThread(userId: string) {
         if (turn.failure) throw new Error(turn.failure)
         // A stream that ends without "done" was cut off; its partial text isn't kept.
         if (!turn.done && !controller.signal.aborted) throw new Error(CUT_OFF)
-        if (turn.text.trim() && shouldPersist(started, generation.current)) {
-          persist([...thread, answer()])
+        if ((turn.text.trim() || turn.cards.length) && shouldPersist(started, generation.current)) {
+          persist(mergeCards(messagesRef.current, answer(), turn.cards))
         }
       } catch (e) {
         if (!shouldPersist(started, generation.current)) return
         if (controller.signal.aborted) {
           // Stop keeps whatever arrived.
-          if (turn.text.trim()) persist([...thread, answer()])
+          if (turn.text.trim() || turn.cards.length) persist(mergeCards(messagesRef.current, answer(), turn.cards))
         } else {
           setError(e instanceof Error ? e.message : "Something went wrong.")
         }
@@ -125,6 +144,7 @@ export function useChatThread(userId: string) {
           setDraft(null)
           setDiscarded(null)
           setStatusLabel(null)
+          setLiveCards([])
         }
       }
     },
@@ -158,11 +178,17 @@ export function useChatThread(userId: string) {
     [messages.length]
   )
 
+  const updateCard = useCallback(
+    (id: string, patch: CardPatch) => persist(updateThreadCard(messagesRef.current, id, patch)),
+    [persist]
+  )
+
   const reset = useCallback(() => {
     generation.current += 1
     abortRef.current?.abort()
     abortRef.current = null
     clearThread(storage(), userId)
+    messagesRef.current = []
     setMessages([])
     setNotices([])
     setError(null)
@@ -170,7 +196,8 @@ export function useChatThread(userId: string) {
     setDraft(null)
     setDiscarded(null)
     setStatusLabel(null)
+    setLiveCards([])
   }, [userId])
 
-  return { messages, notices, draft, discarded, statusLabel, error, busy, send, retry, stop, reset, addNotice }
+  return { messages, notices, draft, discarded, statusLabel, error, busy, send, retry, stop, reset, addNotice, liveCards, updateCard }
 }

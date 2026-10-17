@@ -18,6 +18,11 @@ import {
 import { cn } from "@/lib/utils"
 import { ObservationDialog, type ConditionOption, type ObservationRow } from "./observation-form"
 import { ObservationPattern } from "./observation-pattern"
+import { ObservationCalendar } from "./observation-calendar"
+import { X } from "lucide-react"
+import { buildTimeline, type TimelineMedication } from "@/lib/medication-timeline"
+import { medicationEvents } from "@/lib/medication-effects"
+import { utcDay } from "@/lib/observation-calendar"
 
 const ALL = "__all__"
 
@@ -46,16 +51,19 @@ interface Props {
   personId: string
   observations: ObservationRow[]
   conditions: ConditionOption[]
+  /// The same person's medications, marked on the year calendar.
+  medications?: TimelineMedication[]
   openId?: string
 }
 
-export function ObservationsSection({ personId, observations, conditions, openId }: Props) {
+export function ObservationsSection({ personId, observations, conditions, medications = [], openId }: Props) {
   const fmt = useFormat()
   const [editing, setEditing] = useState<ObservationRow | null>(null)
   const [open, setOpen] = useState(false)
   const [type, setType] = useState<string>(ALL)
   const [conditionId, setConditionId] = useState<string>(ALL)
   const [range, setRange] = useState<RangeValue>("90")
+  const [pickedDay, setPickedDay] = useState<number | null>(null)
 
   // A ?open= link (e.g. from a notification or the assistant) opens that entry once.
   const [handledOpenId, setHandledOpenId] = useState<string | undefined>(undefined)
@@ -68,9 +76,14 @@ export function ObservationsSection({ personId, observations, conditions, openId
   const typeOptions = useMemo(() => typeSuggestions(observations), [observations])
   const now = new Date()
   const base = { type: type === ALL ? null : type, conditionId: conditionId === ALL ? null : conditionId }
-  const shown = filterObservations(observations, { ...base, range }, now)
+  const matching = filterObservations(observations, base, now)
+  // A day picked on the calendar overrides the time range until it's cleared.
+  const shown = pickedDay != null
+    ? matching.filter((o) => utcDay(o.date) === pickedDay)
+    : filterObservations(observations, { ...base, range }, now)
   const summary = summarizeObservations(shown)
-  const weeks = weeklyCounts(filterObservations(observations, base, now), 12, now)
+  const weeks = weeklyCounts(matching, 12, now)
+  const events = useMemo(() => medicationEvents(buildTimeline(medications, new Date())), [medications])
   const linkedConditions = conditions.filter((c) => observations.some((o) => o.conditionId === c.id))
 
   async function handleDelete(o: ObservationRow) {
@@ -118,10 +131,10 @@ export function ObservationsSection({ personId, observations, conditions, openId
                   key={r.value}
                   type="button"
                   aria-pressed={range === r.value}
-                  onClick={() => setRange(r.value)}
+                  onClick={() => { setRange(r.value); setPickedDay(null) }}
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-medium transition-colors",
-                    range === r.value ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    range === r.value && pickedDay == null ?"bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {r.label}
@@ -130,10 +143,22 @@ export function ObservationsSection({ personId, observations, conditions, openId
             </div>
           </div>
 
+          <ObservationCalendar observations={matching} events={events} pickedDay={pickedDay} onPickDay={setPickedDay} />
+
           <ObservationPattern weeks={weeks} label={type === ALL ? "All observations" : type} />
 
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{summary.count}</span> in {range === "all" ? "total" : `the last ${RANGES.find((r) => r.value === range)!.label}`}
+          <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+            {pickedDay != null && (
+              <button
+                type="button"
+                onClick={() => setPickedDay(null)}
+                className="mr-1 inline-flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+              >
+                {fmt.date(new Date(pickedDay), { utc: true })}
+                <X className="h-3 w-3" aria-label="Clear day" />
+              </button>
+            )}
+            <span className="font-medium text-foreground">{summary.count}</span> {pickedDay != null ? "that day" : <>in {range === "all" ? "total" : `the last ${RANGES.find((r) => r.value === range)!.label}`}</>}
             {summary.avgSeverity != null && <> · average severity {summary.avgSeverity} / 5</>}
             {summary.totalMinutes != null && <> · {formatDuration(summary.totalMinutes)} in all</>}
             {type === ALL && summary.byType.length > 1 && (

@@ -107,7 +107,7 @@ export async function runAgent(o: AgentOptions): Promise<void> {
       result.toolCalls.map((call, i) => {
         if (i >= MAX_CALLS_PER_ROUND) return TOO_MANY_CALLS
         o.emit({ type: "status", tool: call.name, label: toolLabel(o.tools, call), round })
-        return runToolCall(o.tools, call, o.ctx)
+        return runToolCall(o.tools, call, { ...o.ctx, emit: o.emit })
       })
     )
     // Returning quietly would end the stream without "done"; the route hides client aborts.

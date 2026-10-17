@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest"
 import {
-  axisTicks, buildTimeline, formatSpan, parseDose, sortChronologically, weeklyObservationCounts,
+  axisTicks, buildTimeline, formatSpan, parseDose, ratingsInWeeks, parseMedicationView, sortChronologically, weeklyObservationCounts,
   type TimelineMedication,
 } from "./medication-timeline"
+import { dailyRatings } from "./day-ratings"
 
 const d = (s: string) => new Date(s)
 const med = (over: Partial<TimelineMedication> & { name: string }): TimelineMedication => ({
@@ -127,12 +128,38 @@ describe("axisTicks", () => {
 })
 
 describe("weeklyObservationCounts", () => {
-  it("buckets dates into Monday-start weeks inside the range", () => {
+  it("buckets entries into Monday-start weeks inside the range", () => {
     const from = d("2026-09-02").getTime() // a Wednesday
     const to = d("2026-09-21").getTime()
-    const w = weeklyObservationCounts([d("2026-08-31"), d("2026-09-06"), d("2026-09-07"), d("2026-10-01")], from, to)
+    const w = weeklyObservationCounts([d("2026-08-31"), d("2026-09-06"), d("2026-09-07"), d("2026-10-01")].map((date) => ({ date })), from, to)
     expect(w.map((x) => new Date(x.start).toISOString().slice(0, 10))).toEqual(["2026-08-31", "2026-09-07", "2026-09-14"])
     expect(w.map((x) => x.count)).toEqual([2, 1, 0])
+  })
+  it("averages each week's day ratings and counts its severe days", () => {
+    const w = weeklyObservationCounts([
+      { date: d("2026-09-07"), severity: 5 }, { date: d("2026-09-07"), severity: 1 },
+      { date: d("2026-09-08"), severity: 4 }, { date: d("2026-09-09") },
+    ], d("2026-09-07").getTime(), d("2026-09-14").getTime())
+    expect(w).toEqual([{ start: d("2026-09-07").getTime(), count: 4, avg: 1.4, severe: 2 }])
+  })
+})
+
+describe("ratingsInWeeks", () => {
+  it("rates the whole weeks a period touches", () => {
+    // Wed Sep 2 to Tue Sep 15 (end exclusive Sep 16) touches the weeks of Aug 31 and Sep 7 and Sep 14.
+    const r = dailyRatings([
+      { date: d("2026-08-31"), severity: 5 }, { date: d("2026-09-01") }, { date: d("2026-09-10"), severity: 3 },
+      { date: d("2026-09-20"), severity: 2 }, { date: d("2026-09-21"), severity: 5 },
+    ])
+    expect(ratingsInWeeks(r, d("2026-09-02").getTime(), d("2026-09-16").getTime())).toEqual({ weeks: 3, days: 21, avg: 0.5, sum: 11, rough: 4, severe: 1 })
+  })
+})
+
+describe("parseMedicationView", () => {
+  it("accepts the three views and falls back to the list", () => {
+    expect(["list", "timeline", "effects", "chart", undefined, null].map(parseMedicationView)).toEqual([
+      "list", "timeline", "effects", "list", "list", "list",
+    ])
   })
 })
 

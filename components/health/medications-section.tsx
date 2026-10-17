@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChartGantt, List } from "lucide-react"
+import { ChartGantt, GitCompareArrows, List } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -21,13 +21,14 @@ import type { FieldConfig, FormValues } from "@/lib/form-types"
 import { cn } from "@/lib/utils"
 import type { Attachment, Medication } from "@/app/generated/prisma/client"
 import { MedicationTimeline } from "./medication-timeline"
+import { MedicationEffectsView } from "./medication-effects"
 
 export type MedicationRow = Medication & { attachments: Attachment[]; prescriber: { name: string } | null; condition: { name: string } | null }
-
 
 const VIEWS: { value: MedicationView; label: string; icon: React.ElementType }[] = [
   { value: "list", label: "List", icon: List },
   { value: "timeline", label: "Timeline", icon: ChartGantt },
+  { value: "effects", label: "Before & after", icon: GitCompareArrows },
 ]
 
 function ViewToggle({ value, onChange }: { value: MedicationView; onChange: (v: MedicationView) => void }) {
@@ -123,12 +124,12 @@ interface Props {
   conditions: { id: string; name: string }[]
   /// Observation dates for the same person, drawn under the timeline so dose
   /// changes can be read against how often things were logged.
-  observationDates?: Date[]
+  observations?: { date: Date; type: string; severity?: number | null }[]
   initialView?: MedicationView
   openId?: string
 }
 
-export function MedicationsSection({ personId, medications, providers, conditions, observationDates = [], initialView = "list", openId }: Props) {
+export function MedicationsSection({ personId, medications, providers, conditions, observations = [], initialView = "list", openId }: Props) {
   const fmt = useFormat()
   const [editing, setEditing] = useState<MedicationRow | null>(null)
   const [open, setOpen] = useState(false)
@@ -194,9 +195,11 @@ export function MedicationsSection({ personId, medications, providers, condition
       {view === "timeline" ? (
         <MedicationTimeline
           medications={medications}
-          observationDates={observationDates}
+          observations={observations}
           onSelect={(id) => { const m = medications.find((x) => x.id === id); if (m) openEdit(m) }}
         />
+      ) : view === "effects" ? (
+        <MedicationEffectsView medications={medications} observations={observations} />
       ) : (
       <>
       <EntityTable

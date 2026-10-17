@@ -6,6 +6,7 @@ import { createChatClient } from "@/lib/llm/client"
 import { agentErrorMessage, LlmError } from "@/lib/llm/errors"
 import { runAgent } from "@/lib/llm/agent"
 import { buildSystemPrompt } from "@/lib/llm/prompt"
+import { stripDraftLines } from "@/lib/llm/strip-drafts"
 import { chatRequestSchema, firstIssue } from "@/lib/llm/request-schema"
 import { chatTools } from "@/lib/llm/tools"
 import { loadDocumentSettings } from "@/lib/documents/settings"
@@ -75,11 +76,11 @@ export async function POST(request: Request) {
       try {
         const now = new Date()
         await runAgent({
-          history: parsed.data.messages,
-          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, fmt: await getFormat() }),
+          history: health ? parsed.data.messages : stripDraftLines(parsed.data.messages),
+          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, fmt: await getFormat(), today: parsed.data.today }),
           chat,
           tools: chatTools(docs, health, config.healthDocumentsEnabled),
-          ctx: { userId, now, health },
+          ctx: { userId, now, health, today: parsed.data.today },
           signal,
           model,
           maxRounds,

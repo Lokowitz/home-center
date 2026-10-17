@@ -3,6 +3,9 @@ import {
   assetHistoryTool, costSummaryTool, healthAlertsTool, maintenanceStatusTool, observationLogTool, searchTool, warrantyStatusTool,
 } from "./shortcuts"
 import { aggregateTool, findRecordsTool, getRecordTool } from "./generic"
+import { medicationHistoryTool } from "./medications"
+import { draftObservationTool } from "./observation-draft"
+import { proposeDeleteTool, proposeEditTool } from "./observation-change"
 import { documentTools } from "./documents"
 import { inboxTool } from "./inbox"
 import type { DocumentAccess } from "@/lib/documents/tool-helpers"
@@ -14,11 +17,15 @@ const SHORTCUT_TOOLS: RegisteredTool[] = [
   maintenanceStatusTool,
   warrantyStatusTool,
   healthAlertsTool,
+  medicationHistoryTool,
   observationLogTool,
+  draftObservationTool,
+  proposeEditTool,
+  proposeDeleteTool,
 ]
 const GENERIC_TOOLS: RegisteredTool[] = [findRecordsTool, getRecordTool, aggregateTool]
 
-const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, observationLogTool])
+const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, medicationHistoryTool, observationLogTool, draftObservationTool, proposeEditTool, proposeDeleteTool])
 
 /**
  * The chat's tools: document tools go between the shortcuts and the generic

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest"
 import { DUMMY_HASH, verifyLogin, type LoginDeps } from "./auth-credentials"
 import { createLoginThrottle } from "./login-throttle"
 
-const user = { id: "u1", name: "Mike", email: "a@x.com", role: "ADMIN", mustResetPassword: false, sessionVersion: 4, passwordHash: "$2b$12$real" }
+const user = { id: "u1", name: "Sam", email: "a@x.com", role: "ADMIN", mustResetPassword: false, sessionVersion: 4, passwordHash: "$2b$12$real" }
 
 function deps(over: Partial<LoginDeps> = {}): LoginDeps {
   return {
@@ -16,7 +16,7 @@ function deps(over: Partial<LoginDeps> = {}): LoginDeps {
 describe("verifyLogin", () => {
   it("signs in with the right password", async () => {
     const r = await verifyLogin({ email: "a@x.com", password: "right" }, "1.1.1.1", deps())
-    expect(r).toEqual({ status: "ok", user: { id: "u1", name: "Mike", email: "a@x.com", role: "ADMIN", mustResetPassword: false, sessionVersion: 4 } })
+    expect(r).toEqual({ status: "ok", user: { id: "u1", name: "Sam", email: "a@x.com", role: "ADMIN", mustResetPassword: false, sessionVersion: 4 } })
   })
 
   it("rejects a wrong password", async () => {

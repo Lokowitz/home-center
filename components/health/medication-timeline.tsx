@@ -4,9 +4,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import { ArrowDown, ArrowUp, RotateCcw } from "lucide-react"
 import { useFormat } from "@/components/regional-provider"
 import {
-  axisTicks, buildTimeline, daysBetween, formatSpan, weeklyObservationCounts,
-  type TimelineLane, type TimelineMedication, type TimelineSegment,
+  axisTicks, buildTimeline, daysBetween, formatSpan, ratingsInWeeks, weeklyObservationCounts,
+  type TimelineLane, type TimelineMedication, type TimelineSegment, type WeekCount,
 } from "@/lib/medication-timeline"
+import { dailyRatings, type DayRatings, type RatedObservation } from "@/lib/day-ratings"
 import { cn } from "@/lib/utils"
 
 const DAY = 86_400_000
@@ -64,11 +65,11 @@ type Readout = { t: number; x: number }
 
 interface Props {
   medications: TimelineMedication[]
-  observationDates: Date[]
+  observations: RatedObservation[]
   onSelect: (id: string) => void
 }
 
-export function MedicationTimeline({ medications, observationDates, onSelect }: Props) {
+export function MedicationTimeline({ medications, observations, onSelect }: Props) {
   const fmt = useFormat()
   const [range, setRange] = useState<RangeValue>("all")
   const [readout, setReadout] = useState<Readout | null>(null)
@@ -97,8 +98,11 @@ export function MedicationTimeline({ medications, observationDates, onSelect }: 
 
   const visible = lanes.filter((l) => l.segments.some((s) => s.end > from && s.start < to))
   const ticks = axisTicks(from, to)
-  const weeks = useMemo(() => weeklyObservationCounts(observationDates, from, to), [observationDates, from, to])
-  const weekMax = Math.max(1, ...weeks.map((w) => w.count))
+  // Each week's bar is its average day (each day rated by its worst entry),
+  // scaled to the tallest week but never taller than a full mild week.
+  const weeks = useMemo(() => weeklyObservationCounts(observations, from, to), [observations, from, to])
+  const weekMax = Math.max(1, ...weeks.map((w) => w.avg))
+  const ratings = useMemo(() => dailyRatings(observations), [observations])
   const obsInRange = weeks.reduce((s, w) => s + w.count, 0)
   const periods = visible.reduce((s, l) => s + l.segments.length, 0)
   const activeCount = visible.filter((l) => l.active).length
@@ -183,10 +187,10 @@ export function MedicationTimeline({ medications, observationDates, onSelect }: 
                     </div>
                   </div>
                 ))}
-                {observationDates.length > 0 && (
+                {observations.length > 0 && (
                   <div className="flex flex-col justify-center border-t" style={{ height: OBS_HEIGHT + 10 }}>
                     <div className="text-[11px] font-medium leading-tight text-muted-foreground">Observations</div>
-                    <div className="text-[11px] leading-tight text-muted-foreground">per week · {obsInRange}</div>
+                    <div className="text-[11px] leading-tight text-muted-foreground">avg day · {obsInRange} logged</div>
                   </div>
                 )}
               </div>
@@ -251,17 +255,17 @@ export function MedicationTimeline({ medications, observationDates, onSelect }: 
                   </div>
                 ))}
 
-                {observationDates.length > 0 && (
+                {observations.length > 0 && (
                   <div className="relative border-t" style={{ height: OBS_HEIGHT + 10 }} aria-hidden="true">
                     {weeks.map((w) =>
-                      w.count > 0 ? (
+                      w.avg > 0 ? (
                         <div
                           key={w.start}
                           className="absolute bottom-[5px] rounded-t-[2px]"
                           style={{
                             left: `calc(${pos(w.start)}% + 0.5px)`,
                             width: `calc(${pos(w.start + 7 * DAY) - pos(w.start)}% - 1px)`,
-                            height: Math.max(3, (w.count / weekMax) * OBS_HEIGHT),
+                            height: Math.max(3, (w.avg / weekMax) * OBS_HEIGHT),
                             background: "var(--chart-ghost)",
                           }}
                         />
@@ -280,7 +284,8 @@ export function MedicationTimeline({ medications, observationDates, onSelect }: 
                     width={plotWidth}
                     title={fmtDate(readout.t)}
                     rows={onDay.map(({ lane, seg }) => ({ lane: lane.name, seg }))}
-                    observations={readoutWeek?.count}
+                    week={observations.length > 0 ? readoutWeek : undefined}
+                    ratings={ratings}
                   />
                 )}
               </div>
@@ -379,14 +384,17 @@ function SegmentMark({
 }
 
 function DayCard({
-  x, width, title, rows, observations,
+  x, width, title, rows, week, ratings,
 }: {
   x: number
   width: number
   title: string
   rows: { lane: string; seg: TimelineSegment }[]
-  observations: number | undefined
+  week: WeekCount | undefined
+  /// Every day's rating, for each dose's summary under the week's.
+  ratings: DayRatings
 }) {
+  const during = (s: TimelineSegment) => ratingsInWeeks(ratings, s.start, s.end)
   // Sits beside the crosshair, on whichever side has room, so it never covers
   // the bars right under the pointer.
   const flip = x > width / 2
@@ -422,10 +430,32 @@ function DayCard({
           ))}
         </dl>
       )}
-      {observations != null && (
-        <div className="mt-1.5 flex items-center justify-between border-t pt-1.5 text-xs">
-          <span className="text-muted-foreground">Observations that week</span>
-          <span className="font-medium tabular-nums">{observations}</span>
+      {week && (
+        <div className="mt-1.5 space-y-1 border-t pt-1.5 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-muted-foreground">That week</span>
+            <span className="shrink-0 tabular-nums">
+              <span className="font-medium">avg day {week.avg}</span>
+              <span className="text-muted-foreground"> · {week.count} logged{week.severe ? ` · ${week.severe} severe` : ""}</span>
+            </span>
+          </div>
+          {rows.length > 0 && (
+            <div>
+              <div className="text-muted-foreground">During each dose (whole weeks)</div>
+              {rows.map(({ lane, seg }) => {
+                const d = during(seg)
+                return (
+                  <div key={seg.med.id} className="flex items-center justify-between gap-2 pl-2">
+                    <span className="min-w-0 truncate">{lane} {seg.med.dosage ?? ""}</span>
+                    <span className="shrink-0 tabular-nums">
+                      <span className="font-medium">avg {d.avg}</span>
+                      <span className="text-muted-foreground"> · {d.severe} severe in {d.weeks} wk</span>
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
