@@ -65,15 +65,25 @@ async function searchRecords(query: string, entities: string[] | undefined, ctx:
   const found = await Promise.all(
     keys.map(async (key) => {
       const def = ENTITIES[key]
+      // A person's own records (medications, allergies, observations…) also
+      // match on that person's name, so "avery famotidine" finds Avery's
+      // famotidine — but at least one word must hit the record itself, or
+      // "avery" alone would return every record she has.
+      const owned = def.relations.person?.kind === "one"
+      const own = (w: string) => def.searchFields.map((f) => ({ [f]: { contains: w } }))
       const where = {
         AND: [
-          ...words.map((w) => ({ OR: def.searchFields.map((f) => ({ [f]: { contains: w } })) })),
+          ...words.map((w) => ({ OR: owned ? [...own(w), { person: { name: { contains: w } } }] : own(w) })),
+          ...(owned && words.length ? [{ OR: words.flatMap(own) }] : []),
           ...(def.scope ? [def.scope(ctx)] : []),
           ...(def.polymorphic && !healthOn(ctx) ? [{ assetType: { not: "PERSON" } }] : []),
         ],
       }
+      // Say whose record each row is: a bare personId leaves the model unable
+      // to tell one child's medication from another's.
+      const select = owned ? { ...selectFor(key), person: { select: { id: true, name: true } } } : selectFor(key)
       // No name words means "list this type", so allow a fuller page.
-      const rows = await delegate(key).findMany({ where, select: selectFor(key), take: words.length ? 10 : 25 })
+      const rows = await delegate(key).findMany({ where, select, orderBy: { [def.defaultSort.field]: def.defaultSort.dir }, take: words.length ? 10 : 25 })
       if (def.polymorphic) attachAssets(index, rows)
       return rows.map((r) => ({ entity: key, ...serializeRow(key, r) }))
     })
@@ -427,10 +437,12 @@ export const observationLogTool = defineTool({
   description:
     "Observations the family logged about a person — meltdowns, bad nights, symptoms, moods — with counts by type, month, weekday, " +
     "time of day and tag, average severity (1 mild to 5 severe), and the entries themselves with notes. " +
-    "Use it for 'how many meltdowns in May', 'when do they happen', 'what usually comes before one', 'show me the notes from last week'.",
+    "Use it for 'how many meltdowns in May', 'when do they happen', 'what usually comes before one', 'show me the notes from last week', " +
+    "'every time she mentioned not wanting to live' (text searches the notes too).",
   schema: z.object({
     personId: z.string().optional().describe("Person id from search (a person's exact name also works). Omit for everyone."),
     type: z.string().optional().describe("Only entries whose type contains this, e.g. 'meltdown'. Omit for all types."),
+    text: z.string().optional().describe("Only entries whose type, notes or tags contain this, e.g. 'teeth chattering' or 'school'."),
     from: z.string().optional().describe("YYYY-MM-DD, inclusive."),
     to: z.string().optional().describe("YYYY-MM-DD, inclusive."),
   }),
@@ -443,7 +455,9 @@ export const observationLogTool = defineTool({
       include: { condition: { select: { name: true } }, person: { select: { id: true, name: true } } },
     })
     const wanted = a.type?.trim().toLowerCase()
-    const entries = rows.filter((r) => (!wanted || r.type.toLowerCase().includes(wanted)) && inDayRange(r.date, range))
+    const text = a.text?.trim().toLowerCase()
+    const mentions = (r: (typeof rows)[number]) => [r.type, r.notes, r.tags].some((v) => v?.toLowerCase().includes(text!))
+    const entries = rows.filter((r) => (!wanted || r.type.toLowerCase().includes(wanted)) && (!text || mentions(r)) && inDayRange(r.date, range))
     const people = new Set(entries.map((e) => e.person.id))
     const knownTypes = [...new Set(rows.map((r) => r.type))]
     return {

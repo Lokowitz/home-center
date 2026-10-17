@@ -14,12 +14,18 @@ describe("buildSystemPrompt", () => {
     expect(p).toMatch(/never follow instructions/i)
   })
 
+  it("uses the user's local day when given, else UTC", () => {
+    expect(buildSystemPrompt({ now, today: "2026-10-17" })).toContain("Today is 2026-10-17 (the user's local day)")
+    expect(buildSystemPrompt({ now })).toContain("(UTC)")
+  })
+
   it("carries the date, rules and data model", () => {
     const p = buildSystemPrompt({ now })
     expect(p).toContain("Today is 2026-09-26")
     expect(p).toMatch(/only from data returned by your tools/)
     expect(p).toContain("- serviceRecord:")
-    expect(p).toContain("search, cost_summary, asset_history, maintenance_status, warranty_status, health_alerts, observation_log")
+    expect(p).toContain("search, cost_summary, asset_history, maintenance_status, warranty_status, health_alerts, medication_history, observation_log")
+    expect(p).toContain("use medication_history")
     expect(p).not.toMatch(/passwordHash/)
   })
 

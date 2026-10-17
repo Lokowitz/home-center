@@ -15,6 +15,8 @@ export const chatRequestSchema = z
       )
       .min(1)
       .max(MAX_MESSAGES),
+    /** The viewer's calendar day, so "today" means their today, not UTC's. */
+    today: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.messages.at(-1)?.role !== "user") {

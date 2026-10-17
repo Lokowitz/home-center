@@ -35,3 +35,14 @@ describe("chatRequestSchema", () => {
     expect(r).toEqual({ messages: [{ role: "user", content: "q" }] })
   })
 })
+
+describe("chatRequestSchema today", () => {
+  const messages = [{ role: "user" as const, content: "hi" }]
+  it("accepts the viewer's day or none", () => {
+    expect(chatRequestSchema.safeParse({ messages, today: "2026-10-17" }).success).toBe(true)
+    expect(chatRequestSchema.safeParse({ messages }).success).toBe(true)
+  })
+  it("rejects anything else", () => {
+    expect(chatRequestSchema.safeParse({ messages, today: "Oct 17" }).success).toBe(false)
+  })
+})

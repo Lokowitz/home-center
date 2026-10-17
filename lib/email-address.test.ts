@@ -3,11 +3,11 @@ import { emailAddress, isEmailAddress } from "./email-address"
 
 describe("emailAddress", () => {
   it("accepts an ordinary address and trims spaces around it", () => {
-    expect(emailAddress.parse("  mike@example.com ")).toBe("mike@example.com")
+    expect(emailAddress.parse("  sam@example.com ")).toBe("sam@example.com")
   })
 
   it("keeps the case as typed, since sign-in matches the stored address exactly", () => {
-    expect(emailAddress.parse("Mike@Example.com")).toBe("Mike@Example.com")
+    expect(emailAddress.parse("Sam@Example.com")).toBe("Sam@Example.com")
   })
 
   it("rejects an address that smuggles in another recipient", () => {
@@ -28,7 +28,7 @@ describe("emailAddress", () => {
 
 describe("isEmailAddress", () => {
   it("is the same rule, for checking a stored address before sending", () => {
-    expect(isEmailAddress("mike@example.com")).toBe(true)
+    expect(isEmailAddress("sam@example.com")).toBe(true)
     expect(isEmailAddress("a@x.com>\r\nBcc: e@f.g")).toBe(false)
   })
 })

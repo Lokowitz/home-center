@@ -7,6 +7,7 @@ import { redirect } from "next/navigation"
 import { allergySchema, conditionSchema, immunizationSchema, medicationSchema, observationSchema } from "@/lib/health-schemas"
 import { nextRefillFrom } from "@/lib/health"
 import { removeUploadDir } from "@/lib/upload-fs"
+import { STALE_ENTRY } from "@/lib/observation-cards"
 import type { ActionResult, FormValues } from "@/lib/form-types"
 
 async function requireSession() {
@@ -225,6 +226,34 @@ export async function deleteObservation(id: string): Promise<ActionResult> {
 
   await prisma.observation.delete({ where: { id: existing.id } })
   await removeUploadDir("observation", existing.id)
+  revalidatePerson(existing.personId)
+  return { success: true }
+}
+
+/** An edit from an assistant card: applied only if the entry is as the card saw it. */
+export async function applyObservationEdit(id: string, values: FormValues, expectedUpdatedAt: string): Promise<ActionResult> {
+  await requireSession()
+  const parsed = observationSchema.safeParse(values)
+  if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+  const existing = await prisma.observation.findUnique({ where: { id }, select: { personId: true } })
+  if (!existing) return NOT_FOUND
+  const bad = await conditionError(existing.personId, parsed.data.conditionId)
+  if (bad) return bad
+  // Atomic: the filter on updatedAt is the check.
+  const { count } = await prisma.observation.updateMany({ where: { id, updatedAt: new Date(expectedUpdatedAt) }, data: parsed.data })
+  if (count === 0) return { error: STALE_ENTRY }
+  revalidatePerson(existing.personId)
+  return { success: true, id }
+}
+
+/** A delete from an assistant card, refused if the entry changed since the card was made. */
+export async function deleteObservationIfUnchanged(id: string, expectedUpdatedAt: string): Promise<ActionResult> {
+  await requireSession()
+  const existing = await prisma.observation.findUnique({ where: { id }, select: { personId: true } })
+  if (!existing) return NOT_FOUND
+  const { count } = await prisma.observation.deleteMany({ where: { id, updatedAt: new Date(expectedUpdatedAt) } })
+  if (count === 0) return { error: STALE_ENTRY }
+  await removeUploadDir("observation", id)
   revalidatePerson(existing.personId)
   return { success: true }
 }

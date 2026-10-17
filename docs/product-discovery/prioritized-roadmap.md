@@ -211,8 +211,8 @@ F11 ICS ── independent; benefits from F2 (snooze) and F9 (renewals)
 
 | Item | Decision | Reason |
 |---|---|---|
-| Assistant write tools | **Avoid** (for now) | Error-prone on local models and hard to audit. F6 provides reviewed creation. Revisit only as "assistant drafts into the Inbox". |
-| More assistant settings and tools | **Pause** | The assistant is already capable (13 tools, link verification). Its value is now limited by the *data volume*, not by its features. |
+| Assistant write tools | **Avoid** (for now) | Error-prone on local models and hard to audit. F6 provides reviewed creation. Observations (2026-10) follow the allowed shape: the assistant proposes adds, edits and deletes as chat cards and the user confirms each one. Direct writes stay out. |
+| More assistant settings and tools | **Pause** | The assistant is already capable (15 tools, link verification). Its value is now limited by the *data volume*, not by its features. |
 | Server-side chat history | **Avoid** | Breaks a clear privacy promise for little value. |
 | Budgeting, bank sync, general ledger | **Avoid** | Other tools own this. It dilutes the identity. F9 covers asset-linked costs. |
 | Chores, groceries, meal planning | **Avoid** | Grocy and Homechart territory. |

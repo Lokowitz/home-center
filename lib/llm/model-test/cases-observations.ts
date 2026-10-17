@@ -91,6 +91,35 @@ export const OBSERVATION_CASES: ModelTestCase[] = [
     question: "Show me the notes from the last few bad nights we logged.",
     check: either(calledTool("observation_log"), genericOnObservations),
   },
+  {
+    id: "choice-observations-draft",
+    stage: "tool-choice",
+    category: "Observations",
+    title: "Drafts an entry when told what happened, estimating severity",
+    question: "Jamie was hitting his sister after school today, it went on for about 20 minutes.",
+    check: calledTool("draft_observation", (a) => {
+      if (!String(a.person ?? "").toLowerCase().includes("jamie")) return "it wasn't for Jamie"
+      if (a.durationMinutes !== 20) return "it didn't record 20 minutes"
+      if (a.severity === undefined && !(Number(a.severityEstimate) >= 3)) return "it didn't estimate a severity of at least 3 for hitting"
+      return null
+    }),
+  },
+  {
+    id: "choice-observations-edit",
+    stage: "tool-choice",
+    category: "Observations",
+    title: "Looks up the entry before proposing a change",
+    question: "Change Jamie's meltdown on May 12 to a severity 4.",
+    check: either(calledTool("observation_log"), calledTool("propose_observation_edit")),
+  },
+  {
+    id: "choice-observations-delete",
+    stage: "tool-choice",
+    category: "Observations",
+    title: "Looks up the entry before proposing a deletion",
+    question: "Delete the duplicate meltdown entry for Jamie on May 12.",
+    check: either(calledTool("observation_log"), calledTool("propose_observation_delete")),
+  },
 
   // -------------------------------------------------------------------- answer
   {

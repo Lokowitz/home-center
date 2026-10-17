@@ -42,7 +42,13 @@ describe("assistant with Health off", () => {
     const names = chatTools({ enabled: false, includeHealth: false }, false).map((t) => t.name)
     expect(names).not.toContain("health_alerts")
     expect(names).not.toContain("observation_log")
+    expect(names).not.toContain("draft_observation")
+    expect(names).not.toContain("propose_observation_edit")
+    expect(names).not.toContain("propose_observation_delete")
+    expect(buildSystemPrompt({ now: off.now, health: false })).not.toContain("propose_observation")
     expect(chatTools({ enabled: false, includeHealth: false }).map((t) => t.name)).toContain("health_alerts")
+    expect(chatTools({ enabled: false, includeHealth: false }).map((t) => t.name)).toContain("draft_observation")
+    expect(buildSystemPrompt({ now: off.now, health: false })).not.toContain("draft_observation")
   })
 
   it("offers the intake tool with Health on or off", () => {

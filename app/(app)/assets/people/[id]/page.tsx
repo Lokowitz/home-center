@@ -2,6 +2,7 @@ import { requireHealth } from "@/lib/features-server"
 import { DropPageAsset } from "@/components/drop/drop-provider"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
+import { cookies } from "next/headers"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Cake, Download, Droplet, FileText, ShieldPlus, Stethoscope, Users, User } from "lucide-react"
@@ -21,6 +22,7 @@ import { LogObservationButton } from "@/components/health/observation-form"
 import { byNewest, typeSuggestions } from "@/lib/observations"
 import { getFormat } from "@/lib/regional-server"
 import { ageFrom, INSURANCE_KINDS, labelFor, RELATIONSHIPS } from "@/lib/health"
+import { MEDICATION_VIEW_COOKIE, parseMedicationView } from "@/lib/medication-timeline"
 
 export default async function PersonDetailPage({
   params,
@@ -33,6 +35,7 @@ export default async function PersonDetailPage({
   const fmt = await getFormat()
   const { id } = await params
   const { tab, open } = await searchParams
+  const medicationView = parseMedicationView((await cookies()).get(MEDICATION_VIEW_COOKIE)?.value)
   const person = await prisma.person.findUnique({
     where: { id },
     include: {
@@ -158,13 +161,13 @@ export default async function PersonDetailPage({
             <ServiceRecordList records={visits} assetId={id} assetType="PERSON" providerOptions={providers} conditionOptions={conditionOptions} reminders={schedules} openId={tab === "visits" ? open : undefined} />
           </TabsContent>
           <TabsContent value="observations" className="mt-4">
-            <ObservationsSection personId={id} observations={observations} conditions={conditionOptions} openId={tab === "observations" ? open : undefined} />
+            <ObservationsSection personId={id} observations={observations} conditions={conditionOptions} medications={person.medications} openId={tab === "observations" ? open : undefined} />
           </TabsContent>
           <TabsContent value="conditions" className="mt-4">
             <ConditionsSection personId={id} conditions={person.conditions} providers={providers} observations={observations} />
           </TabsContent>
           <TabsContent value="medications" className="mt-4">
-            <MedicationsSection personId={id} medications={person.medications} providers={providers} conditions={conditionOptions} openId={tab === "medications" ? open : undefined} />
+            <MedicationsSection personId={id} medications={person.medications} providers={providers} conditions={conditionOptions} observations={observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))} initialView={medicationView} openId={tab === "medications" ? open : undefined} />
           </TabsContent>
           <TabsContent value="immunizations" className="mt-4">
             <ImmunizationsSection personId={id} immunizations={person.immunizations} openId={tab === "immunizations" ? open : undefined} />

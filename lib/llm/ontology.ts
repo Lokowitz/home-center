@@ -231,7 +231,9 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
   },
   medication: {
     model: "medication", label: "Medication", plural: "medications",
-    description: "Prescriptions for a person. No endDate (or a future one) means still taken.",
+    description:
+      "A person's medications, one row per dose period: a dose change ends one row and starts the next, so one drug can have many rows. " +
+      "No endDate (or a future one) means still taken. For a person's medication history prefer medication_history.",
     nameField: "name", searchFields: ["name", "pharmacy"], keys: ["personId", "prescriberId", "conditionId"],
     fields: {
       name: s, dosage: s, frequency: s, pharmacy: s, startDate: date, endDate: date,
@@ -242,7 +244,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
       prescriber: { kind: "one", entity: "provider" },
       condition: { kind: "one", entity: "healthCondition" },
     },
-    defaultSort: { field: "name", dir: "asc" },
+    defaultSort: { field: "startDate", dir: "desc" },
     href: personLink,
   },
   allergy: {

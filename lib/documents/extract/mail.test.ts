@@ -29,7 +29,7 @@ describe("extractFile — email and legacy formats", () => {
   it("reads an .eml: headers, body and attachment name", async () => {
     const eml = [
       "From: Pat Smith <pat@example.com>",
-      "To: mike@example.com",
+      "To: sam@example.com",
       "Subject: Dishwasher warranty claim",
       "MIME-Version: 1.0",
       'Content-Type: text/plain; charset="utf-8"',

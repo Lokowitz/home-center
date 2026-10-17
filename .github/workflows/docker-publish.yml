@@ -23,6 +23,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Every version is published once: a package.json version that already has a
+      # release tag fails here, before anything is built or pushed (PRs see it early).
+      - name: Check version is new
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if git ls-remote --exit-code --tags origin "refs/tags/$version" > /dev/null; then
+            echo "::error file=package.json::Version $version is already released (tag $version). Bump \"version\" in package.json."
+            exit 1
+          fi
+          echo "Version $version is new."
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -48,9 +59,16 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # The image is tagged with package.json's version (and the release below uses it too).
+      - name: Read version
+        id: pkg
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -72,7 +90,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.pkg.outputs.version }}
             type=sha,format=short
+          labels: |
+            org.opencontainers.image.version=${{ steps.pkg.outputs.version }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -82,3 +103,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # One GitHub release per package.json version, made after its image is pushed.
+  # verify has already refused a version that was released before.
+  release:
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.build-and-push.outputs.version }}
+    steps:
+      - name: Create release
+        run: |
+          tag="$VERSION"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "$tag" \
+            --generate-notes \
+            --notes "Image: \`docker pull ${REGISTRY}/${IMAGE_NAME}:${VERSION}\`"

@@ -47,6 +47,7 @@ dev.log
 /prisma/dev.db-journal
 /prisma/search-index.db
 /prisma/search-index.db-*
+/prisma/*.backup*
 
 # generated prisma client
 /app/generated/

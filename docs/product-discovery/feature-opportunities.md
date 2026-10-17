@@ -539,7 +539,7 @@
 
 | Idea | Decision | Reason |
 |---|---|---|
-| **Assistant that writes records** ("log an oil change for $45") | Defer | The tool layer is deliberately read-only (`lib/llm/*`). Writes through a small local model are error-prone and hard to undo. F6's review-then-confirm flow captures most of the value deterministically. Revisit as "assistant proposes a draft into the Inbox", never direct writes. |
+| **Assistant that writes records** ("log an oil change for $45") | Defer | The tool layer is deliberately read-only (`lib/llm/*`). Writes through a small local model are error-prone and hard to undo. F6's review-then-confirm flow captures most of the value deterministically. Revisit as "assistant proposes a draft into the Inbox", never direct writes. Observations now work the propose-then-confirm way (cards in the chat for adds, edits and deletes; the user confirms each); see docs/superpowers/specs/2026-10-17-assistant-observation-changes-design.md. |
 | **Server-side chat history** | Reject (for now) | It weakens a clear privacy promise (`README.md:141`) for low value. Answers are re-derivable from the data. |
 | **Budgeting, bank sync, a general ledger** | Reject | Firefly III, Actual and others own this. It would dilute the identity and bring heavy support (bank APIs). F9 covers asset-linked fixed costs only. |
 | **Chores, groceries, meal planning** | Reject | Grocy and Homechart cover these. HomeCenter's identity is *ownership and upkeep*, not daily household ops. |
