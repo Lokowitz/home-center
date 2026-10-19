@@ -1,17 +1,17 @@
 import { Empty, SectionTitle } from "./report-parts"
-import { MedicationReview, ObservationCalendarSection } from "./medication-review"
+import { MedicationReview, ObservationChartSection } from "./medication-review"
 import type { Formatter } from "@/lib/regional"
 import {
   ALLERGY_SEVERITIES, CONDITION_STATUSES, INSURANCE_KINDS, isMedicationActive, labelFor,
 } from "@/lib/health"
 import type { ReportHealth } from "@/lib/report-server"
-import {
-  filterObservations, formatDuration, summarizeObservations, type RangeValue,
-} from "@/lib/observations"
+import { filterObservations, formatDuration, type RangeValue } from "@/lib/observations"
+import { obsDays, rangeLabel, type ReportOptions } from "@/lib/report-options"
 
 // Ordered the way a clinician reads a chart: what could hurt them, what they
 // have, what they take, what they've had, who pays, who treats them.
-export function HealthSummary({ health, now, observationDays, fmt }: { health: ReportHealth; now: Date; observationDays: number | null; fmt: Formatter }) {
+export function HealthSummary({ health, now, options, fmt }: { health: ReportHealth; now: Date; options: ReportOptions; fmt: Formatter }) {
+  const observationDays = obsDays(options)
   const { person, careTeam } = health
   const day = (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : "—")
   const conditions = person.conditions.filter((c) => c.status !== "RESOLVED")
@@ -20,6 +20,7 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
 
   return (
     <>
+      {options.allergies && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Allergies</SectionTitle>
         {person.allergies.length === 0 ? (
@@ -36,7 +37,9 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+      )}
 
+      {options.conditions && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Active conditions</SectionTitle>
         {conditions.length === 0 ? (
@@ -49,7 +52,9 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
         )}
         {resolved > 0 && <Empty>{resolved} resolved condition{resolved === 1 ? "" : "s"} not shown.</Empty>}
       </section>
+      )}
 
+      {options.medications && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Current medications</SectionTitle>
         {medications.length === 0 ? (
@@ -66,7 +71,9 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+      )}
 
+      {options.immunizations && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Immunizations</SectionTitle>
         {person.immunizations.length === 0 ? (
@@ -78,8 +85,10 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+      )}
 
 
+      {options.insurance && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Insurance</SectionTitle>
         {person.insurancePolicies.length === 0 ? (
@@ -98,7 +107,9 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+      )}
 
+      {options.careTeam && (
       <section className="report-section report-break-avoid mt-7">
         <SectionTitle>Care team</SectionTitle>
         {careTeam.length === 0 ? (
@@ -110,54 +121,54 @@ export function HealthSummary({ health, now, observationDays, fmt }: { health: R
           />
         )}
       </section>
+      )}
 
       <MedicationReview
         medications={person.medications}
         observations={person.observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))}
         now={now}
         fmt={fmt}
+        show={{ review: options.review, history: options.history, list: options.medList, listNotes: options.medListNotes, changes: options.changes }}
+        historyRange={options.historyRange}
       />
 
-      {/* Observations come last: the year at a glance, then the entries
-          behind it. Both follow the summary's observations setting. */}
       {observationDays != null && (
         <>
-          <ObservationCalendarSection
-            observations={person.observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))}
-            medications={person.medications}
-            now={now}
-            fmt={fmt}
-          />
-          <Observations rows={person.observations} days={observationDays} now={now} fmt={fmt} />
+          {options.obsView !== "none" && (
+            <ObservationChartSection
+              observations={person.observations.map((o) => ({ date: o.date, type: o.type, severity: o.severity }))}
+              medications={person.medications}
+              days={observationDays}
+              view={options.obsView}
+              now={now}
+              fmt={fmt}
+            />
+          )}
+          {options.obsList && <Observations rows={person.observations} days={observationDays} notes={options.obsNotes} now={now} fmt={fmt} />}
         </>
       )}
     </>
   )
 }
 
-function Observations({ rows, days, now, fmt }: { rows: ReportHealth["person"]["observations"]; days: number; now: Date; fmt: Formatter }) {
+function Observations({ rows, days, notes, now, fmt }: { rows: ReportHealth["person"]["observations"]; days: number | "all"; notes: boolean; now: Date; fmt: Formatter }) {
   const day = (d: Date | null | undefined) => (d ? fmt.date(d, { utc: true }) : "—")
   const shown = filterObservations(rows, { range: String(days) as RangeValue }, now)
-  const summary = summarizeObservations(shown)
   return (
     <section className="report-section mt-7">
-      <SectionTitle>Observations — last {days} days</SectionTitle>
+      <SectionTitle>Observation entries — {rangeLabel(days)}</SectionTitle>
       {shown.length === 0 ? (
         <Empty>Nothing logged in this period.</Empty>
       ) : (
         <>
-          <p className="mt-1 text-[10pt]">
-            {summary.byType.map((t) => `${t.type}: ${t.count}`).join(" · ")}
-            {summary.avgSeverity != null && ` · average severity ${summary.avgSeverity} / 5`}
-          </p>
           <Rows
-            head={["When", "What", "Severity", "Duration", "Notes"]}
+            head={notes ? ["When", "What", "Severity", "Duration", "Notes"] : ["When", "What", "Severity", "Duration"]}
             rows={shown.map((o) => [
               `${day(o.date)}${o.time ? ` ${fmt.clock(o.time)}` : ""}`,
               o.condition ? `${o.type} (${o.condition.name})` : o.type,
               o.severity ? `${o.severity} / 5` : "—",
               formatDuration(o.durationMinutes),
-              [o.notes, o.tags ? `Tags: ${o.tags}` : null].filter(Boolean).join(" — ") || "—",
+              ...(notes ? [[o.notes, o.tags ? `Tags: ${o.tags}` : null].filter(Boolean).join(" — ") || "—"] : []),
             ])}
           />
         </>

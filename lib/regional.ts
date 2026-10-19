@@ -58,6 +58,18 @@ export function createFormatter(r: Regional) {
     }
   }
 
+  /** Numeric with a two-digit year, for tight spaces: "01/05/24". Text formats fall back on their numeric order. */
+  const dateNumeric = (d: When, opts: { utc?: boolean } = {}) => {
+    const { y, m, day } = ymd(toDate(d), !!opts.utc)
+    const yy = pad(y % 100)
+    switch (r.dateFormat) {
+      case "DMY_SHORT":
+      case "DMY_NUM": return `${pad(day)}/${pad(m + 1)}/${yy}`
+      case "ISO": return `${y}-${pad(m + 1)}-${pad(day)}`
+      default: return `${pad(m + 1)}/${pad(day)}/${yy}`
+    }
+  }
+
   const dayMonth = (d: When, opts: { utc?: boolean } = {}) => {
     const { m, day } = ymd(toDate(d), !!opts.utc)
     switch (r.dateFormat) {
@@ -97,6 +109,7 @@ export function createFormatter(r: Regional) {
     areaLabel: sqm ? "Floor area (m²)" : "Square footage",
     area: (n: number) => `${n.toLocaleString()} ${sqm ? "m²" : "ft²"}`,
     date,
+    dateNumeric,
     dayMonth,
     time,
     /** A stored "HH:MM" wall-clock time. */
