@@ -4,7 +4,7 @@ import type { AssetType, MeterUnit, Prisma, Provider } from "@/app/generated/pri
 import type { CostRow } from "@/lib/costs"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
-import { ageFrom, labelFor, RELATIONSHIPS } from "@/lib/health"
+import { ageFrom } from "@/lib/health"
 
 // Everything the printable asset report needs, in one place.
 //
@@ -162,13 +162,12 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       include: { primaryProvider: { select: { name: true } } },
     })
     if (!p) return null
-    const relationship = labelFor(RELATIONSHIPS, p.relationship)
     const age = p.dateOfBirth ? ageFrom(p.dateOfBirth, new Date()) : null
     return {
       type: "PERSON",
       id: p.id,
       name: p.name,
-      subtitle: age != null ? `${relationship} · Age ${age}` : relationship,
+      subtitle: age != null ? `Age ${age}` : null,
       imageFilename: p.imageFilename,
       purchaseDate: null,
       purchasePrice: null,
@@ -176,7 +175,6 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       meterUnit: null,
       currentMeter: null,
       details: [
-        { label: "Relationship", value: relationship },
         ...(p.dateOfBirth ? [{ label: "Date of birth", value: fmt.date(p.dateOfBirth, { utc: true }) }] : []),
         ...(p.sex ? [{ label: "Sex", value: p.sex }] : []),
         ...(p.bloodType ? [{ label: "Blood type", value: p.bloodType }] : []),

@@ -8,13 +8,14 @@ import { Empty, SectionTitle } from "./report-parts"
 import { HealthSummary } from "./health-summary"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
+import { DEFAULT_REPORT_OPTIONS, type ReportOptions } from "@/lib/report-options"
 
 // The printable asset report. A document, not a screen: one column, real
 // headings, tables where things line up, and no interactive affordance anywhere
 // inside it — the only control lives outside the sheet and is hidden in print.
 
-/** Days of observations to print on a medical summary; null leaves them out. */
-export async function AssetReport({ data, observationDays = 90 }: { data: ReportData; observationDays?: number | null }) {
+/** `options` only applies to a medical summary; other reports print everything. */
+export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { data: ReportData; options?: ReportOptions }) {
   const fmt = await getFormat()
   const { asset, services, warranties, schedules, costRows, generatedAt } = data
   const isPerson = asset.type === "PERSON"
@@ -44,29 +45,8 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
         kind={isPerson ? "Medical summary" : assetLabel[asset.type]}
         generatedAt={generatedAt}
         fmt={fmt}
-      />
-
-      <section className="report-section mt-7 grid grid-cols-[1.6fr_1fr] gap-7">
-        <div>
-          <SectionTitle>{isPerson ? "Personal details" : "Asset details"}</SectionTitle>
-          <dl className="mt-3">
-            {asset.details.map((row) => (
-              <div
-                key={row.label}
-                className="flex gap-4 border-b py-[5px] text-[10pt] last:border-b-0"
-                style={{ borderColor: "var(--rule)" }}
-              >
-                <dt className="w-36 shrink-0" style={{ color: "var(--ink-soft)" }}>
-                  {row.label}
-                </dt>
-                <dd className="min-w-0 flex-1 font-medium">{row.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <div>
-          {asset.imageFilename ? (
+        image={
+          asset.imageFilename ? (
             <AssetImage
               assetType={asset.type}
               assetId={asset.id}
@@ -77,11 +57,28 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
               // survive the print pipeline like every other rule here.
               data-print-color=""
             />
-          ) : null}
-        </div>
-      </section>
-      {data.health && <HealthSummary health={data.health} now={now} observationDays={observationDays} fmt={fmt} />}
+          ) : null
+        }
+      >
+        <SectionTitle>{isPerson ? "Personal details" : "Asset details"}</SectionTitle>
+        <dl className="mt-3">
+          {asset.details.map((row) => (
+            <div
+              key={row.label}
+              className="flex gap-4 border-b py-[5px] text-[10pt] last:border-b-0"
+              style={{ borderColor: "var(--rule)" }}
+            >
+              <dt className="w-36 shrink-0" style={{ color: "var(--ink-soft)" }}>
+                {row.label}
+              </dt>
+              <dd className="min-w-0 flex-1 font-medium">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </Masthead>
+      {data.health && <HealthSummary health={data.health} now={now} options={options} fmt={fmt} />}
 
+      {(!isPerson || options.expense) && (
       <section className="report-section mt-7">
         <SectionTitle>Summary</SectionTitle>
         <div
@@ -131,6 +128,7 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
           )}
         </div>
       </section>
+      )}
 
       {asset.notes ? (
         <section className="report-section report-break-avoid mt-7">
@@ -141,9 +139,13 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
         </section>
       ) : null}
 
-      <ServiceHistory services={services} asset={data.asset} total={lifetime} fmt={fmt} />
+      {(!isPerson || options.visits !== "off") && (
+        <ServiceHistory services={services} asset={data.asset} total={lifetime} showCost={!isPerson || options.visits === "cost"} fmt={fmt} />
+      )}
       {!isPerson && <Warranties warranties={warranties} now={now} fmt={fmt} />}
-      <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} fmt={fmt} />
+      {(!isPerson || options.reminders) && (
+        <Maintenance schedules={schedules} mileage={mileage} asset={data.asset} now={now} fmt={fmt} />
+      )}
 
       <footer
         className="mt-9 border-t pt-3 text-[8.5pt]"
@@ -157,21 +159,14 @@ export async function AssetReport({ data, observationDays = 90 }: { data: Report
           </span>
           <span>HomeCenter</span>
         </div>
-        <p className="mt-1.5">
-          {isPerson ? (
-            <>
-              {services.length} visit{services.length === 1 ? "" : "s"} ·{" "}
-              {schedules.length} health reminder{schedules.length === 1 ? "" : "s"}.{" "}
-            </>
-          ) : (
-            <>
-              {services.length} service record{services.length === 1 ? "" : "s"} ·{" "}
-              {warranties.length} warrant{warranties.length === 1 ? "y" : "ies"} ·{" "}
-              {schedules.length} maintenance schedule{schedules.length === 1 ? "" : "s"}.{" "}
-            </>
-          )}
-          Attachments are named but not embedded; download them from the asset page.
-        </p>
+        {!isPerson && (
+          <p className="mt-1.5">
+            {services.length} service record{services.length === 1 ? "" : "s"} ·{" "}
+            {warranties.length} warrant{warranties.length === 1 ? "y" : "ies"} ·{" "}
+            {schedules.length} maintenance schedule{schedules.length === 1 ? "" : "s"}.{" "}
+            Attachments are named but not embedded; download them from the asset page.
+          </p>
+        )}
       </footer>
     </article>
   )
@@ -183,12 +178,16 @@ function Masthead({
   kind,
   generatedAt,
   fmt,
+  image,
+  children,
 }: {
   title: string
   subtitle: string | null
   kind: string
   generatedAt: Date
   fmt: Formatter
+  image: React.ReactNode
+  children: React.ReactNode
 }) {
   return (
     <header>
@@ -200,12 +199,20 @@ function Masthead({
         <span>HomeCenter · {kind} report</span>
         <span>{fmt.date(generatedAt, { long: true })}</span>
       </div>
-      <h1 className="font-heading mt-5 text-[26pt] font-semibold leading-none">{title}</h1>
-      {subtitle ? (
-        <p className="mt-2 text-[12pt]" style={{ color: "var(--ink-soft)" }}>
-          {subtitle}
-        </p>
-      ) : null}
+      {/* The photo sits beside the title, not below it, so it uses the room the
+          masthead leaves free; the details run on underneath the title. */}
+      <div className="report-section mt-5 grid grid-cols-[1.6fr_1fr] gap-7">
+        <div>
+          <h1 className="font-heading text-[26pt] font-semibold leading-none">{title}</h1>
+          {subtitle ? (
+            <p className="mt-2 text-[12pt]" style={{ color: "var(--ink-soft)" }}>
+              {subtitle}
+            </p>
+          ) : null}
+          <div className="mt-6">{children}</div>
+        </div>
+        <div>{image}</div>
+      </div>
     </header>
   )
 }
@@ -257,11 +264,13 @@ function ServiceHistory({
   services,
   asset,
   total,
+  showCost,
   fmt,
 }: {
   services: ReportService[]
   asset: ReportData["asset"]
   total: number
+  showCost: boolean
   fmt: Formatter
 }) {
   const showMeter = asset.type === "VEHICLE" && services.some((s) => s.mileageAtService != null)
@@ -287,7 +296,7 @@ function ServiceHistory({
               {showMeter ? (
                 <th className="w-[84px] py-2 pr-3 text-right font-semibold">{unit}</th>
               ) : null}
-              <th className="w-[84px] py-2 text-right font-semibold">Cost</th>
+              {showCost ? <th className="w-[84px] py-2 text-right font-semibold">Cost</th> : null}
             </tr>
           </thead>
           {services.map((s) => (
@@ -318,20 +327,24 @@ function ServiceHistory({
                     {s.mileageAtService != null ? s.mileageAtService.toLocaleString() : "—"}
                   </td>
                 ) : null}
-                <td className="py-2.5 text-right font-medium tabular-nums">
-                  {s.cost != null ? fmt.money(s.cost) : "—"}
-                </td>
+                {showCost ? (
+                  <td className="py-2.5 text-right font-medium tabular-nums">
+                    {s.cost != null ? fmt.money(s.cost) : "—"}
+                  </td>
+                ) : null}
               </tr>
             </tbody>
           ))}
-          <tfoot>
-            <tr className="border-t-2" style={{ borderColor: "var(--rule-strong)" }}>
-              <td className="py-2.5 text-[9pt] font-semibold uppercase tracking-wide" colSpan={showMeter ? 4 : 3}>
-                Total
-              </td>
-              <td className="py-2.5 text-right font-semibold tabular-nums">{fmt.money(total)}</td>
-            </tr>
-          </tfoot>
+          {showCost ? (
+            <tfoot>
+              <tr className="border-t-2" style={{ borderColor: "var(--rule-strong)" }}>
+                <td className="py-2.5 text-[9pt] font-semibold uppercase tracking-wide" colSpan={showMeter ? 4 : 3}>
+                  Total
+                </td>
+                <td className="py-2.5 text-right font-semibold tabular-nums">{fmt.money(total)}</td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       )}
     </section>
