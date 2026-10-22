@@ -63,3 +63,6 @@ next-env.d.ts
 
 # embedding models (built-in is fetched by npm run models:fetch-builtin)
 /models/
+
+# brainstorm / SDD scratch
+.superpowers/
