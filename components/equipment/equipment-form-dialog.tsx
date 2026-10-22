@@ -16,7 +16,7 @@ import { createEquipment, updateEquipment } from "@/lib/actions/equipment"
 import { EQUIPMENT_CATEGORIES, categoryLabel } from "./categories"
 import type { Equipment, EquipmentCategory } from "@/app/generated/prisma/client"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
-import { locationLabel, matchRoom } from "@/lib/rooms"
+import { locationLabel, resolveRoomId } from "@/lib/rooms"
 import type { PropertyWithRooms } from "@/lib/rooms-server"
 
 // Base UI Select has no empty-string option, so "unassigned" needs a sentinel.
@@ -90,11 +90,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
     const propertyId = values.propertyId === NO_PROPERTY ? "" : values.propertyId
-    // Text naming one of the property's rooms links that room; anything else is free text.
-    // With Rooms off there are no suggestions, so the current room counts as the only one
-    // and saving its name unchanged keeps the link. A different property drops it.
-    const current = equipment?.roomId && equipment.room && equipment.propertyId === propertyId ? [{ id: equipment.roomId, name: equipment.room.name }] : []
-    const roomId = (matchRoom(values.location, selectedRooms) ?? matchRoom(values.location, current))?.id ?? ""
+    const roomId = resolveRoomId(values.location, propertyId, selectedRooms, equipment)
     const payload = {
       ...values,
       propertyId,

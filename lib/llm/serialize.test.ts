@@ -45,6 +45,22 @@ describe("serializeRow", () => {
     ).toEqual({ id: "m1", name: "X", personId: "p1", nextRefillDate: "2026-09-30", href: "/assets/people/p1" })
   })
 
+  it("gives equipment the location the UI shows: its room's name, else the free text", () => {
+    expect(serializeRow("equipment", { id: "e1", name: "Fridge", location: null, roomId: "r1", room: { name: "Kitchen" } })).toEqual({
+      id: "e1", name: "Fridge", location: "Kitchen", roomId: "r1", href: "/assets/equipment/e1",
+    })
+    expect(serializeRow("equipment", { id: "e1", name: "Fridge", location: "Garage", room: null })).toEqual({
+      id: "e1", name: "Fridge", location: "Garage", href: "/assets/equipment/e1",
+    })
+    expect(serializeRow("equipment", { id: "e1", name: "Fridge", location: null, room: null })).toEqual({
+      id: "e1", name: "Fridge", href: "/assets/equipment/e1",
+    })
+    // An included room (with its id) stays as a related record.
+    expect(serializeRow("equipment", { id: "e1", name: "Fridge", location: null, room: { id: "r1", name: "Kitchen" } })).toMatchObject({
+      location: "Kitchen", room: { id: "r1", name: "Kitchen" },
+    })
+  })
+
   it("keeps an attached asset ref as-is", () => {
     const asset = { type: "VEHICLE", id: "v1", name: "Civic", href: "/assets/vehicles/v1" }
     expect(serializeRow("serviceRecord", { id: "s1", title: "Oil", assetType: "VEHICLE", assetId: "v1", asset })).toEqual({

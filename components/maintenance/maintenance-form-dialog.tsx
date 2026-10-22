@@ -97,6 +97,8 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
     defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "" },
   })
 
+  // A room that isn't one of the options (the equipment moved property since) would only fail to save, so it opens as None.
+  const roomKey = roomOptions.map((r) => r.id).join(" ")
   useEffect(() => {
     form.reset(schedule ? {
       assetId: schedule.assetId, assetType: schedule.assetType,
@@ -108,11 +110,11 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       nextDueMileage: schedule.nextDueMileage?.toString() ?? "",
       reminderDaysBefore: schedule.reminderDaysBefore.toString(),
       reminderMilesBefore: schedule.reminderMilesBefore.toString(),
-      roomId: schedule.roomId ?? "",
+      roomId: schedule.roomId && roomKey.split(" ").includes(schedule.roomId) ? schedule.roomId : "",
     } : {
       assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
     })
-  }, [schedule, open, form, assetId, assetType, defaultRoomId])
+  }, [schedule, open, form, assetId, assetType, defaultRoomId, roomKey])
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files

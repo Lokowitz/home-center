@@ -77,6 +77,22 @@ export function matchRoom<T extends { name: string }>(text: string | null | unde
   return rooms.find((r) => r.name.trim().toLowerCase() === t) ?? null
 }
 
+/**
+ * The room an equipment form's location links on save: text naming one of the chosen
+ * property's rooms links that room; anything else is free text (""). With Rooms off there
+ * are no rooms to offer, so the current room counts as the only one and saving its name
+ * unchanged keeps the link. A different property drops it.
+ */
+export function resolveRoomId(
+  location: string | null | undefined,
+  propertyId: string | undefined,
+  rooms: { id: string; name: string }[],
+  current: { propertyId: string | null; roomId: string | null; room?: { name: string } | null } | null | undefined,
+): string {
+  const kept = current?.roomId && current.room && current.propertyId === propertyId ? [{ id: current.roomId, name: current.room.name }] : []
+  return (matchRoom(location, rooms) ?? matchRoom(location, kept))?.id ?? ""
+}
+
 export type HistoryScope = "own" | "withEquipment"
 
 /**

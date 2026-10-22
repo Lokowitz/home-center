@@ -125,6 +125,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
   const scheduleValue = form.watch("scheduleId")
   const suggested = !record && !createdRecordId && !scheduleValue ? matchingReminder(titleValue ?? "", targetReminders) : null
 
+  // A room that isn't one of the options (the equipment moved property since) would only fail to save, so it opens as None.
+  const roomKey = roomOptions.map((r) => r.id).join(" ")
   useEffect(() => {
     if (record) {
       form.reset({
@@ -138,13 +140,13 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
         mileageAtService: record.mileageAtService?.toString() ?? "",
         providerId: record.providerId ?? "",
         conditionId: record.conditionId ?? "",
-        roomId: record.roomId ?? "",
+        roomId: record.roomId && roomKey.split(" ").includes(record.roomId) ? record.roomId : "",
         scheduleId: "",
       })
     } else {
       form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "" })
     }
-  }, [record, open, form, assetId, assetType, defaultRoomId])
+  }, [record, open, form, assetId, assetType, defaultRoomId, roomKey])
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files

@@ -13,7 +13,7 @@ import {
 } from "@/lib/health"
 import type { AssetType, ServiceCategory } from "@/app/generated/prisma/client"
 import { ENTITIES, HEALTH_ENTITIES, ROOM_ENTITIES, type EntityKey, type Row } from "../ontology"
-import { coerceValue, entityDef, healthOn, inDayRange, roomsOn, requireDay, selectFor, ToolInputError, type ToolContext } from "../query"
+import { coerceValue, entityDef, healthOn, inDayRange, roomsOn, requireDay, selectFor, ToolInputError, withLocationSelect, type ToolContext } from "../query"
 import { compact, serializeRow, toDay } from "../serialize"
 import { aggregateRows, groupSpec, measureSpec } from "../aggregate"
 import { assetRef, attachAssets, delegate } from "../execute"
@@ -71,7 +71,11 @@ async function searchRecords(query: string, entities: string[] | undefined, ctx:
       // famotidine — but at least one word must hit the record itself, or
       // "avery" alone would return every record she has.
       const owned = def.relations.person?.kind === "one"
-      const own = (w: string) => def.searchFields.map((f) => ({ [f]: { contains: w } }))
+      // Equipment is also where the UI says it is: its room's name.
+      const own = (w: string) => [
+        ...def.searchFields.map((f) => ({ [f]: { contains: w } })),
+        ...(key === "equipment" ? [{ room: { name: { contains: w } } }] : []),
+      ]
       const where = {
         AND: [
           ...words.map((w) => ({ OR: owned ? [...own(w), { person: { name: { contains: w } } }] : own(w) })),
@@ -82,7 +86,7 @@ async function searchRecords(query: string, entities: string[] | undefined, ctx:
       }
       // Say whose record each row is: a bare personId leaves the model unable
       // to tell one child's medication from another's.
-      const select = owned ? { ...selectFor(key), person: { select: { id: true, name: true } } } : selectFor(key)
+      const select = withLocationSelect(key, owned ? { ...selectFor(key), person: { select: { id: true, name: true } } } : selectFor(key))
       // No name words means "list this type", so allow a fuller page.
       const rows = await delegate(key).findMany({ where, select, orderBy: { [def.defaultSort.field]: def.defaultSort.dir }, take: words.length ? 10 : 25 })
       if (def.polymorphic) attachAssets(index, rows)

@@ -192,7 +192,7 @@ export function RoomHistory({ room, serviceRecords, schedules }: { room: RoomWit
             {records.map((r) => (
               <li key={r.id}>
                 <Link href={href(r, "service")} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
-                  <span className="w-24 shrink-0 text-muted-foreground">{fmt.date(r.date)}</span>
+                  <span className="w-24 shrink-0 text-muted-foreground">{fmt.date(r.date, { utc: true })}</span>
                   <span className="flex-1 truncate">{r.title}</span>
                   {source(r)}
                 </Link>

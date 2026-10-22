@@ -15,7 +15,7 @@ import { readWindow } from "@/lib/documents/read-window"
 import { splitPages } from "@/lib/documents/normalize"
 import {
   groupHits, hiddenRecordTypes, isHealthDocument, listDocumentsDescription, listedDocument, READ_DOCUMENT_DESCRIPTION,
-  searchDocumentsDescription, STATUS_NOTE, toRecordType, visibleRecordTypes,
+  recordTypeFilter, searchDocumentsDescription, STATUS_NOTE, visibleRecordTypes,
 } from "@/lib/documents/tool-helpers"
 import { ToolInputError, type ToolContext } from "../query"
 import { compact } from "../serialize"
@@ -44,8 +44,11 @@ async function assetScope(
   }
 }
 
-export function documentTools(includeHealth: boolean): RegisteredTool[] {
-  const hidden = hiddenRecordTypes(includeHealth)
+export function documentTools(includeHealth: boolean, includeRooms = true): RegisteredTool[] {
+  const hidden = hiddenRecordTypes(includeHealth, includeRooms)
+  // With Health off its files stay out; with Rooms off, room files do.
+  const isHidden = (ref: { recordType: string; asset: { type: string; id: string } | null }) =>
+    (!includeHealth && isHealthDocument(ref)) || (!includeRooms && ref.recordType === "ROOM")
 
   const list = defineTool({
     name: "list_documents",
@@ -53,12 +56,12 @@ export function documentTools(includeHealth: boolean): RegisteredTool[] {
     schema: z.object({
       asset: z.string().optional().describe(ASSET_ARG),
       assetType: z.string().optional().describe("PROPERTY, VEHICLE, EQUIPMENT or PERSON, if known."),
-      recordType: z.string().optional().describe(`Only files attached to one kind of record: ${visibleRecordTypes(includeHealth).join(", ")}.`),
+      recordType: z.string().optional().describe(`Only files attached to one kind of record: ${visibleRecordTypes(includeHealth, includeRooms).join(", ")}.`),
       limit: z.number().int().min(1).max(30).optional().describe(`Most files to return, default ${LIST_LIMIT}, at most 30.`),
     }),
     label: () => "Listing documents…",
     async run(a, ctx) {
-      const recordTypes = a.recordType ? [toRecordType(a.recordType, includeHealth)] : null
+      const recordTypes = recordTypeFilter(a.recordType, includeHealth, includeRooms)
       const resolved = await assetScope(a, ctx)
       if ("reply" in resolved) return resolved.reply
       const { attachmentIds, scope } = resolved
@@ -86,7 +89,7 @@ export function documentTools(includeHealth: boolean): RegisteredTool[] {
       query: z.string().min(1).describe("What to look for: a plain question, key words, a model or part number, or a \"quoted phrase\"."),
       asset: z.string().optional().describe(ASSET_ARG),
       assetType: z.string().optional().describe("PROPERTY, VEHICLE, EQUIPMENT or PERSON, if known."),
-      recordType: z.string().optional().describe(`Only files attached to one kind of record: ${visibleRecordTypes(includeHealth).join(", ")}.`),
+      recordType: z.string().optional().describe(`Only files attached to one kind of record: ${visibleRecordTypes(includeHealth, includeRooms).join(", ")}.`),
       limit: z.number().int().min(1).max(8).optional().describe(`Most files to return, default ${DEFAULT_LIMIT}.`),
     }),
     label: (a) => `Searching documents for “${a.query}”…`,
@@ -94,7 +97,7 @@ export function documentTools(includeHealth: boolean): RegisteredTool[] {
       const parsed = parseSearch(a.query)
       const model = await semanticSearchModel()
       if (!parsed && !model) throw new ToolInputError("Give some words to search for, e.g. 'filter size' or a model number.")
-      const recordTypes = a.recordType ? [toRecordType(a.recordType, includeHealth)] : null
+      const recordTypes = recordTypeFilter(a.recordType, includeHealth, includeRooms)
       const resolved = await assetScope(a, ctx)
       if ("reply" in resolved) return resolved.reply
       const { attachmentIds, scope } = resolved
@@ -130,9 +133,9 @@ export function documentTools(includeHealth: boolean): RegisteredTool[] {
 
       const documents = groups.flatMap((g) => {
         const ref = refs.get(g.attachmentId)
-        // Deleted since it was indexed (reconcile drops its chunks), or a health
-        // file — the index filter already excludes those; this is the second lock.
-        if (!ref || !ref.text || (!includeHealth && isHealthDocument(ref))) return []
+        // Deleted since it was indexed (reconcile drops its chunks), or a hidden
+        // health or room file — the index filter already excludes those; this is the second lock.
+        if (!ref || !ref.text || isHidden(ref)) return []
         const pages = ref.text.pageCount ?? 1
         return [compact({
           attachmentId: ref.attachmentId,
@@ -169,7 +172,7 @@ export function documentTools(includeHealth: boolean): RegisteredTool[] {
         select: { ...OWNER_SELECT, text: { select: { status: true, text: true, truncated: true } } },
       })
       const ref = row ? describeAttachment(row) : null
-      if (!row || !ref || (!includeHealth && isHealthDocument({ recordType: row.recordType, asset: ref.asset }))) {
+      if (!row || !ref || isHidden({ recordType: row.recordType, asset: ref.asset })) {
         throw new ToolInputError(`No document with id "${a.attachmentId}". Use search_documents to find one.`)
       }
       const head = { fileName: ref.fileName, fileHref: ref.fileHref, record: ref.record }

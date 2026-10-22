@@ -166,14 +166,14 @@ model User {
   sessionVersion    Int      @default(0)
   createdAt         DateTime @default(now())
 
-  emailDigest   EmailDigest @default(DAILY)
+  emailDigest           EmailDigest        @default(DAILY)
   /// Chosen by an admin under Settings → Notifications. Off means no new
   /// in-app notifications and no digest emails for this account.
-  receivesNotifications Boolean @default(true)
+  receivesNotifications Boolean            @default(true)
   /// How often a due item is raised again — see lib/notifications/repeat.ts.
-  notificationRepeat NotificationRepeat @default(REACHED_AND_DUE)
+  notificationRepeat    NotificationRepeat @default(REACHED_AND_DUE)
   /// When this user was last emailed, so a cadence can be measured from it.
-  lastDigestAt  DateTime?
+  lastDigestAt          DateTime?
 
   notifications  Notification[]
   serviceRecords ServiceRecord[]
@@ -424,7 +424,7 @@ model Medication {
   conditionId  String?
   condition    HealthCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
 
-  attachments  Attachment[]
+  attachments Attachment[]
 }
 
 model Allergy {
@@ -483,7 +483,7 @@ model InsurancePolicy {
 // ─── Service Records ──────────────────────────────────────────────────────────
 
 model ServiceRecord {
-  id               String    @id @default(cuid())
+  id               String           @id @default(cuid())
   assetId          String
   assetType        AssetType
   date             DateTime
@@ -499,8 +499,8 @@ model ServiceRecord {
   provider         Provider?        @relation(fields: [providerId], references: [id], onDelete: SetNull)
   conditionId      String?
   condition        HealthCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
@@ -570,7 +570,7 @@ model MaintenanceSchedule {
 model Attachment {
   id           String               @id @default(cuid())
   recordType   AttachmentRecordType
-  filename     String               // UUID-based name stored on disk
+  filename     String // UUID-based name stored on disk
   originalName String
   mimeType     String
   sizeBytes    Int
@@ -579,46 +579,46 @@ model Attachment {
   uploadedById String
   uploadedBy   User   @relation(fields: [uploadedById], references: [id])
 
-  serviceRecordId       String?
-  serviceRecord         ServiceRecord?       @relation(fields: [serviceRecordId], references: [id], onDelete: Cascade)
+  serviceRecordId String?
+  serviceRecord   ServiceRecord? @relation(fields: [serviceRecordId], references: [id], onDelete: Cascade)
 
-  warrantyId            String?
-  warranty              Warranty?            @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  warrantyId String?
+  warranty   Warranty? @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
 
   maintenanceScheduleId String?
   maintenanceSchedule   MaintenanceSchedule? @relation(fields: [maintenanceScheduleId], references: [id], onDelete: Cascade)
 
-  healthConditionId     String?
-  healthCondition       HealthCondition?     @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
+  healthConditionId String?
+  healthCondition   HealthCondition? @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
 
-  insurancePolicyId     String?
-  insurancePolicy       InsurancePolicy?     @relation(fields: [insurancePolicyId], references: [id], onDelete: Cascade)
+  insurancePolicyId String?
+  insurancePolicy   InsurancePolicy? @relation(fields: [insurancePolicyId], references: [id], onDelete: Cascade)
 
-  observationId         String?
-  observation           Observation?         @relation(fields: [observationId], references: [id], onDelete: Cascade)
+  observationId String?
+  observation   Observation? @relation(fields: [observationId], references: [id], onDelete: Cascade)
 
-  medicationId          String?
-  medication            Medication?          @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  medicationId String?
+  medication   Medication? @relation(fields: [medicationId], references: [id], onDelete: Cascade)
 
-  allergyId             String?
-  allergy               Allergy?             @relation(fields: [allergyId], references: [id], onDelete: Cascade)
+  allergyId String?
+  allergy   Allergy? @relation(fields: [allergyId], references: [id], onDelete: Cascade)
 
-  immunizationId        String?
-  immunization          Immunization?        @relation(fields: [immunizationId], references: [id], onDelete: Cascade)
+  immunizationId String?
+  immunization   Immunization? @relation(fields: [immunizationId], references: [id], onDelete: Cascade)
 
   /// DOCUMENT only: the property, vehicle, equipment or person the file sits on.
   /// Polymorphic like ServiceRecord's, so no foreign key: deleting the asset
   /// deletes these rows itself (lib/asset-delete-server.ts, deletePerson).
-  assetType             AssetType?
-  assetId               String?
+  assetType AssetType?
+  assetId   String?
 
-  inboxItemId           String?
-  inboxItem             InboxItem?           @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  inboxItemId String?
+  inboxItem   InboxItem? @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
 
-  roomId                String?
-  room                  Room?                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
-  text                  AttachmentText?
+  text AttachmentText?
 
   @@index([roomId])
   @@index([assetType, assetId])
@@ -630,19 +630,19 @@ model Attachment {
 /// A file dropped into the inbox before anyone chose its record. The parsed
 /// fields are suggestions for the filing form, never applied on their own.
 model InboxItem {
-  id          String      @id @default(cuid())
-  createdAt   DateTime    @default(now())
-  createdById String
-  createdBy   User        @relation(fields: [createdById], references: [id])
-  status      InboxStatus @default(PENDING)
-  parsedDate   DateTime?
-  parsedTotal  Float?
-  parsedVendor String?
+  id                 String      @id @default(cuid())
+  createdAt          DateTime    @default(now())
+  createdById        String
+  createdBy          User        @relation(fields: [createdById], references: [id])
+  status             InboxStatus @default(PENDING)
+  parsedDate         DateTime?
+  parsedTotal        Float?
+  parsedVendor       String?
   /// "basic" or "llm"; null when nothing was parsed (reading off, or no text).
-  parseMethod  String?
+  parseMethod        String?
   /// Why Local AI was chosen but the built-in parser read it: "llm-not-ready", "llm-health",
   /// "llm-failed" or "llm-no-answer". Null otherwise. A fixed code, never receipt text.
-  parseNote    String?
+  parseNote          String?
   suggestedAssetType AssetType?
   suggestedAssetId   String?
   /// Why that asset was suggested, in words for the card ("VIN on the receipt"). Never the matched value.
@@ -651,7 +651,7 @@ model InboxItem {
   /// page), so the reader keeps it instead of matching.
   suggestedByUser    Boolean     @default(false)
   /// Fixed phrase shown on the item, e.g. the extractor's error.
-  error       String?
+  error              String?
 
   attachments Attachment[]
 }
@@ -683,51 +683,51 @@ model MailSettings {
 /// Single row (id is always "singleton"). Configured from Settings only — no
 /// environment fallback. Any OpenAI-compatible Chat Completions server works.
 model LlmSettings {
-  id           String   @id @default("singleton")
-  enabled      Boolean  @default(false)
+  id                     String   @id @default("singleton")
+  enabled                Boolean  @default(false)
   /// Hides the assistant from the nav and header while it's off. Only
   /// meaningful while enabled is false — turning the assistant on clears it.
-  hidden       Boolean  @default(false)
+  hidden                 Boolean  @default(false)
   /// e.g. https://api.openai.com/v1 or http://localhost:11434/v1 — no trailing slash.
-  baseUrl      String?
+  baseUrl                String?
   /// AES-256-GCM via lib/secret-box.ts. Optional: local servers need none.
   /// Never leaves the server; the UI is only told whether one is stored.
-  apiKeyEnc    String?
-  model        String?
+  apiKeyEnc              String?
+  model                  String?
   /// null = provider default.
-  temperature  Float?
+  temperature            Float?
   /// Cap on each completion; null = provider default.
-  maxTokens    Int?
+  maxTokens              Int?
   /// Appended to the built-in system prompt.
-  systemPrompt String?
+  systemPrompt           String?
   /// Per-question time limit in seconds; null = the built-in default.
-  timeoutSeconds Int?
+  timeoutSeconds         Int?
   /// Most rounds of lookups per question; null = the built-in default.
-  maxToolRounds Int?
+  maxToolRounds          Int?
   /// JSON object merged into every request, e.g. {"chat_template_kwargs":{"enable_thinking":true}}.
-  extraBody    String?
+  extraBody              String?
   /// Offer search_documents / read_document to the assistant.
   documentsEnabled       Boolean  @default(true)
   /// Include attachments on health records (conditions, observations,
   /// medications, allergies, immunizations) in those tools.
   healthDocumentsEnabled Boolean  @default(false)
-  updatedAt    DateTime @updatedAt
+  updatedAt              DateTime @updatedAt
 }
 
 // ─── Document text and search ─────────────────────────────────────────────────
 
 enum DocumentTextStatus {
-  PENDING      // queued, or needs redoing
-  DONE         // text extracted
-  EMPTY        // readable file, no text found
-  UNSUPPORTED  // file type we don't extract
-  FAILED       // extractor threw or timed out; see error
+  PENDING // queued, or needs redoing
+  DONE // text extracted
+  EMPTY // readable file, no text found
+  UNSUPPORTED // file type we don't extract
+  FAILED // extractor threw or timed out; see error
 }
 
 enum DocumentTextMethod {
-  TEXT   // native text: PDF text layer, office, plain
-  OCR    // every page came from OCR
-  MIXED  // PDF with some text pages and some OCR'd pages
+  TEXT // native text: PDF text layer, office, plain
+  OCR // every page came from OCR
+  MIXED // PDF with some text pages and some OCR'd pages
 }
 
 /// Extracted text of one attachment. Canonical: search-index.db is rebuilt
@@ -754,18 +754,18 @@ model AttachmentText {
 
 /// Single row (id is always "singleton"). No row = defaults.
 model DocumentSettings {
-  id              String   @id @default("singleton")
+  id              String        @id @default("singleton")
   /// Master switch for extraction, OCR and the search index.
-  indexingEnabled Boolean  @default(true)
+  indexingEnabled Boolean       @default(true)
   /// OCR images and scanned PDFs during indexing. CPU-heavy on small hosts.
-  ocrEnabled      Boolean  @default(true)
+  ocrEnabled      Boolean       @default(true)
   /// Embed chunks and use them in search_documents. Needs indexingEnabled.
-  semanticEnabled Boolean  @default(true)
+  semanticEnabled Boolean       @default(true)
   /// Vetted model id (lib/documents/embed/models.ts). Default is the built-in one.
-  embeddingModel  String   @default("bge-small-en-v1.5")
+  embeddingModel  String        @default("bge-small-en-v1.5")
   /// How the capture inbox reads receipts. LLM falls back to BASIC when the assistant is off.
   captureParser   CaptureParser @default(BASIC)
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime      @updatedAt
 }
 
 /// Optional parts of the site an admin can switch off. Turning one off hides
@@ -777,7 +777,7 @@ model FeatureSettings {
   healthEnabled Boolean  @default(true)
   /// Rooms inside properties: paint, flooring, photos, and what is tagged to them.
   roomsEnabled  Boolean  @default(true)
-  updatedAt    DateTime @updatedAt
+  updatedAt     DateTime @updatedAt
 }
 
 /// How money, distances, areas and dates are written for this household.

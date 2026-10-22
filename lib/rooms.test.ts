@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { locationLabel, matchRoom, paintLabel, paintRows, roomData, roomSchema, scopeRecords } from "./rooms"
+import { locationLabel, matchRoom, paintLabel, paintRows, resolveRoomId, roomData, roomSchema, scopeRecords } from "./rooms"
 
 describe("paintRows", () => {
   it("drops all-blank rows and numbers sortOrder from 0", () => {
@@ -103,5 +103,31 @@ describe("matchRoom", () => {
     expect(matchRoom("", rooms)).toBeNull()
     expect(matchRoom("   ", rooms)).toBeNull()
     expect(matchRoom("Kitchen", [])).toBeNull()
+  })
+})
+
+describe("resolveRoomId", () => {
+  const linked = { propertyId: "p1", roomId: "r1", room: { name: "Kitchen" } }
+
+  it("keeps the link with Rooms off when the location is unchanged", () => {
+    expect(resolveRoomId("Kitchen", "p1", [], linked)).toBe("r1")
+    expect(resolveRoomId("  kitchen ", "p1", [], linked)).toBe("r1")
+  })
+
+  it("drops the link with Rooms off when the location text is edited", () => {
+    expect(resolveRoomId("Pantry", "p1", [], linked)).toBe("")
+  })
+
+  it("drops the link when the property changes", () => {
+    expect(resolveRoomId("Kitchen", "p2", [], linked)).toBe("")
+    expect(resolveRoomId("Kitchen", "", [], linked)).toBe("")
+  })
+
+  it("links the property's room the text names with Rooms on", () => {
+    const rooms = [{ id: "r1", name: "Kitchen" }, { id: "r2", name: "Garage" }]
+    expect(resolveRoomId("garage", "p1", rooms, linked)).toBe("r2")
+    expect(resolveRoomId("Garage", "p1", rooms, undefined)).toBe("r2")
+    expect(resolveRoomId("Shed", "p1", rooms, undefined)).toBe("")
+    expect(resolveRoomId("", "p1", rooms, linked)).toBe("")
   })
 })

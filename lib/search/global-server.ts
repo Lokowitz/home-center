@@ -690,14 +690,15 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
   const now = new Date()
   const [owners, features] = await Promise.all([loadOwners(), loadFeatures()])
   const parsed = parseSearch(q)
-  // With Health off, its files never come back either.
+  // With Health off, its files never come back either; with Rooms off, neither do room files.
   const hidden = features.health ? null : new Set(await healthAttachmentIds())
   const visibleHits = <H extends { attachmentId: string }>(hits: H[]) => (hidden ? hits.filter((h) => !hidden.has(h.attachmentId)) : hits)
+  const excludeRecordTypes = features.rooms ? [] : ["ROOM"]
 
   const keywordDocs = async () => {
     if (!parsed) return { hits: [] as Hit[] }
     try {
-      return { hits: visibleHits(await (await searchIndex()).search(parsed.match, { limit: DOC_POOL })) }
+      return { hits: visibleHits(await (await searchIndex()).search(parsed.match, { excludeRecordTypes, limit: DOC_POOL })) }
     } catch (error) {
       console.error("[search] document keyword search failed:", error instanceof Error ? error.name : typeof error)
       return { hits: [] as Hit[] }
@@ -726,7 +727,7 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
         )
         const [records, docHits] = await Promise.all([
           semanticRecords(vector, shown, owners, now, features),
-          (await searchIndex()).vectorSearch(vector, { limit: DOC_POOL }),
+          (await searchIndex()).vectorSearch(vector, { excludeRecordTypes, limit: DOC_POOL }),
         ])
         const fresh = semanticOnly(visibleHits(docHits), new Set(keyword.hits.map((h) => h.attachmentId)))
         const docs = await toDocuments(fresh, [], "semantic", owners)

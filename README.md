@@ -70,6 +70,7 @@ Give each thing you own a page: photo, details, and every repair, warranty and r
 - **Properties:** houses, condos, cabins and land.
 - **Vehicles:** service history that tracks mileage.
 - **Equipment:** linked to the property it's in, with model and serial numbers.
+- **Rooms** *(optional)*: a property's rooms with their paint colors and flooring, and the equipment, service and reminders in each. Turn them off under **Settings → Features**.
 - **Documents** that belong to the thing itself, like a deed, a car title or a manual, with no service record needed.
 - **Download all files** for any asset as a zip.
 

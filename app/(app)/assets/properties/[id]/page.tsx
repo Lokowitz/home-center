@@ -117,7 +117,7 @@ export default async function PropertyDetailPage({
         </div>
 
         {/* Keyed on the tab and open params so a link to ?tab=…&open=… from inside this page (a room's history) switches tabs, even to the tab already showing. */}
-        <Tabs key={`${tab ?? ""}:${open ?? ""}`} defaultValue={tab ?? "service"}>
+        <Tabs key={`${tab ?? ""}:${open ?? ""}`} defaultValue={tab === "rooms" && !features.rooms ? "service" : tab ?? "service"}>
           <TabsList variant="line" className="w-full justify-start border-b">
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>

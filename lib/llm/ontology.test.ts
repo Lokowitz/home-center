@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { AssetType, ServiceCategory } from "@/app/generated/prisma/enums"
 import { describeOntology, ENTITIES, ENTITY_KEYS, entityKeysFor } from "./ontology"
-import { compileInclude, compileWhere, entityDef, relationNames } from "./query"
+import { compileInclude, compileWhere, entityDef, relationNames, withLocationSelect } from "./query"
 
 const FORBIDDEN = ["passwordHash", "passwordEnc", "apiKeyEnc", "imageFilename", "createdById", "createdBy", "uploadedBy", "attachments", "user", "userId"]
 
@@ -89,6 +89,16 @@ describe("ontology", () => {
     expect(relationNames("room", { rooms: true })).toBe("property, paints, equipment")
     expect(() => compileInclude("equipment", ["nope"], undefined, off)).toThrow(/Relations on equipment: property, serviceRecords/)
     expect(() => compileWhere("property", [{ field: "nope", op: "has" }], off)).toThrow(/list relation of property: equipment, serviceRecords/)
+  })
+
+  it("selects equipment's room name for its location, Rooms on or off", () => {
+    const off = { userId: "u1", now: new Date(), rooms: false }
+    expect(compileInclude("equipment", [], undefined, off).select.room).toEqual({ select: { name: true } })
+    expect(compileInclude("equipment").select.room).toEqual({ select: { name: true } })
+    expect(compileInclude("equipment", [], ["name"]).select.room).toBeUndefined()
+    expect(compileInclude("equipment", ["room"], undefined, { rooms: true }).select.room).toMatchObject({ select: { id: true, name: true } })
+    expect(withLocationSelect("equipment", { id: true, location: true })).toEqual({ id: true, location: true, room: { select: { name: true } } })
+    expect(withLocationSelect("vehicle", { id: true })).toEqual({ id: true })
   })
 
   it("brings a room's paint along on a plain lookup", () => {

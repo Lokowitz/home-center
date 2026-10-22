@@ -341,5 +341,15 @@ export function compileInclude(
   if (entity === "room" && !select.paints) {
     select.paints = { select: selectFor("roomPaint"), orderBy: compileSort("roomPaint"), take: CHILD_LIMIT }
   }
-  return { select, children }
+  return { select: withLocationSelect(entity, select), children }
+}
+
+/**
+ * Equipment's location reads as the UI shows it — its room's name, else the
+ * free text — whether or not Rooms is on, so a selected location brings the
+ * room's name along. serializeRow folds it in and drops this name-only room.
+ */
+export function withLocationSelect(entity: EntityKey, select: Row): Row {
+  if (entity !== "equipment" || !select.location || select.room) return select
+  return { ...select, room: { select: { name: true } } }
 }

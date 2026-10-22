@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           history: health ? parsed.data.messages : stripDraftLines(parsed.data.messages),
           systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, rooms, fmt: await getFormat(), today: parsed.data.today }),
           chat,
-          tools: chatTools(docs, health, config.healthDocumentsEnabled),
+          tools: chatTools(docs, health, config.healthDocumentsEnabled, rooms),
           ctx: { userId, now, health, rooms, today: parsed.data.today },
           signal,
           model,
