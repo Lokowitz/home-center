@@ -28,6 +28,7 @@ describe("readable", () => {
         INSERT INTO "Property" (id, name, address, updatedAt) VALUES ('p2', 'Cabin', '2 Oak St', '${t}');
         INSERT INTO "Room" (id, propertyId, name, level, area, updatedAt) VALUES ('r1', 'p1', 'Kitchen', 'Main floor', 180, '${t}'), ('r2', 'p2', 'Loft', NULL, NULL, '${t}');
         INSERT INTO "RoomPaint" (id, roomId, surface, brand, colorName, sortOrder) VALUES ('rp1', 'r1', 'Walls', 'Behr', 'Soft Sage', 0);
+        INSERT INTO "Equipment" (id, name, category, propertyId, roomId, updatedAt) VALUES ('e9', 'Fridge', 'APPLIANCE', 'p1', 'r1', '${t}');
         INSERT INTO "Attachment" (id, recordType, filename, originalName, mimeType, sizeBytes, uploadedById, roomId) VALUES
           ('a5', 'ROOM', 'f-a5.jpg', 'kitchen.jpg', 'image/jpeg', 1, 'u1', 'r1'), ('a6', 'ROOM', 'f-a6.jpg', 'loft.jpg', 'image/jpeg', 1, 'u1', 'r2');
       `)
@@ -41,6 +42,7 @@ describe("readable", () => {
     expect(kitchen).toMatchObject({ assetId: "p1", assetType: "property", level: "Main floor", area: 180 })
     expect(kitchen.paints).toEqual([{ surface: "Walls", brand: "Behr", colorName: "Soft Sage", colorCode: null, finish: null }])
     expect(kitchen.files[0]).toMatchObject({ name: "kitchen.jpg", path: "../files/room/r1/f-a5.jpg" })
+    expect(all.data.assets.find((a) => a.id === "e9")?.details.Location).toBe("Kitchen")
     const one = await loadReadable(db, { kind: "asset", assetType: "PROPERTY", assetId: "p1" }, rawPlacement)
     expect(one.data.rooms.map((r) => r.id)).toEqual(["r1"])
     expect(one.files.map((f) => f.rel)).toContain("room/r1/f-a5.jpg")

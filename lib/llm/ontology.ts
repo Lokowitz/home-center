@@ -18,7 +18,7 @@ export type Row = Record<string, unknown>
 export const ENTITY_KEYS = [
   "property", "vehicle", "equipment", "person", "provider", "serviceRecord", "warranty",
   "maintenanceSchedule", "healthCondition", "medication", "allergy", "immunization",
-  "insurancePolicy", "notification", "observation",
+  "insurancePolicy", "notification", "observation", "room", "roomPaint",
 ] as const
 export type EntityKey = (typeof ENTITY_KEYS)[number]
 
@@ -27,9 +27,12 @@ export const HEALTH_ENTITIES: ReadonlySet<EntityKey> = new Set<EntityKey>([
   "person", "provider", "healthCondition", "medication", "allergy", "immunization", "insurancePolicy", "observation",
 ])
 
+/** Rooms' entities: out of reach, and out of the prompt, while Rooms is off (Settings → Features). */
+export const ROOM_ENTITIES: ReadonlySet<EntityKey> = new Set<EntityKey>(["room", "roomPaint"])
+
 /** The entities the assistant can reach. */
-export const entityKeysFor = (health: boolean): EntityKey[] =>
-  health ? [...ENTITY_KEYS] : ENTITY_KEYS.filter((k) => !HEALTH_ENTITIES.has(k))
+export const entityKeysFor = (health: boolean, rooms = true): EntityKey[] =>
+  ENTITY_KEYS.filter((k) => (health || !HEALTH_ENTITIES.has(k)) && (rooms || !ROOM_ENTITIES.has(k)))
 
 /** Relation names equal the Prisma relation field names for one/many. */
 export type RelationDef =
@@ -94,7 +97,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
       name: s, type: enumOf(PropertyType), address: s, purchaseDate: date, purchasePrice: money,
       yearBuilt: int, sqFt: { type: "int", description: "Floor area in the household area unit (field name is historical)" }, notes: s,
     },
-    relations: { equipment: { kind: "many", entity: "equipment" }, ...assetChildren },
+    relations: { equipment: { kind: "many", entity: "equipment" }, rooms: { kind: "many", entity: "room" }, ...assetChildren },
     defaultSort: { field: "name", dir: "asc" },
     href: assetLink("PROPERTY"),
   },
@@ -114,13 +117,13 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
   equipment: {
     model: "equipment", label: "Equipment", plural: "equipment",
     description: "Appliances, HVAC, tools, electronics, usually tied to a property.",
-    nameField: "name", searchFields: ["name", "manufacturer", "modelNumber", "location"], keys: ["propertyId"],
+    nameField: "name", searchFields: ["name", "manufacturer", "modelNumber", "location"], keys: ["propertyId", "roomId"],
     assetType: "EQUIPMENT",
     fields: {
       name: s, category: enumOf(EquipmentCategory), manufacturer: s, modelNumber: s, serialNumber: s,
       location: s, purchaseDate: date, purchasePrice: money, installDate: date, notes: s,
     },
-    relations: { property: { kind: "one", entity: "property" }, ...assetChildren },
+    relations: { property: { kind: "one", entity: "property" }, room: { kind: "one", entity: "room" }, ...assetChildren },
     defaultSort: { field: "name", dir: "asc" },
     href: assetLink("EQUIPMENT"),
   },
@@ -162,7 +165,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
     model: "serviceRecord", label: "Service record", plural: "service records",
     description: "Repairs, maintenance, doctor visits and other dated work, usually with a cost. Belongs to an asset (property, vehicle, equipment or person).",
     nameField: "title", searchFields: ["title", "vendor", "description"],
-    ...polymorphic, keys: ["assetType", "assetId", "providerId", "conditionId"],
+    ...polymorphic, keys: ["assetType", "assetId", "providerId", "conditionId", "roomId"],
     fields: {
       date: date, title: s, description: s, vendor: s, cost: money, category: enumOf(ServiceCategory),
       mileageAtService: { type: "int", description: "Odometer (household distance unit) or hour meter at the time (vehicles)" },
@@ -172,6 +175,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
       asset: { kind: "asset" },
       provider: { kind: "one", entity: "provider" },
       condition: { kind: "one", entity: "healthCondition" },
+      room: { kind: "one", entity: "room" },
     },
     defaultSort: { field: "date", dir: "desc" },
   },
@@ -189,7 +193,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
   maintenanceSchedule: {
     model: "maintenanceSchedule", label: "Maintenance schedule", plural: "maintenance schedules",
     description: "Recurring maintenance or checkups for an asset. For due/overdue status use the maintenance_status tool.",
-    nameField: "title", searchFields: ["title", "description"], ...polymorphic,
+    nameField: "title", searchFields: ["title", "description"], ...polymorphic, keys: ["assetType", "assetId", "roomId"],
     fields: {
       title: s, description: s, intervalDays: int,
       intervalMiles: { type: "int", description: "Interval in the vehicle's meter unit" },
@@ -197,7 +201,7 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
       reminderDaysBefore: int, reminderMilesBefore: int, isActive: bool,
       assetType: enumOf(AssetType, "Kind of asset this belongs to"),
     },
-    relations: { asset: { kind: "asset" } },
+    relations: { asset: { kind: "asset" }, room: { kind: "one", entity: "room" } },
     defaultSort: { field: "nextDueDate", dir: "asc" },
   },
   healthCondition: {
@@ -287,6 +291,30 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
     href: () => "/notifications",
     scope: (ctx) => ({ userId: ctx.userId }),
   },
+  room: {
+    model: "room", label: "Room", plural: "rooms",
+    description: "Rooms of a property: level, size, flooring, paint (see paints), notes. Equipment, service records and schedules can name the room they're in.",
+    nameField: "name", searchFields: ["name", "level", "flooringType", "flooringProduct", "notes"], keys: ["propertyId"],
+    fields: {
+      name: s, level: s, area: { type: "number", description: "Floor area in the household area unit" },
+      dimensions: s, flooringType: s, flooringProduct: s, flooringInstalled: date, notes: s,
+    },
+    relations: {
+      property: { kind: "one", entity: "property" },
+      paints: { kind: "many", entity: "roomPaint" },
+      equipment: { kind: "many", entity: "equipment" },
+    },
+    defaultSort: { field: "name", dir: "asc" },
+    href: (row) => (row.propertyId ? `${assetHref("PROPERTY", String(row.propertyId))}?tab=rooms&open=${String(row.id)}` : null),
+  },
+  roomPaint: {
+    model: "roomPaint", label: "Room paint", plural: "room paints",
+    description: "The paint on one surface of a room (walls, ceiling, trim…): brand, color name, color code, finish.",
+    nameField: "surface", searchFields: ["surface", "brand", "colorName", "colorCode"], keys: ["roomId"],
+    fields: { surface: s, brand: s, colorName: s, colorCode: s, finish: s, sortOrder: int },
+    relations: { room: { kind: "one", entity: "room" } },
+    defaultSort: { field: "sortOrder", dir: "asc" },
+  },
 }
 
 function describeField(name: string, f: FieldDef) {
@@ -299,12 +327,13 @@ function describeRelation(name: string, r: RelationDef, health: boolean) {
 }
 
 /** One line per entity, for the system prompt. */
-export function describeOntology(health = true): string {
-  return entityKeysFor(health).map((key) => {
+export function describeOntology(health = true, rooms = true): string {
+  return entityKeysFor(health, rooms).map((key) => {
     const d = ENTITIES[key]
     const fields = Object.entries(d.fields).map(([n, f]) => describeField(n, f)).join(", ")
     const rels = Object.entries(d.relations)
       .filter(([, r]) => health || !("entity" in r) || !HEALTH_ENTITIES.has(r.entity))
+      .filter(([, r]) => rooms || !("entity" in r) || !ROOM_ENTITIES.has(r.entity))
       .map(([n, r]) => describeRelation(n, r, health))
     return `- ${key}: ${d.description} Fields: ${fields}.${rels.length ? ` Relations: ${rels.join(", ")}.` : ""}`
   }).join("\n")

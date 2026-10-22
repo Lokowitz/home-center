@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { AssetType, ServiceCategory } from "@/app/generated/prisma/enums"
-import { describeOntology, ENTITIES, ENTITY_KEYS } from "./ontology"
+import { describeOntology, ENTITIES, ENTITY_KEYS, entityKeysFor } from "./ontology"
+import { compileInclude, entityDef } from "./query"
 
 const FORBIDDEN = ["passwordHash", "passwordEnc", "apiKeyEnc", "imageFilename", "createdById", "createdBy", "uploadedBy", "attachments", "user", "userId"]
 
@@ -46,6 +47,7 @@ describe("ontology", () => {
     expect(ENTITIES.medication.href?.({ id: "m1", personId: "p1" })).toBe("/assets/people/p1")
     expect(ENTITIES.serviceRecord.href?.({ id: "s1", assetType: "EQUIPMENT", assetId: "e1" })).toBe("/assets/equipment/e1")
     expect(ENTITIES.provider.href?.({ id: "x" })).toBe("/providers")
+    expect(ENTITIES.room.href?.({ id: "r1", propertyId: "p1" })).toBe("/assets/properties/p1?tab=rooms&open=r1")
   })
 
   it("describes every entity compactly", () => {
@@ -55,5 +57,28 @@ describe("ontology", () => {
     expect(text).toContain("asset→property|vehicle|equipment|person")
     expect(text).toContain("medications→medication[]")
     expect(text).not.toMatch(/passwordHash|imageFilename/)
+  })
+
+  it("leaves rooms out while Rooms is off", () => {
+    expect(entityKeysFor(true, false)).not.toContain("room")
+    expect(entityKeysFor(true, false)).not.toContain("roomPaint")
+    expect(entityKeysFor(true, true)).toEqual(expect.arrayContaining(["room", "roomPaint"]))
+    expect(entityKeysFor(false, false)).not.toContain("person")
+    const off = describeOntology(true, false)
+    expect(off).not.toMatch(/^- room/m)
+    expect(off).not.toMatch(/→room/)
+    const on = describeOntology(true, true)
+    expect(on).toContain("rooms→room[]")
+    expect(on).toContain("paints→roomPaint[]")
+    expect(on).toMatch(/^- equipment:.*room→room/m)
+  })
+
+  it("refuses room entities and relations while Rooms is off", () => {
+    const ctx = { userId: "u1", now: new Date(), rooms: false }
+    expect(() => entityDef("room", ctx)).toThrow(/Rooms is turned off/)
+    expect(() => entityDef("rooms", ctx)).toThrow(/Rooms is turned off/)
+    expect(() => compileInclude("property", ["rooms"], undefined, ctx)).toThrow(/Rooms is turned off/)
+    expect(() => compileInclude("equipment", ["room"], undefined, ctx)).toThrow(/Rooms is turned off/)
+    expect(() => compileInclude("property", ["rooms"], undefined, { rooms: true })).not.toThrow()
   })
 })

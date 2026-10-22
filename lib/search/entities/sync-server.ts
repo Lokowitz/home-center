@@ -7,9 +7,10 @@ import { loadDocumentSettings } from "@/lib/documents/settings"
 import { documentIndexer, searchIndex } from "@/lib/documents/indexer-server"
 import {
   allergyDoc, conditionDoc, equipmentDoc, immunizationDoc, insuranceDoc, maintenanceDoc, medicationDoc, observationDoc,
-  personDoc, propertyDoc, providerDoc, serviceDoc, vehicleDoc, warrantyDoc, type EntityDoc, type OwnerRef,
+  personDoc, propertyDoc, providerDoc, roomDoc, serviceDoc, vehicleDoc, warrantyDoc, type EntityDoc, type OwnerRef,
 } from "./text"
 import { getFormat } from "@/lib/regional-server"
+import { locationLabel } from "@/lib/rooms"
 import { onEntitiesChanged } from "./changes"
 
 // Keeps the record half of search-index.db in step with the database: build
@@ -26,11 +27,11 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
   const fmt = await getFormat()
   const [
     properties, vehicles, equipment, people, services, schedules, warranties, policies, providers,
-    conditions, medications, allergies, immunizations, observations,
+    conditions, medications, allergies, immunizations, observations, rooms,
   ] = await Promise.all([
     prisma.property.findMany({ include: { equipment: { select: { name: true, category: true }, orderBy: { name: "asc" } } } }),
     prisma.vehicle.findMany(),
-    prisma.equipment.findMany({ include: { property: { select: { name: true } } } }),
+    prisma.equipment.findMany({ include: { property: { select: { name: true } }, room: { select: { name: true } } } }),
     prisma.person.findMany({
       include: {
         primaryProvider: { select: { name: true, specialty: true } },
@@ -53,6 +54,8 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
     prisma.allergy.findMany({ include: { person: { select: { name: true } } } }),
     prisma.immunization.findMany({ include: { person: { select: { name: true } } } }),
     prisma.observation.findMany({ include: { person: { select: { name: true } }, condition: { select: { name: true } } } }),
+    // Indexed whatever the Rooms switch says, like Health's records; search leaves them out while it's off.
+    prisma.room.findMany({ include: { property: { select: { name: true } }, paints: { orderBy: { sortOrder: "asc" } } } }),
   ])
 
   // Owners by id (cuids are unique across tables), with where equipment sits.
@@ -71,8 +74,9 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
     }, now, fmt)),
     ...vehicles.map((v) => vehicleDoc(v, now, fmt)),
     ...equipment.map((e) => equipmentDoc({
-      ...e, category: equipmentCategoryLabel(e.category), propertyName: e.property?.name ?? null,
+      ...e, category: equipmentCategoryLabel(e.category), location: locationLabel(e), propertyName: e.property?.name ?? null,
     }, now, fmt)),
+    ...rooms.map((r) => roomDoc(r, fmt)),
     ...people.map((p) => personDoc({
       ...p,
       medications: p.medications.filter((m) => !m.endDate || m.endDate.getTime() >= now.getTime()).map((m) => m.name),

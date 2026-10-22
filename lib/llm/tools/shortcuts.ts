@@ -12,8 +12,8 @@ import {
   daysUntil, HEALTH_WINDOWS, immunizationDue, insuranceExpiring, isSupersededImmunization, refillDue,
 } from "@/lib/health"
 import type { AssetType, ServiceCategory } from "@/app/generated/prisma/client"
-import { ENTITIES, HEALTH_ENTITIES, type EntityKey, type Row } from "../ontology"
-import { coerceValue, entityDef, healthOn, inDayRange, requireDay, selectFor, ToolInputError, type ToolContext } from "../query"
+import { ENTITIES, HEALTH_ENTITIES, ROOM_ENTITIES, type EntityKey, type Row } from "../ontology"
+import { coerceValue, entityDef, healthOn, inDayRange, roomsOn, requireDay, selectFor, ToolInputError, type ToolContext } from "../query"
 import { compact, serializeRow, toDay } from "../serialize"
 import { aggregateRows, groupSpec, measureSpec } from "../aggregate"
 import { assetRef, attachAssets, delegate } from "../execute"
@@ -39,12 +39,13 @@ const dayOrNull = (d: Date | null | undefined) => (d ? toDay(d) : null)
 const SEARCHABLE: EntityKey[] = [
   "property", "vehicle", "equipment", "person", "provider", "insurancePolicy", "healthCondition",
   "medication", "allergy", "immunization", "warranty", "maintenanceSchedule", "serviceRecord", "observation",
+  "room", "roomPaint",
 ]
 
 export const searchTool = defineTool({
   name: "search",
   description:
-    "Find records by name anywhere in the household data — assets, people, providers, insurance, conditions, medications, allergies, vaccines, warranties, maintenance, service records. " +
+    "Find records by name anywhere in the household data — assets, people, providers, insurance, conditions, medications, allergies, vaccines, warranties, maintenance, service records, rooms and their paint. " +
     "Use it first to turn a name into an id and link. Every word must match (in any searchable field). " +
     "A type word lists that type: 'vehicles' lists vehicles, 'powertrain warranty' searches warranties.",
   schema: z.object({
@@ -59,8 +60,8 @@ async function searchRecords(query: string, entities: string[] | undefined, ctx:
   const { words, types } = splitSearchQuery(query)
   if (!words.length && !types.length) throw new ToolInputError("Search needs at least one word of two or more characters.")
   const requested = types.length ? types : entities?.length ? entities.map((e) => entityDef(e, ctx).key) : SEARCHABLE
-  // With Health off its entities are skipped, and a person's records with them.
-  const keys = healthOn(ctx) ? requested : requested.filter((k) => !HEALTH_ENTITIES.has(k))
+  // With Health off its entities are skipped, and a person's records with them; likewise rooms with Rooms off.
+  const keys = requested.filter((k) => (healthOn(ctx) || !HEALTH_ENTITIES.has(k)) && (roomsOn(ctx) || !ROOM_ENTITIES.has(k)))
   const index = await loadAssetIndex()
   const found = await Promise.all(
     keys.map(async (key) => {

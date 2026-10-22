@@ -1,4 +1,4 @@
-import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type Row } from "./ontology"
+import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, ROOM_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type Row } from "./ontology"
 import { HEALTH_NOTIFICATION_TYPES } from "@/lib/features"
 import type { AgentEvent } from "./types"
 
@@ -19,18 +19,22 @@ export type Op = (typeof OPS)[number]
 export type Filter = { field: string; op: Op; value?: unknown }
 /**
  * health: false while Health is off in Settings → Features; absent means on.
+ * rooms: the same for Rooms.
  * today: the viewer's calendar day (YYYY-MM-DD), when the page sent it.
  * emit: sends an event straight to the page (only draft tools use it).
  */
-export type ToolContext = { userId: string; now: Date; health?: boolean; today?: string; emit?: (event: AgentEvent) => void }
+export type ToolContext = { userId: string; now: Date; health?: boolean; rooms?: boolean; today?: string; emit?: (event: AgentEvent) => void }
 
 export const healthOn = (ctx?: Pick<ToolContext, "health">) => ctx?.health !== false
+export const roomsOn = (ctx?: Pick<ToolContext, "rooms">) => ctx?.rooms !== false
 
 const HEALTH_OFF = "isn't available: Health is turned off in Settings."
+const ROOMS_OFF = "isn't available: Rooms is turned off in Settings."
 
-/** Throws when an entity belongs to Health and Health is off. */
-export function requireReachable(key: EntityKey, ctx?: Pick<ToolContext, "health">) {
+/** Throws when an entity belongs to a feature that is off (Health, Rooms). */
+export function requireReachable(key: EntityKey, ctx?: Pick<ToolContext, "health" | "rooms">) {
   if (!healthOn(ctx) && HEALTH_ENTITIES.has(key)) throw new ToolInputError(`${key} ${HEALTH_OFF}`)
+  if (!roomsOn(ctx) && ROOM_ENTITIES.has(key)) throw new ToolInputError(`${key} ${ROOMS_OFF}`)
 }
 /**
  * has/hasNone on an asset's warranties, service records or schedules. Those
@@ -57,10 +61,10 @@ const OPS_BY_TYPE: Record<FieldType, Op[]> = {
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "")
 
-export function entityDef(raw: string, ctx?: Pick<ToolContext, "health">): { key: EntityKey; def: EntityDef } {
+export function entityDef(raw: string, ctx?: Pick<ToolContext, "health" | "rooms">): { key: EntityKey; def: EntityDef } {
   const n = norm(String(raw))
   const key = ENTITY_KEYS.find((k) => norm(k) === n || norm(ENTITIES[k].plural) === n)
-  if (!key) throw new ToolInputError(`Unknown entity "${raw}". Valid entities: ${entityKeysFor(healthOn(ctx)).join(", ")}.`)
+  if (!key) throw new ToolInputError(`Unknown entity "${raw}". Valid entities: ${entityKeysFor(healthOn(ctx), roomsOn(ctx)).join(", ")}.`)
   requireReachable(key, ctx)
   return { key, def: ENTITIES[key] }
 }
@@ -302,7 +306,7 @@ export function compileInclude(
   entity: EntityKey,
   include: string[] = [],
   fields?: string[],
-  ctx?: Pick<ToolContext, "health">
+  ctx?: Pick<ToolContext, "health" | "rooms">
 ): { select: Row; children: { relation: string; entity: EntityKey }[] } {
   const def = ENTITIES[entity]
   const select = selectFor(entity, fields)

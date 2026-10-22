@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   ageWords, allergyDoc, compose, INLINE_NOTE_CHARS, intervalWords, maintenanceDoc, medicationDoc, observationDoc, personDoc,
-  propertyDoc, sentences, serviceDoc, vehicleDoc, warrantyDoc,
+  propertyDoc, roomDoc, sentences, serviceDoc, vehicleDoc, warrantyDoc,
 } from "./text"
 import { createFormatter, DEFAULT_REGIONAL } from "@/lib/regional"
 
@@ -63,6 +63,25 @@ describe("record text", () => {
         "Notes: Corner lot, finished basement.",
       ],
     })
+  })
+
+  it("writes a room with its property, flooring and paint", () => {
+    const doc = roomDoc({
+      id: "r1", name: "Kitchen", level: "Main floor", area: 224, dimensions: "14 × 16 ft",
+      flooringType: "Hardwood", flooringProduct: "Bruce Natural Oak", notes: null,
+      property: { name: "Maple Street House" },
+      paints: [
+        { surface: "Walls", brand: "Sherwin-Williams", colorName: "Agreeable Gray", colorCode: "SW 7029", finish: "Eggshell" },
+        { surface: "Ceiling", brand: null, colorName: null, colorCode: null, finish: null },
+      ],
+    })
+    expect(doc.kind).toBe("ROOM")
+    expect(doc.chunks[0]).toContain("Agreeable Gray")
+    expect(doc.chunks[0]).toContain("Maple Street House")
+    expect(doc.chunks[0]).toBe(
+      "Room: Kitchen at Maple Street House. Level: Main floor. 224 square feet (14 × 16 ft). " +
+      "Flooring: Hardwood, Bruce Natural Oak. Paint: Walls: Sherwin-Williams Agreeable Gray SW 7029 · Eggshell; Ceiling."
+    )
   })
 
   it("leaves identifiers out of a vehicle", () => {

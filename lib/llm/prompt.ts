@@ -35,7 +35,7 @@ const DOCUMENTS_SECTION = [
   "- If nothing matched and notIndexed is above 0, say some files couldn't be searched yet.",
 ]
 
-export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true, fmt = DEFAULT_FORMAT, today }: { now: Date; today?: string; fmt?: Formatter; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean }): string {
+export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true, rooms = true, fmt = DEFAULT_FORMAT, today }: { now: Date; today?: string; fmt?: Formatter; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean; rooms?: boolean }): string {
   return [
     health
       ? "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, people and their health records (including observations the family logs, like meltdowns or bad nights), care providers, insurance, service records and costs, warranties, and maintenance schedules."
@@ -63,7 +63,7 @@ export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS,
     "- Link records you mention by copying the exact href from the tool results, e.g. [2019 Civic](/assets/vehicles/abc123). Never build a link yourself: only properties, vehicles, equipment and people have their own pages; medications, providers, service records, warranties and the like link to the page in their href.",
     "",
     "Data model — every row also has an id (entity: description, fields, relations):",
-    describeOntology(health),
+    describeOntology(health, rooms),
     ...(extra ? ["", "Additional instructions from the administrator:", extra] : []),
   ].join("\n")
 }
