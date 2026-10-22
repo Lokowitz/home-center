@@ -126,7 +126,7 @@ export default async function PropertyDetailPage({
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} scopeToggle={equipment.length > 0 ? { ownLabel: "Property only", withLabel: "Property + equipment" } : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "warranties" ? open : undefined} />

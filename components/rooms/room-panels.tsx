@@ -12,6 +12,7 @@ import { useFormat } from "@/components/regional-provider"
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { scopeRecords, type HistoryScope } from "@/lib/rooms"
 import { cn } from "@/lib/utils"
+import { ScopeToggle } from "./scope-toggle"
 import { FileText, Image, Paperclip, Trash2, Upload, X } from "lucide-react"
 import type { Attachment } from "@/app/generated/prisma/client"
 import type { RoomSchedule, RoomServiceRecord, RoomWithDetails } from "./room-list"
@@ -160,11 +161,6 @@ export function RoomEquipment({ room }: { room: RoomWithDetails }) {
   )
 }
 
-const SCOPES: { value: HistoryScope; label: string }[] = [
-  { value: "own", label: "Room only" },
-  { value: "withEquipment", label: "Room + its equipment" },
-]
-
 /** Service records and reminders for the room, optionally with those for equipment in it. Read-only; each links to its own page. */
 export function RoomHistory({ room, serviceRecords, schedules }: { room: RoomWithDetails; serviceRecords: RoomServiceRecord[]; schedules: RoomSchedule[] }) {
   const fmt = useFormat()
@@ -187,14 +183,7 @@ export function RoomHistory({ room, serviceRecords, schedules }: { room: RoomWit
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-md border p-0.5" role="group" aria-label="Whose history">
-        {SCOPES.map((s) => (
-          <button key={s.value} type="button" aria-pressed={scope === s.value} onClick={() => setScope(s.value)}
-            className={cn("rounded px-2.5 py-1 text-xs font-medium transition-colors", scope === s.value ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground")}>
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <ScopeToggle scope={scope} onChange={setScope} ownLabel="Room only" withLabel="Room + its equipment" />
 
       <section className="space-y-1.5">
         <h3 className="text-sm font-medium">Service records ({records.length})</h3>

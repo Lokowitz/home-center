@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useCallback, useState } from "react"
+import { Fragment, useCallback, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,9 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import { ScopeToggle } from "@/components/rooms/scope-toggle"
+import { scopeRecords, type HistoryScope } from "@/lib/rooms"
+import type { Attachment,ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 import type { RoomOption } from "@/lib/rooms-server"
 
 type RecordWithAttachments = ServiceRecord & { attachments: Attachment[] }
@@ -53,9 +55,11 @@ interface Props {
   /** Active reminders a new record can mark complete. */
   reminders?: { id: string; title: string; assetType: AssetType; assetId: string }[]
   openId?: string
+  /** Property only: show a "this property / with its equipment" filter, labelled as given. */
+  scopeToggle?: { ownLabel: string; withLabel: string }
 }
 
-export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, roomOptions = [], defaultRoomId, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
+export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, roomOptions = [], defaultRoomId, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId, scopeToggle }: Props) {
   const fmt = useFormat()
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
@@ -79,8 +83,15 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
     else if (openId && initialRecords.some((r) => r.id === openId)) { setEditingId(openId); setDialogOpen(true) }
   }
 
+  const [scope, setScope] = useState<HistoryScope>("withEquipment")
+  // Memoized: the table re-sorts whenever its rows array changes identity.
+  const scopedRecords = useMemo(
+    () => (scopeToggle ? scopeRecords(records, scope, { assetType: "PROPERTY", assetId }) : records),
+    [records, scope, scopeToggle, assetId],
+  )
+
   const table = useClientTable({
-    rows: records,
+    rows: scopedRecords,
     accessors: ACCESSORS,
     defaultSort: "date",
     defaultDir: "desc",
@@ -110,7 +121,10 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{records.length} {isPerson ? "visit" : "record"}{records.length !== 1 ? "s" : ""}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground">{scopedRecords.length} {isPerson ? "visit" : "record"}{scopedRecords.length !== 1 ? "s" : ""}</p>
+          {scopeToggle && <ScopeToggle scope={scope} onChange={(s) => { setScope(s); table.setPage(1) }} ownLabel={scopeToggle.ownLabel} withLabel={scopeToggle.withLabel} />}
+        </div>
         <AddSplitButton
           label={isPerson ? "Add visit" : "Add record"}
           menuLabel={isPerson ? "More ways to add a visit" : "More ways to add a record"}
@@ -119,7 +133,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
         />
       </div>
 
-      {records.length === 0 ? (
+      {scopedRecords.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           {emptyStateCopy(isPerson ? "visits" : "service")}
         </div>
