@@ -12,6 +12,8 @@ import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { getFormat } from "@/lib/regional-server"
+import { loadFeatures } from "@/lib/features-server"
+import { RoomList } from "@/components/rooms/room-list"
 
 const typeLabel: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
@@ -30,13 +32,15 @@ export default async function PropertyDetailPage({
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
 
-  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents] = await Promise.all([
+  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.equipment.findMany({ where: { propertyId: id }, select: { id: true, name: true } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
+    loadFeatures(),
   ])
+  const { rooms, roomServiceRecords, roomSchedules } = features.rooms ? await loadRooms(id) : { rooms: [], roomServiceRecords: [], roomSchedules: [] }
 
   const equipmentIds = equipment.map((e) => e.id)
 
@@ -110,10 +114,12 @@ export default async function PropertyDetailPage({
           </div>
         </div>
 
-        <Tabs defaultValue={tab ?? "service"}>
+        {/* Keyed on the tab param so a link to ?tab=…&open=… from inside this page (a room's history) switches tabs. */}
+        <Tabs key={tab} defaultValue={tab ?? "service"}>
           <TabsList variant="line" className="w-full justify-start border-b">
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
+            {features.rooms && <TabsTrigger value="rooms">Rooms ({rooms.length})</TabsTrigger>}
             <TabsTrigger value="maintenance">Maintenance Reminders ({maintenanceSchedules.length})</TabsTrigger>
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
@@ -123,6 +129,11 @@ export default async function PropertyDetailPage({
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
+          {features.rooms && (
+            <TabsContent value="rooms" className="mt-4">
+              <RoomList rooms={rooms} propertyId={id} serviceRecords={roomServiceRecords} schedules={roomSchedules} openId={tab === "rooms" ? open : undefined} />
+            </TabsContent>
+          )}
           <TabsContent value="maintenance" className="mt-4">
             <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
@@ -133,6 +144,34 @@ export default async function PropertyDetailPage({
       </div>
     </div>
   )
+}
+
+/** The property's rooms, plus the history the room dialog lists: records tagged with a room or on equipment in one. */
+async function loadRooms(propertyId: string) {
+  const rooms = await prisma.room.findMany({
+    where: { propertyId },
+    include: {
+      paints: { orderBy: { sortOrder: "asc" } },
+      attachments: { orderBy: { uploadedAt: "asc" } },
+      equipment: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+    },
+    orderBy: { name: "asc" },
+  })
+  const roomIds = rooms.map((r) => r.id)
+  const roomEquipmentIds = rooms.flatMap((r) => r.equipment.map((e) => e.id))
+  if (!roomIds.length) return { rooms, roomServiceRecords: [], roomSchedules: [] }
+
+  const where = {
+    OR: [
+      { roomId: { in: roomIds } },
+      ...(roomEquipmentIds.length ? [{ assetType: "EQUIPMENT" as const, assetId: { in: roomEquipmentIds } }] : []),
+    ],
+  }
+  const [roomServiceRecords, roomSchedules] = await Promise.all([
+    prisma.serviceRecord.findMany({ where, select: { id: true, title: true, date: true, assetType: true, assetId: true, roomId: true }, orderBy: { date: "desc" } }),
+    prisma.maintenanceSchedule.findMany({ where, select: { id: true, title: true, nextDueDate: true, assetType: true, assetId: true, roomId: true }, orderBy: { nextDueDate: "asc" } }),
+  ])
+  return { rooms, roomServiceRecords, roomSchedules }
 }
 
 function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
