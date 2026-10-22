@@ -112,4 +112,17 @@ describe("specs", () => {
     expect(() => measureSpec("serviceRecord", { op: "sum", field: "title" })).toThrow(/numeric field on serviceRecord: cost, mileageAtService/)
     expect(() => measureSpec("serviceRecord", { op: "sum" })).toThrow(ToolInputError)
   })
+
+  it("won't group through a relation into a feature that's off", () => {
+    expect(() => groupSpec("equipment", "room", { rooms: false })).toThrow(/Rooms is turned off/)
+    expect(() => groupSpec("serviceRecord", "room", { rooms: false })).toThrow(/Rooms is turned off/)
+    expect(() => groupSpec("maintenanceSchedule", "room", { rooms: false })).toThrow(/Rooms is turned off/)
+    expect(() => groupSpec("serviceRecord", "provider", { health: false })).toThrow(/Health is turned off/)
+    expect(groupSpec("equipment", "room").select).toEqual({ room: { select: { name: true } } })
+  })
+
+  it("lists only reachable relations when a name is unknown", () => {
+    expect(() => groupSpec("equipment", "nope", { rooms: false })).toThrow(/Relations: property, serviceRecords/)
+    expect(() => groupSpec("equipment", "nope")).toThrow(/Relations: property, room, serviceRecords/)
+  })
 })

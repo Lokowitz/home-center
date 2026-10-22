@@ -1,4 +1,4 @@
-import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, ROOM_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type Row } from "./ontology"
+import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, ROOM_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type RelationDef, type Row } from "./ontology"
 import { HEALTH_NOTIFICATION_TYPES } from "@/lib/features"
 import type { AgentEvent } from "./types"
 
@@ -77,8 +77,13 @@ function fieldDef(entity: EntityKey, name: string): FieldDef {
   return f
 }
 
-function relationNames(entity: EntityKey) {
-  return Object.keys(ENTITIES[entity].relations).join(", ") || "none"
+/** Whether a relation leads somewhere the assistant may go (not into a feature that's off). */
+const relationReachable = (r: RelationDef, ctx?: Pick<ToolContext, "health" | "rooms">) =>
+  !("entity" in r) || ((healthOn(ctx) || !HEALTH_ENTITIES.has(r.entity)) && (roomsOn(ctx) || !ROOM_ENTITIES.has(r.entity)))
+
+/** An entity's relation names for error messages, leaving out ones into a feature that's off. */
+export function relationNames(entity: EntityKey, ctx?: Pick<ToolContext, "health" | "rooms">) {
+  return Object.entries(ENTITIES[entity].relations).filter(([, r]) => relationReachable(r, ctx)).map(([n]) => n).join(", ") || "none"
 }
 
 export function requireDay(value: unknown, name: string): Date {
@@ -230,7 +235,9 @@ export function compileWhere(
     if (EXISTS_OPS.includes(f.op)) {
       const rel = tail ? undefined : def.relations[head]
       if (!rel) {
-        const lists = Object.entries(def.relations).filter(([, r]) => r.kind === "many" || r.kind === "assetChildren").map(([n]) => n)
+        const lists = Object.entries(def.relations)
+          .filter(([, r]) => (r.kind === "many" || r.kind === "assetChildren") && relationReachable(r, ctx))
+          .map(([n]) => n)
         throw new ToolInputError(`${f.op} goes on a list relation of ${entity}: ${lists.join(", ") || "none"}. Put conditions on its rows in value.`)
       }
       if (rel.kind === "one" || rel.kind === "asset") {
@@ -252,7 +259,7 @@ export function compileWhere(
     }
 
     const rel = def.relations[head]
-    if (!rel) throw new ToolInputError(`Unknown relation "${head}" on ${entity}. Relations: ${relationNames(entity)}.`)
+    if (!rel) throw new ToolInputError(`Unknown relation "${head}" on ${entity}. Relations: ${relationNames(entity, ctx)}.`)
     if ("entity" in rel) requireReachable(rel.entity, ctx)
 
     if (rel.kind === "asset") {
@@ -314,7 +321,7 @@ export function compileInclude(
 
   for (const name of include) {
     const rel = def.relations[name]
-    if (!rel) throw new ToolInputError(`Unknown relation "${name}". Relations on ${entity}: ${relationNames(entity)}.`)
+    if (!rel) throw new ToolInputError(`Unknown relation "${name}". Relations on ${entity}: ${relationNames(entity, ctx)}.`)
     if (rel.kind === "asset") continue // always attached for polymorphic rows
     requireReachable(rel.entity, ctx)
     if (rel.kind === "assetChildren") {
@@ -330,5 +337,9 @@ export function compileInclude(
   // model can't tell one child's fluoxetine from another's, and won't think to
   // ask for the person relation.
   if (def.relations.person?.kind === "one" && !select.person) select.person = { select: { id: true, name: true } }
+  // A room's paint is part of what the room is, so a plain lookup carries it.
+  if (entity === "room" && !select.paints) {
+    select.paints = { select: selectFor("roomPaint"), orderBy: compileSort("roomPaint"), take: CHILD_LIMIT }
+  }
   return { select, children }
 }

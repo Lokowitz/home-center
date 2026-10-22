@@ -141,7 +141,7 @@ export type AggregateArgs = { entity: string; measure: MeasureInput; groupBy?: s
 export async function aggregateRecords(args: AggregateArgs, ctx: ToolContext) {
   const { key, def } = entityDef(args.entity, ctx)
   const measure = measureSpec(key, args.measure)
-  const groups = (args.groupBy ?? []).map((g) => groupSpec(key, g))
+  const groups = (args.groupBy ?? []).map((g) => groupSpec(key, g, ctx))
   const index = def.polymorphic ? await loadAssetIndex() : null
   const where = await resolveWhere(key, args.filters, ctx, index)
   if (!where) return { entity: key, groups: [], total: { value: 0, count: 0 }, note: NO_ASSET_MATCH }

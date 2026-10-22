@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { AssetType, ServiceCategory } from "@/app/generated/prisma/enums"
 import { describeOntology, ENTITIES, ENTITY_KEYS, entityKeysFor } from "./ontology"
-import { compileInclude, entityDef } from "./query"
+import { compileInclude, compileWhere, entityDef, relationNames } from "./query"
 
 const FORBIDDEN = ["passwordHash", "passwordEnc", "apiKeyEnc", "imageFilename", "createdById", "createdBy", "uploadedBy", "attachments", "user", "userId"]
 
@@ -80,5 +80,19 @@ describe("ontology", () => {
     expect(() => compileInclude("property", ["rooms"], undefined, ctx)).toThrow(/Rooms is turned off/)
     expect(() => compileInclude("equipment", ["room"], undefined, ctx)).toThrow(/Rooms is turned off/)
     expect(() => compileInclude("property", ["rooms"], undefined, { rooms: true })).not.toThrow()
+  })
+
+  it("leaves room relations out of error messages while Rooms is off", () => {
+    const off = { userId: "u1", now: new Date(), rooms: false }
+    expect(relationNames("property", off)).not.toContain("rooms")
+    expect(relationNames("property")).toContain("rooms")
+    expect(relationNames("room", { rooms: true })).toBe("property, paints, equipment")
+    expect(() => compileInclude("equipment", ["nope"], undefined, off)).toThrow(/Relations on equipment: property, serviceRecords/)
+    expect(() => compileWhere("property", [{ field: "nope", op: "has" }], off)).toThrow(/list relation of property: equipment, serviceRecords/)
+  })
+
+  it("brings a room's paint along on a plain lookup", () => {
+    const { select } = compileInclude("room")
+    expect(select.paints).toMatchObject({ select: { surface: true, colorName: true }, orderBy: { sortOrder: "asc" } })
   })
 })

@@ -1,6 +1,6 @@
 import { cents } from "@/lib/costs"
 import { ENTITIES, type EntityKey, type Row } from "./ontology"
-import { ToolInputError } from "./query"
+import { relationNames, requireReachable, ToolInputError, type ToolContext } from "./query"
 import { compact, toDay } from "./serialize"
 
 // In-memory grouping for the aggregate and cost_summary tools. Same reasoning
@@ -55,7 +55,7 @@ export function measureSpec(entity: EntityKey, m: MeasureInput): MeasureSpec {
   }
 }
 
-export function groupSpec(entity: EntityKey, raw: string): GroupSpec {
+export function groupSpec(entity: EntityKey, raw: string, ctx?: Pick<ToolContext, "health" | "rooms">): GroupSpec {
   const def = ENTITIES[entity]
   const [name, bucket] = String(raw).split(":")
 
@@ -91,6 +91,7 @@ export function groupSpec(entity: EntityKey, raw: string): GroupSpec {
       }
     }
     if (rel.kind === "one") {
+      requireReachable(rel.entity, ctx)
       const nameField = ENTITIES[rel.entity].nameField
       return {
         label: name,
@@ -105,7 +106,7 @@ export function groupSpec(entity: EntityKey, raw: string): GroupSpec {
   }
 
   if (!def.fields[name]) {
-    throw new ToolInputError(`Unknown field or relation "${name}" on ${entity}. Fields: ${Object.keys(def.fields).join(", ")}. Relations: ${Object.keys(def.relations).join(", ") || "none"}.`)
+    throw new ToolInputError(`Unknown field or relation "${name}" on ${entity}. Fields: ${Object.keys(def.fields).join(", ")}. Relations: ${relationNames(entity, ctx)}.`)
   }
   return {
     label: name,
