@@ -155,8 +155,13 @@ describe("completionRecordData", () => {
   it("logs the reminder's title with what was entered", () => {
     expect(completionRecordData(schedule, { date, mileage: 41000, vendor: "Jiffy", cost: 59.99, notes: "Synthetic" }, "u1")).toEqual({
       assetType: "VEHICLE", assetId: "v1", date, title: "Oil change", description: "Synthetic", vendor: "Jiffy", cost: 59.99,
-      category: "ROUTINE", mileageAtService: 41000, createdById: "u1",
+      category: "ROUTINE", mileageAtService: 41000, roomId: null, createdById: "u1",
     })
+  })
+
+  it("files the record in the reminder's room", () => {
+    const r = completionRecordData({ assetType: "PROPERTY", assetId: "p1", title: "Clean gutters", roomId: "r1" }, { date, mileage: null, vendor: "", cost: null, notes: "" }, "u1")
+    expect(r.roomId).toBe("r1")
   })
 
   it("stores blanks as empty, not zero", () => {

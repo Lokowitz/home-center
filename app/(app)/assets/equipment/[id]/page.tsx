@@ -13,6 +13,7 @@ import { EquipmentEditButton } from "@/components/equipment/equipment-edit-butto
 import { categoryLabel } from "@/components/equipment/categories"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { getFormat } from "@/lib/regional-server"
+import { roomOptionsFor } from "@/lib/rooms-server"
 
 export default async function EquipmentDetailPage({
   params,
@@ -30,12 +31,14 @@ export default async function EquipmentDetailPage({
   })
   if (!equipment) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, properties, documents] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, properties, documents, roomOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "EQUIPMENT", assetId: id }, orderBy: { uploadedAt: "asc" } }),
+    // Rooms of its property, for the room selects and badges; empty with Rooms off or no property.
+    roomOptionsFor("EQUIPMENT", id),
   ])
 
   return (
@@ -107,13 +110,13 @@ export default async function EquipmentDetailPage({
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="EQUIPMENT" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Manual, install guide, spec sheet: files for the equipment itself, not one service." />

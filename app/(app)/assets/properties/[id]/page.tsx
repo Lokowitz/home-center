@@ -36,11 +36,13 @@ export default async function PropertyDetailPage({
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
-    prisma.equipment.findMany({ where: { propertyId: id }, select: { id: true, name: true } }),
+    prisma.equipment.findMany({ where: { propertyId: id }, select: { id: true, name: true, roomId: true } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadFeatures(),
   ])
   const { rooms, roomServiceRecords, roomSchedules } = features.rooms ? await loadRooms(id) : { rooms: [], roomServiceRecords: [], roomSchedules: [] }
+  // For the room selects and badges on the Service and Maintenance tabs; empty with Rooms off.
+  const roomOptions = rooms.map((r) => ({ id: r.id, name: r.name }))
 
   const equipmentIds = equipment.map((e) => e.id)
 
@@ -114,8 +116,8 @@ export default async function PropertyDetailPage({
           </div>
         </div>
 
-        {/* Keyed on the tab param so a link to ?tab=…&open=… from inside this page (a room's history) switches tabs. */}
-        <Tabs key={tab} defaultValue={tab ?? "service"}>
+        {/* Keyed on the tab and open params so a link to ?tab=…&open=… from inside this page (a room's history) switches tabs, even to the tab already showing. */}
+        <Tabs key={`${tab ?? ""}:${open ?? ""}`} defaultValue={tab ?? "service"}>
           <TabsList variant="line" className="w-full justify-start border-b">
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
@@ -124,7 +126,7 @@ export default async function PropertyDetailPage({
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "warranties" ? open : undefined} />
@@ -135,7 +137,7 @@ export default async function PropertyDetailPage({
             </TabsContent>
           )}
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Deed, survey, closing papers, floor plans: files for the property itself, not one service." />

@@ -22,6 +22,8 @@ import { ASSET_TYPES } from "@/lib/assets"
 import { BellRing, Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
+import { RoomSelect } from "@/components/rooms/room-select"
+import type { RoomOption } from "@/lib/rooms-server"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
 const NO_CATEGORY = "__none__"
@@ -39,6 +41,7 @@ const schema = z.object({
   mileageAtService: z.string().optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
+  roomId: z.string().optional(),
   scheduleId: z.string().optional(),
 })
 
@@ -53,8 +56,12 @@ interface Props {
   attachments?: Attachment[]
   onAttachmentDeleted?: (recordId: string, attachmentId: string) => void
   /** When set (property view), shows a target picker: this property or one of its equipment. */
-  equipmentOptions?: { id: string; name: string }[]
+  equipmentOptions?: { id: string; name: string; roomId: string | null }[]
   propertyName?: string
+  /** Rooms of the target's property. Empty or missing hides the room select. */
+  roomOptions?: RoomOption[]
+  /** A new record's room (on an equipment page: the equipment's own). */
+  defaultRoomId?: string | null
   /** Vehicle's odometer unit, for the mileage field's label. Defaults to miles. */
   meterUnit?: MeterUnit
   /** People only: the provider directory and this person's conditions. */
@@ -79,7 +86,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES", providerOptions, conditionOptions, reminderOptions = [] }: Props) {
+export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, record, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES", providerOptions, conditionOptions, reminderOptions = [] }: Props) {
   const isPerson = assetType === "PERSON"
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
@@ -106,7 +113,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       assetId, assetType,
       date: new Date().toISOString().split("T")[0],
       title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "",
-      providerId: "", conditionId: "", scheduleId: "",
+      providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "",
     },
   })
 
@@ -131,12 +138,13 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
         mileageAtService: record.mileageAtService?.toString() ?? "",
         providerId: record.providerId ?? "",
         conditionId: record.conditionId ?? "",
+        roomId: record.roomId ?? "",
         scheduleId: "",
       })
     } else {
-      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", scheduleId: "" })
+      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "" })
     }
-  }, [record, open, form, assetId, assetType])
+  }, [record, open, form, assetId, assetType, defaultRoomId])
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
@@ -172,6 +180,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       category: values.category === NO_CATEGORY ? "" : values.category,
       providerId: values.providerId === NO_LINK ? "" : values.providerId,
       conditionId: values.conditionId === NO_LINK ? "" : values.conditionId,
+      // No room select shown: send nothing, so an edit keeps the record's room.
+      roomId: roomOptions.length > 0 ? values.roomId : undefined,
       // Only a new record completes a reminder; the edit path ignores it.
       scheduleId: (record?.id ?? createdRecordId) ? "" : values.scheduleId,
     } as unknown as Parameters<typeof createServiceRecord>[0]
@@ -180,7 +190,11 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       ? await updateServiceRecord(existingId, payload)
       : await createServiceRecord(payload)
 
-    if (result?.error) { toast.error("Please fix the errors and try again."); return }
+    if (result?.error) {
+      const roomError = typeof result.error === "object" && "roomId" in result.error ? result.error.roomId?.[0] : undefined
+      toast.error(roomError ?? "Please fix the errors and try again.")
+      return
+    }
 
     const recordId = existingId ?? (result as { success: boolean; id?: string }).id
     if (recordId && !existingId) setCreatedRecordId(recordId)
@@ -247,6 +261,9 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                     form.setValue("assetType", type as FormValues["assetType"])
                     form.setValue("assetId", rest.join(":"))
                     form.setValue("scheduleId", "")
+                    // Equipment with a room fills a blank room; a chosen room stays.
+                    const equipmentRoom = type === "EQUIPMENT" ? equipmentOptions.find((e) => e.id === rest.join(":"))?.roomId : null
+                    if (equipmentRoom && !form.getValues("roomId")) form.setValue("roomId", equipmentRoom)
                   }}
                 >
                   <FormControl>
@@ -265,6 +282,8 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
                 </Select>
               </FormItem>
             )}
+
+            <RoomSelect value={form.watch("roomId") ?? ""} onChange={(v) => form.setValue("roomId", v)} options={roomOptions} />
 
             {!record && targetReminders.length > 0 && (
               <FormField control={form.control} name="scheduleId" render={({ field }) => (

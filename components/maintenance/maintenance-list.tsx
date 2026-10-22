@@ -24,6 +24,7 @@ import { useFormat } from "@/components/regional-provider"
 import type { Formatter } from "@/lib/regional"
 import { scheduleDue, dueBadge, isSnoozed, type MileageIndex } from "@/lib/maintenance-due"
 import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import type { RoomOption } from "@/lib/rooms-server"
 
 type MaintenanceScheduleWithAttachments = MaintenanceSchedule & { attachments: Attachment[] }
 
@@ -44,8 +45,12 @@ interface Props {
   /** Vehicle's odometer unit. Defaults to miles. */
   meterUnit?: MeterUnit
   /** Property's equipment, for the Source column and the "For" picker when adding/editing. */
-  equipment?: { id: string; name: string }[]
+  equipment?: { id: string; name: string; roomId: string | null }[]
   propertyName?: string
+  /** Rooms of the property, for the room select and the rows' room badges. Empty with Rooms off. */
+  roomOptions?: RoomOption[]
+  /** A new schedule's room (on an equipment page: the equipment's own). */
+  defaultRoomId?: string | null
   openId?: string
 }
 
@@ -75,7 +80,7 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
 const stickyActions =
   "sticky right-0 z-[1] bg-card shadow-[-10px_0_10px_-10px_rgb(0_0_0/0.25)] [tr:hover_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))] [tr:has([aria-expanded=true])_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]"
 
-export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, openId }: Props) {
+export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, roomOptions = [], defaultRoomId, openId }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const [schedules, setSchedules] = useState(initialSchedules)
@@ -107,6 +112,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
 
   const showSource = !!equipment
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
+  const roomNames: Record<string, string> = Object.fromEntries(roomOptions.map((r) => [r.id, r.name]))
 
   const handleAttachmentDeleted = useCallback((scheduleId: string, attachmentId: string) => {
     setSchedules((prev) =>
@@ -177,7 +183,12 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                     className={`cursor-pointer ${s.isActive ? "" : "text-muted-foreground"}`}
                     onClick={() => { setEditing(s); setFormOpen(true) }}
                   >
-                    <TableCell className="font-medium">{s.title}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-medium">{s.title}</span>
+                        {s.roomId && roomNames[s.roomId] && <Badge variant="outline" className="text-xs">{roomNames[s.roomId]}</Badge>}
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-[220px]">
                       {s.description ? (
                         <Tooltip>
@@ -288,6 +299,8 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
         onAttachmentDeleted={handleAttachmentDeleted}
         equipmentOptions={equipment}
         propertyName={propertyName}
+        roomOptions={roomOptions}
+        defaultRoomId={defaultRoomId}
         meterUnit={meterUnit}
       />
 

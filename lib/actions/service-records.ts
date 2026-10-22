@@ -11,11 +11,16 @@ import {
   cleanServiceRecord, newServiceRecordWrites, prepareNewServiceRecord, revalidateNewServiceRecord, serviceRecordSchema,
   withProviderVendor, type ServiceRecordInput,
 } from "@/lib/service-record-server"
+import { checkRoom, roomOptionsFor, type RoomOption } from "@/lib/rooms-server"
 
 export type RecordFormContext = {
   meterUnit?: MeterUnit
   propertyName?: string
-  equipmentOptions?: { id: string; name: string }[]
+  equipmentOptions?: { id: string; name: string; roomId: string | null }[]
+  /** Rooms of the asset's property; empty or missing hides the room select. */
+  roomOptions?: RoomOption[]
+  /** A new record's room: the equipment's own. */
+  defaultRoomId?: string | null
   providerOptions?: { id: string; name: string }[]
   conditionOptions?: { id: string; name: string }[]
   reminderOptions: { id: string; title: string; assetType: AssetType; assetId: string }[]
@@ -38,11 +43,14 @@ export async function loadRecordFormContext(assetType: AssetType, assetId: strin
   if (assetType === "PROPERTY") {
     const property = await prisma.property.findUnique({ where: { id: assetId }, select: { name: true } })
     if (!property) return { error: "Not found" }
-    const equipment = await prisma.equipment.findMany({ where: { propertyId: assetId }, select: { id: true, name: true } })
-    const reminderOptions = await reminders({
-      OR: [{ assetType, assetId }, ...(equipment.length ? [{ assetType: "EQUIPMENT" as const, assetId: { in: equipment.map((e) => e.id) } }] : [])],
-    })
-    return { propertyName: property.name, equipmentOptions: equipment, reminderOptions }
+    const equipment = await prisma.equipment.findMany({ where: { propertyId: assetId }, select: { id: true, name: true, roomId: true } })
+    const [reminderOptions, roomOptions] = await Promise.all([
+      reminders({
+        OR: [{ assetType, assetId }, ...(equipment.length ? [{ assetType: "EQUIPMENT" as const, assetId: { in: equipment.map((e) => e.id) } }] : [])],
+      }),
+      roomOptionsFor(assetType, assetId),
+    ])
+    return { propertyName: property.name, equipmentOptions: equipment, roomOptions, reminderOptions }
   }
   if (assetType === "PERSON") {
     const person = await prisma.person.findUnique({ where: { id: assetId }, select: { conditions: { select: { id: true, name: true } } } })
@@ -52,6 +60,12 @@ export async function loadRecordFormContext(assetType: AssetType, assetId: strin
       reminders({ assetType, assetId }),
     ])
     return { providerOptions, conditionOptions: person.conditions, reminderOptions }
+  }
+  if (assetType === "EQUIPMENT") {
+    const equipment = await prisma.equipment.findUnique({ where: { id: assetId }, select: { roomId: true } })
+    if (!equipment) return { error: "Not found" }
+    const [reminderOptions, roomOptions] = await Promise.all([reminders({ assetType, assetId }), roomOptionsFor(assetType, assetId)])
+    return { roomOptions, defaultRoomId: equipment.roomId, reminderOptions }
   }
   return { reminderOptions: await reminders({ assetType, assetId }) }
 }
@@ -87,7 +101,12 @@ export async function updateServiceRecord(id: string, data: ServiceRecordInput) 
   const parsed = serviceRecordSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.serviceRecord.update({ where: { id }, data: await withProviderVendor(cleanServiceRecord(parsed.data, session.user.id)) })
+  // No roomId sent (no room select shown, e.g. Rooms off) leaves the record's room as it was.
+  const room = parsed.data.roomId === undefined ? undefined : await checkRoom(parsed.data.roomId, parsed.data.assetType, parsed.data.assetId)
+  if (room && "error" in room) return { error: { roomId: [room.error] } }
+
+  const row = await withProviderVendor(cleanServiceRecord(parsed.data, session.user.id))
+  await prisma.serviceRecord.update({ where: { id }, data: { ...row, roomId: room?.roomId } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/records")
   return { success: true }

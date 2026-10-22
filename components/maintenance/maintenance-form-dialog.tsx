@@ -17,6 +17,8 @@ import { createMaintenanceSchedule, updateMaintenanceSchedule } from "@/lib/acti
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { ASSET_TYPES } from "@/lib/assets"
 import { useFormat } from "@/components/regional-provider"
+import { RoomSelect } from "@/components/rooms/room-select"
+import type { RoomOption } from "@/lib/rooms-server"
 import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/app/generated/prisma/client"
 
@@ -31,6 +33,7 @@ const schema = z.object({
   nextDueMileage: z.string().optional(),
   reminderDaysBefore: z.string().optional(),
   reminderMilesBefore: z.string().optional(),
+  roomId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -44,8 +47,12 @@ interface Props {
   attachments?: Attachment[]
   onAttachmentDeleted?: (scheduleId: string, attachmentId: string) => void
   /** When set (property view), shows a target picker: this property or one of its equipment. */
-  equipmentOptions?: { id: string; name: string }[]
+  equipmentOptions?: { id: string; name: string; roomId: string | null }[]
   propertyName?: string
+  /** Rooms of the target's property. Empty or missing hides the room select. */
+  roomOptions?: RoomOption[]
+  /** A new schedule's room (on an equipment page: the equipment's own). */
+  defaultRoomId?: string | null
   /** Vehicle's odometer unit, for the mileage field labels. Defaults to miles. */
   meterUnit?: MeterUnit
 }
@@ -65,7 +72,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", meterUnit = "MILES" }: Props) {
+export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES" }: Props) {
   const fmt = useFormat()
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
@@ -87,7 +94,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500" },
+    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "" },
   })
 
   useEffect(() => {
@@ -101,10 +108,11 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       nextDueMileage: schedule.nextDueMileage?.toString() ?? "",
       reminderDaysBefore: schedule.reminderDaysBefore.toString(),
       reminderMilesBefore: schedule.reminderMilesBefore.toString(),
+      roomId: schedule.roomId ?? "",
     } : {
-      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500",
+      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
     })
-  }, [schedule, open, form, assetId, assetType])
+  }, [schedule, open, form, assetId, assetType, defaultRoomId])
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
@@ -135,13 +143,21 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
   }
 
   async function onSubmit(values: FormValues) {
-    const payload = values as unknown as Parameters<typeof createMaintenanceSchedule>[0]
+    const payload = {
+      ...values,
+      // No room select shown: send nothing, so an edit keeps the schedule's room.
+      roomId: roomOptions.length > 0 ? values.roomId : undefined,
+    } as unknown as Parameters<typeof createMaintenanceSchedule>[0]
     const existingId = schedule?.id ?? createdScheduleId
     const result = existingId
       ? await updateMaintenanceSchedule(existingId, payload)
       : await createMaintenanceSchedule(payload)
 
-    if (result?.error) { toast.error("Please fix the errors and try again."); return }
+    if (result?.error) {
+      const roomError = "roomId" in result.error ? result.error.roomId?.[0] : undefined
+      toast.error(roomError ?? "Please fix the errors and try again.")
+      return
+    }
 
     const scheduleId = existingId ?? (result as { success: boolean; id?: string }).id
     if (scheduleId && !existingId) setCreatedScheduleId(scheduleId)
@@ -204,6 +220,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                     const [type, ...rest] = value.split(":")
                     form.setValue("assetType", type as FormValues["assetType"])
                     form.setValue("assetId", rest.join(":"))
+                    // Equipment with a room fills a blank room; a chosen room stays.
+                    const equipmentRoom = type === "EQUIPMENT" ? equipmentOptions.find((e) => e.id === rest.join(":"))?.roomId : null
+                    if (equipmentRoom && !form.getValues("roomId")) form.setValue("roomId", equipmentRoom)
                   }}
                 >
                   <FormControl>
@@ -222,6 +241,8 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                 </Select>
               </FormItem>
             )}
+
+            <RoomSelect value={form.watch("roomId") ?? ""} onChange={(v) => form.setValue("roomId", v)} options={roomOptions} />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="title" render={({ field }) => (

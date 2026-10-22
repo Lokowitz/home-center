@@ -4,6 +4,7 @@ import { Fragment, useCallback, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ChevronDown, Pencil, Trash2 } from "lucide-react"
@@ -19,6 +20,7 @@ import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
 import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import type { RoomOption } from "@/lib/rooms-server"
 
 type RecordWithAttachments = ServiceRecord & { attachments: Attachment[] }
 
@@ -37,8 +39,12 @@ interface Props {
   assetId: string
   assetType: AssetType
   /** Property's equipment, for the Source column and the "For" picker when adding/editing. */
-  equipment?: { id: string; name: string }[]
+  equipment?: { id: string; name: string; roomId: string | null }[]
   propertyName?: string
+  /** Rooms of the property, for the room select and the rows' room badges. Empty with Rooms off. */
+  roomOptions?: RoomOption[]
+  /** A new record's room (on an equipment page: the equipment's own). */
+  defaultRoomId?: string | null
   /** Vehicle's odometer unit, for the Mileage column header/suffix. Defaults to miles. */
   meterUnit?: MeterUnit
   /** People only: the provider directory and this person's conditions. */
@@ -49,10 +55,11 @@ interface Props {
   openId?: string
 }
 
-export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
+export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, roomOptions = [], defaultRoomId, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
   const fmt = useFormat()
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
+  const roomNames: Record<string, string> = Object.fromEntries(roomOptions.map((r) => [r.id, r.name]))
   const [records, setRecords] = useState(initialRecords)
   const [prevInitialRecords, setPrevInitialRecords] = useState(initialRecords)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -147,7 +154,10 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                         {fmt.date(record.date, { utc: true })}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{record.title}</div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{record.title}</span>
+                          {record.roomId && roomNames[record.roomId] && <Badge variant="outline" className="text-xs">{roomNames[record.roomId]}</Badge>}
+                        </div>
                         {record.vendor && <div className="text-xs text-muted-foreground">{record.vendor}</div>}
                       </TableCell>
                       <TableCell className="max-w-[220px]">
@@ -246,6 +256,8 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
         onAttachmentDeleted={handleAttachmentDeleted}
         equipmentOptions={equipment}
         propertyName={propertyName}
+        roomOptions={roomOptions}
+        defaultRoomId={defaultRoomId}
         meterUnit={meterUnit}
         providerOptions={providerOptions}
         conditionOptions={conditionOptions}

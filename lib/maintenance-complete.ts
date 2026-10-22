@@ -73,8 +73,9 @@ export type CompletionInput = { date: Date; mileage: number | null; vendor: stri
 
 /// The service record "Complete" logs: the reminder's title, with blanks kept
 /// empty rather than 0, and a reading only where an odometer means something.
+/// The record lands in the reminder's room, if it has one.
 export function completionRecordData(
-  schedule: { assetType: AssetType; assetId: string; title: string },
+  schedule: { assetType: AssetType; assetId: string; title: string; roomId?: string | null },
   input: CompletionInput,
   createdById: string
 ) {
@@ -88,6 +89,7 @@ export function completionRecordData(
     cost: input.cost,
     category: completionCategory(schedule.assetType),
     mileageAtService: schedule.assetType === "VEHICLE" ? input.mileage : null,
+    roomId: schedule.roomId ?? null,
     createdById,
   }
 }
