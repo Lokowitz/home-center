@@ -1,0 +1,91 @@
+import { describe, expect, it } from "vitest"
+import { locationLabel, paintLabel, paintRows, roomData, roomSchema, scopeRecords } from "./rooms"
+
+describe("paintRows", () => {
+  it("drops all-blank rows and numbers sortOrder from 0", () => {
+    const rows = paintRows([
+      { surface: "Walls", brand: "  Behr ", colorName: "", colorCode: undefined, finish: "" },
+      { surface: "  ", brand: "", colorName: "\t" },
+      { surface: "Trim" },
+    ])
+    expect(rows).toEqual([
+      { surface: "Walls", brand: "Behr", colorName: null, colorCode: null, finish: null, sortOrder: 0 },
+      { surface: "Trim", brand: null, colorName: null, colorCode: null, finish: null, sortOrder: 1 },
+    ])
+  })
+})
+
+describe("paintLabel", () => {
+  it("joins every part", () => {
+    expect(
+      paintLabel({ surface: "Walls", brand: "Sherwin-Williams", colorName: "Agreeable Gray", colorCode: "SW 7029", finish: "Eggshell" }),
+    ).toBe("Walls: Sherwin-Williams Agreeable Gray SW 7029 · Eggshell")
+  })
+
+  it("skips missing parts", () => {
+    expect(paintLabel({ surface: "Ceiling" })).toBe("Ceiling")
+    expect(paintLabel({ surface: "Trim", finish: "Gloss" })).toBe("Trim: Gloss")
+  })
+})
+
+describe("room input", () => {
+  const base = { propertyId: "p1", name: "Kitchen" }
+  const parse = (extra: Record<string, unknown>) => {
+    const r = roomSchema.safeParse({ ...base, ...extra })
+    if (!r.success) throw new Error(JSON.stringify(r.error.flatten().fieldErrors))
+    return roomData(r.data)
+  }
+
+  it("maps blanks to null and parses the date", () => {
+    const d = parse({ level: "", area: "", dimensions: "  ", flooringType: "", flooringInstalled: "2024-05-01", notes: "" })
+    expect(d).toMatchObject({ propertyId: "p1", name: "Kitchen", level: null, area: null, dimensions: null, flooringType: null, notes: null })
+    expect(d.flooringInstalled).toEqual(new Date("2024-05-01"))
+    expect(parse({}).flooringInstalled).toBeNull()
+    expect("paints" in d).toBe(false)
+  })
+
+  it("keeps a real area and rejects junk", () => {
+    expect(parse({ area: "180.5" }).area).toBe(180.5)
+    expect(roomSchema.safeParse({ ...base, area: "abc" }).success).toBe(false)
+  })
+
+  it("requires a name and defaults paints to empty", () => {
+    expect(roomSchema.safeParse({ ...base, name: "" }).success).toBe(false)
+    expect(roomSchema.parse(base).paints).toEqual([])
+  })
+})
+
+describe("locationLabel", () => {
+  it("prefers the room, then free-text location, then null", () => {
+    expect(locationLabel({ location: "Garage", room: { name: "Kitchen" } })).toBe("Kitchen")
+    expect(locationLabel({ location: "Garage", room: null })).toBe("Garage")
+    expect(locationLabel({ location: "Garage" })).toBe("Garage")
+    expect(locationLabel({ location: null, room: null })).toBeNull()
+  })
+})
+
+describe("scopeRecords", () => {
+  const records = [
+    { assetType: "PROPERTY", assetId: "p1", roomId: null },
+    { assetType: "EQUIPMENT", assetId: "e1", roomId: null },
+    { assetType: "EQUIPMENT", assetId: "e2", roomId: "r1" },
+    { assetType: "PROPERTY", assetId: "p1", roomId: "r1" },
+    { assetType: "VEHICLE", assetId: "e1", roomId: null },
+  ]
+
+  it("property own keeps only the property's records", () => {
+    expect(scopeRecords(records, "own", { assetType: "PROPERTY", assetId: "p1" })).toEqual([records[0], records[3]])
+  })
+
+  it("property withEquipment keeps everything passed in", () => {
+    expect(scopeRecords(records, "withEquipment", { assetType: "PROPERTY", assetId: "p1" })).toEqual(records)
+  })
+
+  it("room own keeps records tagged with the room", () => {
+    expect(scopeRecords(records, "own", { roomId: "r1" }, ["e1"])).toEqual([records[2], records[3]])
+  })
+
+  it("room withEquipment adds the room's equipment records", () => {
+    expect(scopeRecords(records, "withEquipment", { roomId: "r1" }, ["e1"])).toEqual([records[1], records[2], records[3]])
+  })
+})
