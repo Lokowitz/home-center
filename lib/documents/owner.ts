@@ -110,6 +110,9 @@ function owner(a: AttachmentOwnerRow): Owner {
       return a.insurancePolicy
         ? { record: { type: "insurance policy", title: a.insurancePolicy.carrier, href: "/insurance" }, asset: null }
         : missing("insurance policy")
+    case "ROOM":
+      // Room files get their owner link in a later task.
+      return missing("room")
   }
 }
 

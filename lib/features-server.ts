@@ -9,7 +9,10 @@ export const FEATURE_SETTINGS_ID = "singleton"
 /** The saved switches, or the defaults (everything on) when nobody has saved them. Once per request. */
 export const loadFeatures = cache(async (): Promise<Features> => {
   const row = await prisma.featureSettings.findUnique({ where: { id: FEATURE_SETTINGS_ID } })
-  return { health: row?.healthEnabled ?? DEFAULT_FEATURES.health }
+  return {
+    health: row?.healthEnabled ?? DEFAULT_FEATURES.health,
+    rooms: row?.roomsEnabled ?? DEFAULT_FEATURES.rooms,
+  }
 })
 
 /**
@@ -33,4 +36,9 @@ export async function visibleNotificationsWhere(features: Features): Promise<Pri
 /** For Health's own pages: a 404 while Health is off. */
 export async function requireHealth(): Promise<void> {
   if (!(await loadFeatures()).health) notFound()
+}
+
+/** For Rooms' own pages and actions: a 404 while Rooms is off. */
+export async function requireRooms(): Promise<void> {
+  if (!(await loadFeatures()).rooms) notFound()
 }

@@ -119,6 +119,8 @@ enum AttachmentRecordType {
   DOCUMENT
   /// Dropped into the capture inbox and not yet filed anywhere.
   INBOX
+  /// A file on a room: photos, paint receipts, floor plans.
+  ROOM
 }
 
 /// Where a capture-inbox item is: waiting for its text, read, or unreadable.
@@ -212,6 +214,53 @@ model Property {
   updatedAt     DateTime     @updatedAt
 
   equipment Equipment[]
+  rooms     Room[]
+}
+
+/// A room inside a property: finishes, photos, and the equipment and records tagged to it.
+model Room {
+  id                String    @id @default(cuid())
+  propertyId        String
+  property          Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name              String
+  /// Free text: "Main floor", "Upstairs".
+  level             String?
+  /// Labelled with RegionalSettings.areaUnit; never converted.
+  area              Float?
+  /// Free text: "14 × 16 ft".
+  dimensions        String?
+  /// Free text with suggestions (Hardwood, LVP, Tile…).
+  flooringType      String?
+  /// Brand, product, color.
+  flooringProduct   String?
+  flooringInstalled DateTime?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  paints         RoomPaint[]
+  equipment      Equipment[]
+  serviceRecords ServiceRecord[]
+  schedules      MaintenanceSchedule[]
+  attachments    Attachment[]
+
+  @@index([propertyId])
+}
+
+/// One painted surface in a room. Saved by replacing the room's rows.
+model RoomPaint {
+  id        String  @id @default(cuid())
+  roomId    String
+  room      Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  /// "Walls", "Ceiling", "Trim", "Accent wall".
+  surface   String
+  brand     String?
+  colorName String?
+  colorCode String?
+  finish    String?
+  sortOrder Int     @default(0)
+
+  @@index([roomId])
 }
 
 model Vehicle {
@@ -250,6 +299,12 @@ model Equipment {
 
   propertyId String?
   property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
+  /// Where it lives, when that is one of the property's rooms. Wins over the free-text location.
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
 }
 
 // ─── People & health ──────────────────────────────────────────────────────────
@@ -450,7 +505,13 @@ model ServiceRecord {
   createdById String
   createdBy   User   @relation(fields: [createdById], references: [id])
 
+  /// The room the work was done in, if any.
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
   attachments Attachment[]
+
+  @@index([roomId])
 }
 
 // ─── Warranties ───────────────────────────────────────────────────────────────
@@ -495,7 +556,13 @@ model MaintenanceSchedule {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  /// The room the task is for, if any. Copied to the service record on completion.
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+
   attachments Attachment[]
+
+  @@index([roomId])
 }
 
 // ─── Attachments ──────────────────────────────────────────────────────────────
@@ -548,8 +615,12 @@ model Attachment {
   inboxItemId           String?
   inboxItem             InboxItem?           @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
 
+  roomId                String?
+  room                  Room?                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
   text                  AttachmentText?
 
+  @@index([roomId])
   @@index([assetType, assetId])
   @@index([inboxItemId])
 }
@@ -704,7 +775,9 @@ model FeatureSettings {
   id            String   @id @default("singleton")
   /// People, providers, insurance and everything owned by a person.
   healthEnabled Boolean  @default(true)
-  updatedAt     DateTime @updatedAt
+  /// Rooms inside properties: paint, flooring, photos, and what is tagged to them.
+  roomsEnabled  Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
 }
 
 /// How money, distances, areas and dates are written for this household.

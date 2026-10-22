@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { updateFeatureSettings } from "@/lib/actions/feature-settings"
 
-type Values = { healthEnabled: boolean }
+type Values = { healthEnabled: boolean; roomsEnabled: boolean }
 
 export function FeatureSettings({ initial }: { initial: Values }) {
   const [values, setValues] = useState(initial)
@@ -23,11 +23,16 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         toast.error(r.error)
         return
       }
-      toast.success(next.healthEnabled ? "Health turned on." : "Health turned off.")
+      if (next.healthEnabled !== previous.healthEnabled) {
+        toast.success(next.healthEnabled ? "Health turned on." : "Health turned off.")
+      } else {
+        toast.success(next.roomsEnabled ? "Rooms turned on." : "Rooms turned off.")
+      }
     })
   }
 
   const on = values.healthEnabled
+  const roomsOn = values.roomsEnabled
 
   return (
     <div className="space-y-6">
@@ -48,13 +53,39 @@ export function FeatureSettings({ initial }: { initial: Values }) {
             className="h-4 w-4 accent-primary"
             checked={on}
             disabled={pending}
-            onChange={(e) => save({ healthEnabled: e.target.checked })}
+            onChange={(e) => save({ ...values, healthEnabled: e.target.checked })}
           />
           Show the Health section
         </label>
         <p className="ml-6 text-xs text-muted-foreground">
           Turned off, it disappears from the menu, the dashboard, lists, search, notifications and the assistant. Nothing
           is deleted — turn it back on and it all returns.
+        </p>
+      </CardContent>
+    </Card>
+
+    <Card className="py-5">
+      <CardHeader className="px-5">
+        <CardTitle className="flex items-center gap-2">
+          Rooms
+          {roomsOn ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}
+        </CardTitle>
+        <CardDescription>Rooms inside properties: paint, flooring, photos.</CardDescription>
+      </CardHeader>
+      <CardContent className="px-5 space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={roomsOn}
+            disabled={pending}
+            onChange={(e) => save({ ...values, roomsEnabled: e.target.checked })}
+          />
+          Show Rooms
+        </label>
+        <p className="ml-6 text-xs text-muted-foreground">
+          Turned off, rooms disappear from properties, equipment and records. Nothing is deleted — turn it back on and it
+          all returns.
         </p>
       </CardContent>
     </Card>

@@ -147,7 +147,7 @@ export default async function SettingsPage({
             </div>
           )}
 
-          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health }} />}
+          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health, roomsEnabled: features.rooms }} />}
 
           {is("regional") && regional && <RegionalSettingsForm initial={regional} />}
 
