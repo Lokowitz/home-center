@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { locationLabel, paintLabel, paintRows, roomData, roomSchema, scopeRecords } from "./rooms"
+import { locationLabel, matchRoom, paintLabel, paintRows, roomData, roomSchema, scopeRecords } from "./rooms"
 
 describe("paintRows", () => {
   it("drops all-blank rows and numbers sortOrder from 0", () => {
@@ -87,5 +87,21 @@ describe("scopeRecords", () => {
 
   it("room withEquipment adds the room's equipment records", () => {
     expect(scopeRecords(records, "withEquipment", { roomId: "r1" }, ["e1"])).toEqual([records[1], records[2], records[3]])
+  })
+})
+
+describe("matchRoom", () => {
+  const rooms = [{ id: "r1", name: "Kitchen" }, { id: "r2", name: "Primary Bath" }]
+
+  it("matches a room name ignoring case and surrounding spaces", () => {
+    expect(matchRoom("kitchen", rooms)).toEqual(rooms[0])
+    expect(matchRoom("  PRIMARY bath	", rooms)).toEqual(rooms[1])
+  })
+
+  it("returns null for other text, blanks, or no rooms", () => {
+    expect(matchRoom("Kitchenette", rooms)).toBeNull()
+    expect(matchRoom("", rooms)).toBeNull()
+    expect(matchRoom("   ", rooms)).toBeNull()
+    expect(matchRoom("Kitchen", [])).toBeNull()
   })
 })

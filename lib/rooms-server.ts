@@ -22,6 +22,20 @@ export async function roomOptionsFor(assetType: AssetType, assetId: string): Pro
   return prisma.room.findMany({ where: { propertyId }, select: { id: true, name: true }, orderBy: { name: "asc" } })
 }
 
+export type PropertyWithRooms = { id: string; name: string; rooms: RoomOption[] }
+
+/** Every property with its rooms, for the equipment dialog's property select and location suggestions. Rooms empty when Rooms is off. */
+export async function propertiesWithRooms(): Promise<PropertyWithRooms[]> {
+  const [{ rooms: on }, properties] = await Promise.all([
+    loadFeatures(),
+    prisma.property.findMany({
+      select: { id: true, name: true, rooms: { select: { id: true, name: true }, orderBy: { name: "asc" } } },
+      orderBy: { name: "asc" },
+    }),
+  ])
+  return on ? properties : properties.map((p) => ({ ...p, rooms: [] }))
+}
+
 /** Validates a client-sent roomId against the target's property. Blank means no room. */
 export async function checkRoom(
   roomId: string | null | undefined,

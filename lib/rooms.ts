@@ -70,6 +70,13 @@ export function locationLabel(e: { location: string | null; room?: { name: strin
   return e.room?.name ?? e.location ?? null
 }
 
+/** The room whose name the typed text is (ignoring case and surrounding spaces), or null. */
+export function matchRoom<T extends { name: string }>(text: string | null | undefined, rooms: T[]): T | null {
+  const t = text?.trim().toLowerCase()
+  if (!t) return null
+  return rooms.find((r) => r.name.trim().toLowerCase() === t) ?? null
+}
+
 export type HistoryScope = "own" | "withEquipment"
 
 /**
