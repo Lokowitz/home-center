@@ -12,6 +12,7 @@ import { dismissScheduleNotifications, scheduleCompletionWrites } from "@/lib/ma
 import { snoozeEnd, type SnoozeFor } from "@/lib/maintenance-due"
 import { firstDue, templatesFor } from "@/lib/maintenance-templates"
 import { loadTemplateTarget } from "@/lib/maintenance-templates-server"
+import { checkRoom } from "@/lib/rooms-server"
 
 const schema = z.object({
   assetId: z.string().min(1),
@@ -25,7 +26,16 @@ const schema = z.object({
   nextDueMileage: z.literal("").or(z.coerce.number().int().min(0)).optional(),
   reminderDaysBefore: z.coerce.number().int().min(1).default(14),
   reminderMilesBefore: z.coerce.number().int().min(1).default(500),
+  /// Must be a room on the target's property; left out, an update keeps the schedule's room.
+  roomId: z.string().optional(),
 })
+
+/** Checks a sent roomId; `undefined` (none sent) means leave the room alone. */
+async function roomFor(v: z.infer<typeof schema>) {
+  if (v.roomId === undefined) return { roomId: undefined }
+  const room = await checkRoom(v.roomId, v.assetType, v.assetId)
+  return "error" in room ? { error: { roomId: [room.error] } } : room
+}
 
 function clean(v: z.infer<typeof schema>) {
   return {
@@ -47,7 +57,9 @@ export async function createMaintenanceSchedule(data: z.infer<typeof schema>) {
   if (!session) redirect("/login")
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
-  const row = await prisma.maintenanceSchedule.create({ data: clean(parsed.data) })
+  const room = await roomFor(parsed.data)
+  if ("error" in room) return { error: room.error }
+  const row = await prisma.maintenanceSchedule.create({ data: { ...clean(parsed.data), roomId: room.roomId } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")
@@ -59,7 +71,9 @@ export async function updateMaintenanceSchedule(id: string, data: z.infer<typeof
   if (!session) redirect("/login")
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
-  await prisma.maintenanceSchedule.update({ where: { id }, data: clean(parsed.data) })
+  const room = await roomFor(parsed.data)
+  if ("error" in room) return { error: room.error }
+  await prisma.maintenanceSchedule.update({ where: { id }, data: { ...clean(parsed.data), roomId: room.roomId } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")

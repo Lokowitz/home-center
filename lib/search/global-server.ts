@@ -10,6 +10,7 @@ import {
 import { dueBadge, scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
 import { warrantyState } from "@/lib/llm/warranty-status"
 import { observationHref } from "@/lib/observations"
+import { locationLabel, paintLabel } from "@/lib/rooms"
 import { searchIndex, semanticSearchModel } from "@/lib/documents/indexer-server"
 import { embedderFor } from "@/lib/documents/embed/server"
 import { parseSearch } from "@/lib/documents/fts-query"
@@ -137,6 +138,7 @@ type Wheres = {
   allergy: Prisma.AllergyWhereInput
   immunization: Prisma.ImmunizationWhereInput
   observation: Prisma.ObservationWhereInput
+  room: Prisma.RoomWhereInput
 }
 
 /** The text fields keyword search looks in, per model; also what decides an exact match. */
@@ -155,7 +157,15 @@ const FIELDS = {
   allergy: ["substance", "reaction", "notes"],
   immunization: ["vaccine", "dose", "givenBy", "notes"],
   observation: ["type", "notes", "tags"],
+  room: ["name", "level", "flooringType", "flooringProduct", "notes"],
 } as const
+
+/** A room's paint fields keyword search also looks in. */
+const PAINT_FIELDS = ["brand", "colorName", "colorCode"] as const
+
+/** Like termsWhere, with `also(term)` as more places each term may match (fields of related rows). */
+const termsWhereAlso = <W>(terms: string[], fields: readonly string[], also: (term: string) => Record<string, unknown>[]): W =>
+  ({ AND: terms.map((t) => ({ OR: [...fields.map((f) => ({ [f]: { contains: t } })), ...also(t)] })) }) as W
 
 function keywordWheres(terms: string[], owners: Owners): Wheres {
   const onAsset = { ownerIds: (t: string) => idsNamed(owners.allNames, t), ownerClause: (ids: string[]) => ({ assetId: { in: ids } }) }
@@ -163,7 +173,8 @@ function keywordWheres(terms: string[], owners: Owners): Wheres {
   return {
     property: termsWhere(terms, FIELDS.property),
     vehicle: termsWhere(terms, FIELDS.vehicle),
-    equipment: termsWhere(terms, FIELDS.equipment),
+    // Room-linked equipment has no location of its own; its room's name stands in.
+    equipment: termsWhereAlso(terms, FIELDS.equipment, (t) => [{ room: { name: { contains: t } } }]),
     person: termsWhere(terms, FIELDS.person),
     service: termsWhere(terms, FIELDS.service, onAsset),
     maintenance: termsWhere(terms, FIELDS.maintenance, onAsset),
@@ -179,6 +190,7 @@ function keywordWheres(terms: string[], owners: Owners): Wheres {
     allergy: termsWhere(terms, FIELDS.allergy, onPerson),
     immunization: termsWhere(terms, FIELDS.immunization, onPerson),
     observation: termsWhere(terms, FIELDS.observation, onPerson),
+    room: termsWhereAlso(terms, FIELDS.room, (t) => [{ paints: { some: { OR: PAINT_FIELDS.map((f) => ({ [f]: { contains: t } })) } } }]),
   }
 }
 
@@ -212,8 +224,12 @@ const NOTHING = { id: { in: [] as string[] } }
 /** Health's record kinds, as the search index names them. */
 const HEALTH_KINDS = new Set<EntityKind>(["PERSON", "PROVIDER", "INSURANCE", "CONDITION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "OBSERVATION"])
 
-/** With Health off: no people, providers, insurance or health records, and nothing a person owns. */
-function withFeatures(w: Wheres, features: Features): Wheres {
+/**
+ * With Health off: no people, providers, insurance or health records, and nothing a person owns.
+ * With Rooms off: no rooms.
+ */
+function withFeatures(all: Wheres, features: Features): Wheres {
+  const w = features.rooms ? all : { ...all, room: NOTHING }
   if (features.health) return w
   const notPerson = { assetType: { not: "PERSON" as const } }
   return {
@@ -233,14 +249,14 @@ function idWheres(ids: Map<EntityKind, string[]>): Wheres {
     property: of("PROPERTY"), vehicle: of("VEHICLE"), equipment: of("EQUIPMENT"), person: of("PERSON"),
     service: of("SERVICE"), maintenance: of("MAINTENANCE"), warranty: of("WARRANTY"), insurance: of("INSURANCE"),
     provider: of("PROVIDER"), condition: of("CONDITION"), medication: of("MEDICATION"), allergy: of("ALLERGY"),
-    immunization: of("IMMUNIZATION"), observation: of("OBSERVATION"),
+    immunization: of("IMMUNIZATION"), observation: of("OBSERVATION"), room: of("ROOM"),
   }
 }
 
 const RECORD_ENTITY: Record<RecordResult["kind"], EntityKind> = {
   service: "SERVICE", visit: "SERVICE", maintenance: "MAINTENANCE", warranty: "WARRANTY", insurance: "INSURANCE",
   provider: "PROVIDER", condition: "CONDITION", medication: "MEDICATION", allergy: "ALLERGY",
-  immunization: "IMMUNIZATION", observation: "OBSERVATION",
+  immunization: "IMMUNIZATION", observation: "OBSERVATION", room: "ROOM",
 }
 
 /** "KIND:id" as the search index keys records; null for documents. */
@@ -254,7 +270,7 @@ function entityKeyOf(section: Section, item: Section["items"][number]): string |
 async function semanticRecords(vector: number[], shown: Set<string>, owners: Owners, now: Date, features: Features): Promise<Section[]> {
   const all = await (await searchIndex()).entityVectorSearch(vector, ENTITY_POOL)
   // Dropped before ranking so hidden kinds don't take up places.
-  const hits = features.health ? all : all.filter((h) => !HEALTH_KINDS.has(h.kind as EntityKind))
+  const hits = all.filter((h) => (features.health || !HEALTH_KINDS.has(h.kind as EntityKind)) && (features.rooms || h.kind !== "ROOM"))
   const best = bestPerKey(hits.map((h) => ({ key: `${h.kind}:${h.entityId}`, score: h.score })))
   const kept = nearest(best, shown, MAX_RECORD_DISTANCE, RECORD_WINDOW).slice(0, SEMANTIC_RECORD_LIMIT)
   if (!kept.length) return []
@@ -298,7 +314,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
     }),
     prisma.equipment.findMany({
       where: where.equipment,
-      include: { property: { select: { name: true } } },
+      include: { property: { select: { name: true } }, room: { select: { name: true } } },
       orderBy: { name: "asc" },
       take,
     }),
@@ -326,7 +342,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
 
   const p = page(kinds.rank(properties, (r) => textsOf(r, FIELDS.property)))
   const v = page(kinds.rank(vehicles, (r) => textsOf(r, FIELDS.vehicle)))
-  const e = page(kinds.rank(equipment, (r) => textsOf(r, FIELDS.equipment)))
+  const e = page(kinds.rank(equipment, (r) => textsOf(r, FIELDS.equipment, r.room?.name)))
   const pp = page(kinds.rank(people, (r) => textsOf(r, FIELDS.person)))
 
   const propertyCards: AssetResult[] = p.items.map((r) => ({
@@ -365,7 +381,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
     subtitle: [r.manufacturer, r.modelNumber].filter(Boolean).join(" · ") || null,
     facts: facts([
       ["Property", r.property?.name],
-      ["Location", r.location],
+      ["Location", locationLabel(r)],
       ["Serial", r.serialNumber],
       ["Installed", day(r.installDate)],
       ["Last service", last(r.id)],
@@ -409,7 +425,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
 
   const [
     services, visits, schedules, warranties, policies, providers,
-    conditions, medications, allergies, immunizations, observations, mileage,
+    conditions, medications, allergies, immunizations, observations, rooms, mileage,
   ] = await Promise.all([
     prisma.serviceRecord.findMany({
       where: { AND: [where.service, { assetType: { not: "PERSON" } }] },
@@ -468,6 +484,12 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
     prisma.observation.findMany({
       where: where.observation,
       orderBy: { date: "desc" },
+      take,
+    }),
+    prisma.room.findMany({
+      where: where.room,
+      include: { paints: { orderBy: { sortOrder: "asc" } } },
+      orderBy: { name: "asc" },
       take,
     }),
     prisma.vehicle.findMany({ where: { currentMileage: { not: null } }, select: { id: true, currentMileage: true, meterUnit: true } }),
@@ -571,6 +593,19 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
     owner: null, people: null,
   }))
 
+  const ro = page(kinds.rank(rooms, (r) => textsOf(r, FIELDS.room, ...r.paints.flatMap((p) => PAINT_FIELDS.map((f) => p[f])))))
+  const roomCards: RecordResult[] = ro.items.map((r) => ({
+    kind: "room", id: r.id, href: tabHref("PROPERTY", r.propertyId, "rooms", r.id),
+    title: r.name, subtitle: r.level, date: null, amount: null, status: null,
+    facts: facts([
+      ["Size", [r.area != null ? fmt.area(r.area) : null, r.dimensions].filter(Boolean).join(" · ") || null],
+      ["Flooring", [r.flooringType, r.flooringProduct].filter(Boolean).join(" · ") || null],
+      ["Paint", r.paints.map(paintLabel).join("; ") || null],
+      ["Notes", clip(r.notes, 80)],
+    ]),
+    owner: thumb(r.propertyId), people: null,
+  }))
+
   const health: RecordResult[] = [
     ...kinds.rank(conditions, (r) => textsOf(r, FIELDS.condition, personName(r.personId))).slice(0, PER_SECTION).map((r): RecordResult => ({
       kind: "condition", id: r.id, href: tabHref("PERSON", r.personId, "conditions"),
@@ -615,6 +650,7 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
     { key: "visits", title: "Health visits", layout: "records", items: visitCards, more: vi.more },
     { key: "maintenance", title: "Maintenance", layout: "records", items: maintenanceCards, more: m.more },
     { key: "warranties", title: "Warranties", layout: "records", items: warrantyCards, more: w.more },
+    { key: "rooms", title: "Rooms", layout: "records", items: roomCards, more: ro.more },
     { key: "insurance", title: "Insurance", layout: "records", items: insuranceCards, more: ins.more },
     { key: "health", title: "Health records", layout: "records", items: health, more: healthMore },
     { key: "providers", title: "Providers", layout: "records", items: providerCards, more: pr.more },
@@ -654,14 +690,15 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
   const now = new Date()
   const [owners, features] = await Promise.all([loadOwners(), loadFeatures()])
   const parsed = parseSearch(q)
-  // With Health off, its files never come back either.
+  // With Health off, its files never come back either; with Rooms off, neither do room files.
   const hidden = features.health ? null : new Set(await healthAttachmentIds())
   const visibleHits = <H extends { attachmentId: string }>(hits: H[]) => (hidden ? hits.filter((h) => !hidden.has(h.attachmentId)) : hits)
+  const excludeRecordTypes = features.rooms ? [] : ["ROOM"]
 
   const keywordDocs = async () => {
     if (!parsed) return { hits: [] as Hit[] }
     try {
-      return { hits: visibleHits(await (await searchIndex()).search(parsed.match, { limit: DOC_POOL })) }
+      return { hits: visibleHits(await (await searchIndex()).search(parsed.match, { excludeRecordTypes, limit: DOC_POOL })) }
     } catch (error) {
       console.error("[search] document keyword search failed:", error instanceof Error ? error.name : typeof error)
       return { hits: [] as Hit[] }
@@ -690,7 +727,7 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
         )
         const [records, docHits] = await Promise.all([
           semanticRecords(vector, shown, owners, now, features),
-          (await searchIndex()).vectorSearch(vector, { limit: DOC_POOL }),
+          (await searchIndex()).vectorSearch(vector, { excludeRecordTypes, limit: DOC_POOL }),
         ])
         const fresh = semanticOnly(visibleHits(docHits), new Set(keyword.hits.map((h) => h.attachmentId)))
         const docs = await toDocuments(fresh, [], "semantic", owners)

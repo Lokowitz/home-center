@@ -1,4 +1,5 @@
 import { ENTITIES, type EntityKey, type Row } from "./ontology"
+import { locationLabel } from "@/lib/rooms"
 
 // Shapes database rows for the model: short dates, no nulls, a link on every
 // row that has a page, and a hard size budget so a broad query can't blow a
@@ -26,6 +27,14 @@ export function serializeRow(entity: EntityKey, row: Row): Row {
   const def = ENTITIES[entity]
   const out: Row = {}
   for (const [k, v] of Object.entries(row)) {
+    if (entity === "equipment" && k === "location") {
+      // Where the UI says it is: its room, else the free text (see withLocationSelect).
+      const where = locationLabel(row as { location: string | null; room?: { name: string } | null })
+      if (where) out.location = where
+      continue
+    }
+    // A name-only room was selected just for the location above; an included room has its id.
+    if (entity === "equipment" && k === "room" && v && !("id" in (v as Row))) continue
     if (v === null || v === undefined) continue
     const rel = def.relations[k]
     if (!rel || rel.kind === "asset") {

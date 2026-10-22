@@ -24,6 +24,12 @@ describe("equipment input", () => {
     expect(equipmentSchema.safeParse({ ...base, purchasePrice: "abc" }).success).toBe(false)
     expect(equipmentSchema.safeParse({ ...base, purchasePrice: "-1" }).success).toBe(false)
   })
+
+  it("keeps a picked room and saves no room for a blank one", () => {
+    expect(parse({ roomId: "room1" }).roomId).toBe("room1")
+    expect(parse({ roomId: "" }).roomId).toBeNull()
+    expect(parse({}).roomId).toBeNull()
+  })
 })
 
 describe("property input", () => {

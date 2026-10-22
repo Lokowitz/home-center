@@ -3,9 +3,9 @@ import type { NotificationType } from "@/app/generated/prisma/enums"
 // Optional parts of the site (Settings → Features). Pure helpers here; the
 // loader is in features-server.ts.
 
-export type Features = { health: boolean }
+export type Features = { health: boolean; rooms: boolean; equipmentTab: boolean }
 
-export const DEFAULT_FEATURES: Features = { health: true }
+export const DEFAULT_FEATURES: Features = { health: true, rooms: true, equipmentTab: true }
 
 /**
  * Where-clause for service records, warranties and maintenance schedules: with

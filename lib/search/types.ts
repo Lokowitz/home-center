@@ -33,7 +33,7 @@ export type AssetResult = {
 
 export type RecordKind =
   | "service" | "visit" | "maintenance" | "warranty" | "insurance" | "provider"
-  | "condition" | "medication" | "allergy" | "immunization" | "observation"
+  | "condition" | "medication" | "allergy" | "immunization" | "observation" | "room"
 
 /** Anything that belongs to an asset or person, or stands alone (providers, insurance). */
 export type RecordResult = {

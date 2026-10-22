@@ -5,7 +5,7 @@
 /** Prisma models whose rows are embedded for global search. */
 export const ENTITY_MODELS = new Set([
   "Property", "Vehicle", "Equipment", "Person", "ServiceRecord", "MaintenanceSchedule", "Warranty", "InsurancePolicy",
-  "Provider", "HealthCondition", "Medication", "Allergy", "Immunization", "Observation",
+  "Provider", "HealthCondition", "Medication", "Allergy", "Immunization", "Observation", "Room", "RoomPaint",
 ])
 
 export const WRITE_OPERATIONS = new Set([

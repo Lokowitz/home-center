@@ -2,13 +2,14 @@ import { AssetImage } from "@/components/asset-image"
 import { assetLabel } from "@/lib/assets"
 import { averagePerMonth, categoryLabel, costPerMeter, sum, UNCATEGORIZED } from "@/lib/costs"
 import { scheduleDue, type MileageIndex } from "@/lib/maintenance-due"
-import type { ReportData, ReportSchedule, ReportService, ReportWarranty } from "@/lib/report-server"
+import type { ReportData, ReportRoom, ReportSchedule, ReportService, ReportWarranty } from "@/lib/report-server"
 import type { ServiceCategory } from "@/app/generated/prisma/client"
 import { Empty, SectionTitle } from "./report-parts"
 import { HealthSummary } from "./health-summary"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
 import { DEFAULT_REPORT_OPTIONS, type ReportOptions } from "@/lib/report-options"
+import { paintLabel } from "@/lib/rooms"
 
 // The printable asset report. A document, not a screen: one column, real
 // headings, tables where things line up, and no interactive affordance anywhere
@@ -77,6 +78,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
         </dl>
       </Masthead>
       {data.health && <HealthSummary health={data.health} now={now} options={options} fmt={fmt} />}
+      {data.rooms.length > 0 && <Rooms rooms={data.rooms} fmt={fmt} />}
 
       {(!isPerson || options.expense) && (
       <section className="report-section mt-7">
@@ -257,6 +259,59 @@ function Files({ attachments }: { attachments: { id: string; originalName: strin
     <div className="mt-1 text-[8.5pt]" style={{ color: "var(--ink-faint)" }}>
       Files: {attachments.map((a) => a.originalName).join(", ")}
     </div>
+  )
+}
+
+function Rooms({ rooms, fmt }: { rooms: ReportRoom[]; fmt: Formatter }) {
+  return (
+    <section className="report-section mt-7">
+      <SectionTitle>Rooms</SectionTitle>
+      <ul className="mt-1">
+        {rooms.map((r) => {
+          const size = [r.area != null ? fmt.area(r.area) : null, r.dimensions].filter(Boolean).join(" · ")
+          const flooring = [
+            r.flooringType,
+            r.flooringProduct,
+            r.flooringInstalled ? `installed ${fmt.date(r.flooringInstalled, { utc: true })}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+
+          return (
+            <li key={r.id} className="report-break-avoid border-t py-3" style={{ borderColor: "var(--rule)" }}>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="font-semibold">{r.name}</span>
+                {r.level ? (
+                  <span className="text-[9.5pt]" style={{ color: "var(--ink-soft)" }}>
+                    {r.level}
+                  </span>
+                ) : null}
+              </div>
+              {size ? (
+                <div className="mt-1 text-[9.5pt]" style={{ color: "var(--ink-soft)" }}>
+                  Size: {size}
+                </div>
+              ) : null}
+              {flooring ? (
+                <div className="mt-0.5 text-[9.5pt]" style={{ color: "var(--ink-soft)" }}>
+                  Flooring: {flooring}
+                </div>
+              ) : null}
+              {r.paints.map((p) => (
+                <div key={p.id} className="mt-0.5 text-[9.5pt]" style={{ color: "var(--ink-soft)" }}>
+                  {paintLabel(p)}
+                </div>
+              ))}
+              {r.notes ? (
+                <p className="mt-1 whitespace-pre-wrap text-[9.5pt]" style={{ color: "var(--ink-soft)" }}>
+                  {r.notes}
+                </p>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

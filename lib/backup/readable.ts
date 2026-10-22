@@ -15,6 +15,8 @@ type Owned = { assetId: string; assetType: AssetType }
 export type PublicRecord = Owned & { id: string; date: string | null; title: string; vendor: string | null; cost: number | null; category: string | null; mileage: number | null; notes: string | null; files: FileRef[] }
 export type PublicWarranty = Owned & { id: string; product: string; purchased: string | null; expires: string | null; vendor: string | null; phone: string | null; email: string | null; notes: string | null; files: FileRef[] }
 export type PublicReminder = Owned & { id: string; title: string; everyDays: number | null; everyMiles: number | null; lastDone: string | null; nextDue: string | null; nextDueMileage: number | null; active: boolean; files: FileRef[] }
+export type PublicRoomPaint = { surface: string; brand: string | null; colorName: string | null; colorCode: string | null; finish: string | null }
+export type PublicRoom = Owned & { id: string; name: string; level: string | null; area: number | null; dimensions: string | null; flooringType: string | null; flooringProduct: string | null; flooringInstalled: string | null; notes: string | null; paints: PublicRoomPaint[]; files: FileRef[] }
 export type PublicDocument = Owned & FileRef & { id: string; uploaded: string | null }
 type PersonOwned = { id: string; personId: string; files: FileRef[] }
 export type PublicHealth = {
@@ -28,7 +30,7 @@ export type PublicHealth = {
 }
 export type ReadableData = {
   formatVersion: 1; generatedAt: string; scope: ExportScope
-  assets: PublicAsset[]; serviceRecords: PublicRecord[]; warranties: PublicWarranty[]; reminders: PublicReminder[]; documents: PublicDocument[]
+  assets: PublicAsset[]; serviceRecords: PublicRecord[]; warranties: PublicWarranty[]; reminders: PublicReminder[]; documents: PublicDocument[]; rooms: PublicRoom[]
   health: PublicHealth | null
 }
 /** Household labels read from the snapshot itself (this engine file cannot import app code). */
@@ -119,16 +121,19 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
     // eslint-disable-next-line no-restricted-syntax -- engine file cannot import @/lib/regional; fallback literal only
     const regional: ReadableRegional = { currency: str(regionalRow?.currency) ?? "USD", areaUnit: str(regionalRow?.areaUnit) === "SQM" ? "SQM" : "SQFT" }
     const areaLabel = regional.areaUnit === "SQM" ? "Square metres" : "Square feet"
-    const [props, vehicles, equipment, people] = await Promise.all([
+    const [props, vehicles, equipment, people, roomRows] = await Promise.all([
       all(c, `SELECT * FROM "Property"`), all(c, `SELECT * FROM "Vehicle"`), all(c, `SELECT * FROM "Equipment"`), includeHealth ? all(c, `SELECT * FROM "Person"`) : Promise.resolve([] as Row[]),
+      all(c, `SELECT * FROM "Room" ORDER BY name`),
     ])
+    // Room-linked equipment has no location of its own; its room's name is where it is.
+    const roomName = new Map(roomRows.map((r) => [String(r.id), String(r.name)]))
     let assets: PublicAsset[] = [
       ...props.map((r) => ({ id: String(r.id), type: "property" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Type: str(r.type), Address: str(r.address), "Year built": num(r.yearBuilt), [areaLabel]: num(r.sqFt), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...vehicles.map((r) => ({ id: String(r.id), type: "vehicle" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Make: str(r.make), Model: str(r.model), Year: num(r.year), VIN: str(r.vin), Color: str(r.color), "Current reading": num(r.currentMileage), Unit: str(r.meterUnit), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...equipment.map((r) => ({ id: String(r.id), type: "equipment" as const, name: String(r.name), propertyId: str(r.propertyId), photo: str(r.imageFilename),
-        details: { Category: str(r.category), Manufacturer: str(r.manufacturer), Model: str(r.modelNumber), Serial: str(r.serialNumber), Location: str(r.location), Installed: iso(r.installDate), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
+        details: { Category: str(r.category), Manufacturer: str(r.manufacturer), Model: str(r.modelNumber), Serial: str(r.serialNumber), Location: roomName.get(String(r.roomId)) ?? str(r.location), Installed: iso(r.installDate), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...people.map((r) => ({ id: String(r.id), type: "person" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Relationship: str(r.relationship), Born: iso(r.dateOfBirth), Sex: str(r.sex), "Blood type": str(r.bloodType), Notes: str(r.notes) } })),
     ]
@@ -182,6 +187,14 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
       nextDue: iso(r.nextDueDate), nextDueMileage: num(r.nextDueMileage), active: Boolean(Number(r.isActive)),
       files: attachedTo("maintenanceScheduleId", r.id, byId.get(String(r.assetId)) ?? null, "reminders"),
     }))
+    // Rooms belong to a property; a property-scoped export keeps only that property's (byId holds just the kept assets).
+    const paints = await all(c, `SELECT * FROM "RoomPaint" ORDER BY sortOrder, id`)
+    const rooms = roomRows.filter((r) => byId.get(String(r.propertyId))?.type === "property").map((r) => ({
+      assetId: String(r.propertyId), assetType: "property" as const, id: String(r.id), name: String(r.name), level: str(r.level), area: num(r.area), dimensions: str(r.dimensions),
+      flooringType: str(r.flooringType), flooringProduct: str(r.flooringProduct), flooringInstalled: iso(r.flooringInstalled), notes: str(r.notes),
+      paints: paints.filter((p) => p.roomId === r.id).map((p) => ({ surface: String(p.surface), brand: str(p.brand), colorName: str(p.colorName), colorCode: str(p.colorCode), finish: str(p.finish) })),
+      files: attachedTo("roomId", r.id, byId.get(String(r.propertyId)) ?? null, "rooms"),
+    }))
     const documents = attachments.filter((a) => a.recordType === "DOCUMENT" && ownedOk(a)).map((a) => {
       const asset = byId.get(String(a.assetId)) ?? null
       const f = fileFor(a, asset, "documents")
@@ -210,7 +223,7 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
     }
 
     return {
-      data: { formatVersion: 1, generatedAt: new Date().toISOString(), scope, assets, serviceRecords, warranties, reminders, documents, health },
+      data: { formatVersion: 1, generatedAt: new Date().toISOString(), scope, assets, serviceRecords, warranties, reminders, documents, rooms, health },
       files,
       regional,
     }
@@ -242,6 +255,8 @@ export function csvTables(d: ReadableData): Record<string, string> {
     "service-records.csv": toCsv(withAsset(d.serviceRecords), ["date", "asset", "assetType", "title", "vendor", "cost", "category", "mileage", "notes", "id"]),
     "warranties.csv": toCsv(withAsset(d.warranties), ["asset", "product", "purchased", "expires", "vendor", "phone", "email", "notes", "id"]),
     "reminders.csv": toCsv(withAsset(d.reminders), ["asset", "title", "everyDays", "everyMiles", "lastDone", "nextDue", "nextDueMileage", "active", "id"]),
+    "rooms.csv": toCsv(withAsset(d.rooms), ["asset", "name", "level", "area", "dimensions", "flooringType", "flooringProduct", "flooringInstalled", "notes", "id"]),
+    "room-paints.csv": toCsv(d.rooms.flatMap((r) => r.paints.map((p) => ({ ...p, asset: name.get(r.assetId) ?? r.assetId, room: r.name, roomId: r.id }))), ["asset", "room", "surface", "brand", "colorName", "colorCode", "finish", "roomId"]),
     "documents.csv": toCsv(withAsset(d.documents), ["asset", "name", "uploaded", "size", "mimeType", "path", "id"]),
   }
   if (d.health) {

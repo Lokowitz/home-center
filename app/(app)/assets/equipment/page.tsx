@@ -1,12 +1,13 @@
 import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
 import { EquipmentList } from "@/components/equipment/equipment-list"
+import { propertiesWithRooms } from "@/lib/rooms-server"
 import { assetViewCookieName, parseAssetView } from "@/lib/asset-view"
 
 export default async function EquipmentPage() {
   const [equipment, properties, cookieStore] = await Promise.all([
-    prisma.equipment.findMany({ orderBy: { name: "asc" } }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.equipment.findMany({ include: { room: { select: { name: true } } }, orderBy: { name: "asc" } }),
+    propertiesWithRooms(),
     cookies(),
   ])
 

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       : "The assistant isn't configured. An admin can set it up in Settings."
     return NextResponse.json({ error }, { status: 503 })
   }
-  const { health } = await loadFeatures()
+  const { health, rooms } = await loadFeatures()
   // With Health off, health files are out of reach whatever the assistant's own setting says.
   const docs = documentAccess(await loadDocumentSettings(), { ...config, healthDocumentsEnabled: health && config.healthDocumentsEnabled })
 
@@ -77,10 +77,10 @@ export async function POST(request: Request) {
         const now = new Date()
         await runAgent({
           history: health ? parsed.data.messages : stripDraftLines(parsed.data.messages),
-          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, fmt: await getFormat(), today: parsed.data.today }),
+          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, rooms, fmt: await getFormat(), today: parsed.data.today }),
           chat,
-          tools: chatTools(docs, health, config.healthDocumentsEnabled),
-          ctx: { userId, now, health, today: parsed.data.today },
+          tools: chatTools(docs, health, config.healthDocumentsEnabled, rooms),
+          ctx: { userId, now, health, rooms, today: parsed.data.today },
           signal,
           model,
           maxRounds,

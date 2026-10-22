@@ -33,14 +33,15 @@ const HEALTH_TOOLS = new Set<RegisteredTool>([healthAlertsTool, medicationHistor
  * read-only intake tool is always there; it shows items that look like a
  * person's only when health documents may go to the model (`healthDocuments`,
  * which doesn't depend on document indexing being on).
+ * With Rooms off the document tools hide room files.
  * Shortcuts first: weaker models tend to pick from the top of the list.
  */
-export function chatTools(access: DocumentAccess, health = true, healthDocuments = access.includeHealth): RegisteredTool[] {
+export function chatTools(access: DocumentAccess, health = true, healthDocuments = access.includeHealth, rooms = true): RegisteredTool[] {
   const shortcuts = health ? SHORTCUT_TOOLS : SHORTCUT_TOOLS.filter((t) => !HEALTH_TOOLS.has(t))
   return [
     ...shortcuts,
     inboxTool(health && healthDocuments),
-    ...(access.enabled ? documentTools(access.includeHealth) : []),
+    ...(access.enabled ? documentTools(access.includeHealth, rooms) : []),
     ...GENERIC_TOOLS,
   ]
 }

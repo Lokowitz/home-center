@@ -8,15 +8,16 @@ import type { DocumentRef } from "./owner"
 // Rules for the assistant's document tools that don't need the database.
 
 export const RECORD_TYPES = [
-  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX",
+  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX", "ROOM",
 ] as const satisfies readonly AttachmentRecordType[]
 
-export function hiddenRecordTypes(includeHealth: boolean): AttachmentRecordType[] {
-  return includeHealth ? [] : [...HEALTH_RECORD_TYPES]
+/** Record types whose files the tools never see: health types unless included, room files with Rooms off. */
+export function hiddenRecordTypes(includeHealth: boolean, includeRooms = true): AttachmentRecordType[] {
+  return [...(includeHealth ? [] : HEALTH_RECORD_TYPES), ...(includeRooms ? [] : (["ROOM"] as const))]
 }
 
-export function visibleRecordTypes(includeHealth: boolean): AttachmentRecordType[] {
-  const hidden = hiddenRecordTypes(includeHealth)
+export function visibleRecordTypes(includeHealth: boolean, includeRooms = true): AttachmentRecordType[] {
+  const hidden = hiddenRecordTypes(includeHealth, includeRooms)
   return RECORD_TYPES.filter((t) => !hidden.includes(t))
 }
 
@@ -42,18 +43,29 @@ const ALIASES: Record<string, AttachmentRecordType> = {
   immunization: "IMMUNIZATION", vaccine: "IMMUNIZATION", vaccination: "IMMUNIZATION",
   document: "DOCUMENT", assetdocument: "DOCUMENT",
   intake: "INBOX", intakeitem: "INBOX", inbox: "INBOX", inboxitem: "INBOX", unfiled: "INBOX",
+  room: "ROOM",
 }
 
 /** A recordType argument as models send it ("warranties", "Service records") → the enum, if visible. */
-export function toRecordType(raw: string, includeHealth: boolean): AttachmentRecordType {
+export function toRecordType(raw: string, includeHealth: boolean, includeRooms = true): AttachmentRecordType {
   const upper = raw.trim().toUpperCase()
   const key = raw.toLowerCase().replace(/[^a-z]/g, "").replace(/ies$/, "y").replace(/s$/, "")
   const type = (RECORD_TYPES as readonly string[]).includes(upper) ? (upper as AttachmentRecordType) : ALIASES[key]
-  const visible = visibleRecordTypes(includeHealth)
+  const visible = visibleRecordTypes(includeHealth, includeRooms)
   if (!type || !visible.includes(type)) {
     throw new ToolInputError(`Unknown recordType "${raw}". Use one of: ${visible.join(", ")}.`)
   }
   return type
+}
+
+/**
+ * The record types a list or search covers: the one asked for, else every type
+ * (null) — or, with Rooms off, every visible type, since the person-owned health
+ * files are filtered separately but room files only by type.
+ */
+export function recordTypeFilter(raw: string | undefined, includeHealth: boolean, includeRooms: boolean): AttachmentRecordType[] | null {
+  if (raw) return [toRecordType(raw, includeHealth, includeRooms)]
+  return includeRooms ? null : visibleRecordTypes(includeHealth, includeRooms)
 }
 
 /** Chunks → files, best file first, each with its best `perDoc` chunks. Lower BM25 score is better. */

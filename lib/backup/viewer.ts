@@ -16,7 +16,7 @@ export async function writeReadableLayer(w: ArchiveWriter, data: ReadableData, r
   await w.addBytes(`${READABLE_PREFIX}data.js`, dataJs(data))
   const json: Record<string, unknown> = {
     "assets.json": data.assets, "service-records.json": data.serviceRecords, "warranties.json": data.warranties,
-    "reminders.json": data.reminders, "documents.json": data.documents, ...(data.health ? { "health.json": data.health } : {}),
+    "reminders.json": data.reminders, "documents.json": data.documents, "rooms.json": data.rooms, ...(data.health ? { "health.json": data.health } : {}),
   }
   for (const [n, v] of Object.entries(json)) await w.addBytes(`${READABLE_PREFIX}data/${n}`, JSON.stringify(v, null, 2))
   for (const [n, csv] of Object.entries(csvTables(data))) await w.addBytes(`${READABLE_PREFIX}csv/${n}`, csv)
@@ -136,6 +136,8 @@ dt { color:var(--muted); }
     if (rem.length) { app.appendChild(el("h2", { text: "Reminders" })); app.appendChild(table([["What", function (r) { return r.title; }], ["Last done", function (r) { return day(r.lastDone); }], ["Next due", function (r) { return day(r.nextDue) + (r.nextDueMileage ? " / " + r.nextDueMileage : ""); }], ["Files", function (r) { return files(r.files); }]], rem)); }
     var w = mine(D.warranties);
     if (w.length) { app.appendChild(el("h2", { text: "Warranties" })); app.appendChild(table([["Product", function (r) { return r.product; }], ["Expires", function (r) { return day(r.expires); }], ["Vendor", function (r) { return r.vendor; }], ["Files", function (r) { return files(r.files); }]], w)); }
+    var rm = mine(D.rooms || []);
+    if (rm.length) { app.appendChild(el("h2", { text: "Rooms" })); app.appendChild(table([["Room", function (r) { return r.name; }], ["Level", function (r) { return r.level; }], ["Flooring", function (r) { return [r.flooringType, r.flooringProduct].filter(Boolean).join(" - "); }], ["Paint", function (r) { return r.paints.map(function (p) { return [p.surface, p.colorName, p.colorCode].filter(Boolean).join(" "); }).join("; "); }], ["Files", function (r) { return files(r.files); }]], rm)); }
     var docs = mine(D.documents);
     if (docs.length) { app.appendChild(el("h2", { text: "Documents" })); app.appendChild(table([["Name", function (r) { return el("a", { href: r.path, text: r.name }); }], ["Added", function (r) { return day(r.uploaded); }]], docs)); }
     if (a.type === "person" && D.health) {

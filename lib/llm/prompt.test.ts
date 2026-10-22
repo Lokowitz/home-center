@@ -29,6 +29,11 @@ describe("buildSystemPrompt", () => {
     expect(p).not.toMatch(/passwordHash/)
   })
 
+  it("describes rooms only while Rooms is on", () => {
+    expect(buildSystemPrompt({ now })).toMatch(/^- room:/m)
+    expect(buildSystemPrompt({ now, rooms: false })).not.toMatch(/^- room/m)
+  })
+
   it("describes the read-only intake tool and where filing happens", () => {
     for (const health of [true, false]) {
       const p = buildSystemPrompt({ now, health })

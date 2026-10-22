@@ -75,7 +75,7 @@ export default async function SettingsPage({
           assistant: readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value),
           intake: readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value),
           // Same rule as the layout.
-          assistantShown: !s.hidden && (s.available || isAdmin),
+          assistantShown: s.available,
         }))
       : Promise.resolve(null),
     is("data") ? loadBackupOverview() : Promise.resolve(null),
@@ -147,7 +147,7 @@ export default async function SettingsPage({
             </div>
           )}
 
-          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health }} />}
+          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health, roomsEnabled: features.rooms, equipmentTabEnabled: features.equipmentTab }} />}
 
           {is("regional") && regional && <RegionalSettingsForm initial={regional} />}
 
@@ -163,6 +163,7 @@ export default async function SettingsPage({
                 secure: storedMail?.secure == null ? "auto" : String(storedMail.secure),
                 fromAddress: mail.from,
                 digestHour: String(mail.digestHour),
+                publicUrl: mail.publicUrl ?? "",
               }}
               sources={mail.sources}
               hasStoredPassword={Boolean(storedMail?.passwordEnc)}

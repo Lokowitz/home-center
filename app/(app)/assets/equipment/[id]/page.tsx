@@ -13,6 +13,8 @@ import { EquipmentEditButton } from "@/components/equipment/equipment-edit-butto
 import { categoryLabel } from "@/components/equipment/categories"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { getFormat } from "@/lib/regional-server"
+import { propertiesWithRooms, roomOptionsFor } from "@/lib/rooms-server"
+import { locationLabel } from "@/lib/rooms"
 
 export default async function EquipmentDetailPage({
   params,
@@ -26,16 +28,18 @@ export default async function EquipmentDetailPage({
   const { tab, open } = await searchParams
   const equipment = await prisma.equipment.findUnique({
     where: { id },
-    include: { property: { select: { id: true, name: true } } },
+    include: { property: { select: { id: true, name: true } }, room: { select: { name: true } } },
   })
   if (!equipment) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, properties, documents] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, properties, documents, roomOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
-    prisma.property.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    propertiesWithRooms(),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "EQUIPMENT", assetId: id }, orderBy: { uploadedAt: "asc" } }),
+    // Rooms of its property, for the room selects and badges; empty with Rooms off or no property.
+    roomOptionsFor("EQUIPMENT", id),
   ])
 
   return (
@@ -50,7 +54,7 @@ export default async function EquipmentDetailPage({
           {equipment.manufacturer && <Stat icon={Factory} label="Manufacturer" value={equipment.manufacturer} />}
           {equipment.modelNumber && <Stat icon={Tag} label="Model" value={equipment.modelNumber} mono />}
           {equipment.serialNumber && <Stat icon={Fingerprint} label="Serial" value={equipment.serialNumber} mono />}
-          {equipment.location && <Stat icon={MapPin} label="Location" value={equipment.location} />}
+          {locationLabel(equipment) && <Stat icon={MapPin} label="Location" value={locationLabel(equipment)} />}
           {equipment.property && (
             <Stat
               icon={Building2}
@@ -69,7 +73,7 @@ export default async function EquipmentDetailPage({
           )}
         </div>
 
-        <AssetCostPanel assetType="EQUIPMENT" assetId={id} purchasePrice={equipment.purchasePrice} />
+        <AssetCostPanel assetType="EQUIPMENT" assetId={id} purchasePrice={equipment.purchasePrice} ownedSince={equipment.purchaseDate ?? equipment.installDate} />
 
         {equipment.notes && (
           <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground whitespace-pre-wrap">
@@ -85,7 +89,6 @@ export default async function EquipmentDetailPage({
             <EquipmentEditButton equipment={equipment} properties={properties} />
             <Link
               href={`/reports/equipment/${id}`}
-              target="_blank"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               <FileText className="h-3.5 w-3.5" /> Report
@@ -108,13 +111,13 @@ export default async function EquipmentDetailPage({
             <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="service" className="mt-4">
-            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
+            <ServiceRecordList records={serviceRecords} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} reminders={maintenanceSchedules} openId={tab === "service" ? open : undefined} />
           </TabsContent>
           <TabsContent value="warranties" className="mt-4">
             <WarrantyList warranties={warranties} assetId={id} assetType="EQUIPMENT" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Manual, install guide, spec sheet: files for the equipment itself, not one service." />

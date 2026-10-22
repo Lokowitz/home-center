@@ -1,6 +1,6 @@
 import Link from "next/link"
 import {
-  Activity, CalendarClock, ExternalLink, FileText, Pill, ShieldCheck, Sparkles, Stethoscope, Syringe, TextSearch,
+  Activity, CalendarClock, DoorOpen, ExternalLink, FileText, Pill, ShieldCheck, Sparkles, Stethoscope, Syringe, TextSearch,
   TriangleAlert, Umbrella, UserRound, Wrench, NotebookPen,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -146,6 +146,7 @@ const KIND: Record<RecordKind, { label: string; icon: React.ElementType; tint: s
   allergy: { label: "Allergy", icon: TriangleAlert, tint: "bg-orange-500/10 text-orange-700 dark:text-orange-300" },
   immunization: { label: "Immunization", icon: Syringe, tint: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300" },
   observation: { label: "Observation", icon: NotebookPen, tint: "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300" },
+  room: { label: "Room", icon: DoorOpen, tint: "bg-lime-500/10 text-lime-700 dark:text-lime-300" },
 }
 
 export function RecordCard({ item, terms }: { item: RecordResult; terms: string[] }) {

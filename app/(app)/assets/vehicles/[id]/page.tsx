@@ -54,6 +54,7 @@ export default async function VehicleDetailPage({
           assetType="VEHICLE"
           assetId={id}
           purchasePrice={vehicle.purchasePrice}
+          ownedSince={vehicle.purchaseDate}
           meterUnit={vehicle.meterUnit}
         />
 
@@ -71,7 +72,6 @@ export default async function VehicleDetailPage({
             <VehicleEditButton vehicle={vehicle} />
             <Link
               href={`/reports/vehicles/${id}`}
-              target="_blank"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               <FileText className="h-3.5 w-3.5" /> Report

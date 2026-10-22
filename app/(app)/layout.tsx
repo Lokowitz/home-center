@@ -15,6 +15,7 @@ import { resolveNotificationHrefs } from "@/lib/notification-links"
 import { loadNotificationReminders } from "@/lib/notification-reminders"
 import { loadLlmStatus } from "@/lib/llm/config"
 import { inboxCount } from "@/lib/inbox-server"
+import { loadCaptureParser } from "@/lib/capture-server"
 import { ChatProvider } from "@/components/chat/chat-provider"
 import { ChatDock, ChatLauncher, ChatToggle } from "@/components/chat/chat-panel"
 import { DropProvider } from "@/components/drop/drop-provider"
@@ -30,7 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!session) redirect("/login")
 
   const [features, regional] = await Promise.all([loadFeatures(), loadRegionalSettings()])
-  const [notifications, llm, inbox] = await Promise.all([
+  const [notifications, llm, inbox, captureParser] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: session.user.id, dismissedAt: null, ...(await visibleNotificationsWhere(features)) },
       orderBy: { createdAt: "desc" },
@@ -38,19 +39,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     }),
     loadLlmStatus(),
     inboxCount(),
+    loadCaptureParser(),
   ])
   const [hrefs, reminders] = await Promise.all([resolveNotificationHrefs(notifications), loadNotificationReminders(notifications)])
   const notificationItems = notifications.map((n) => ({ ...n, href: hrefs.get(n.id) ?? "/notifications", reminder: reminders.get(n.id) }))
   const isAdmin = session.user.role === "ADMIN"
   const jar = await cookies()
   const sidebarCollapsed = readSidebarCollapsed(jar.get(SIDEBAR_COOKIE)?.value)
-  // Admins see the entry points even when it's off, so they can find the setup —
-  // unless it's been explicitly hidden.
-  const showAssistant = !llm.hidden && (llm.available || isAdmin)
+  // Every entry point (nav, header, floating button) disappears while the assistant is off.
+  // Admins find the setup in Settings.
+  const showAssistant = llm.available
   // Where this device put the assistant's button and Intake (Settings → Appearance).
   const floatingAssistant = showAssistant && readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value) === "floating"
+  // Intake has no entry point while receipt reading is Off (Settings → Documents & search).
+  const showIntake = captureParser !== "OFF"
+  const intakeInSidebar = readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value) === "sidebar"
   // The sidebar shows Intake only when given its count.
-  const sidebarIntake = readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value) === "sidebar" ? inbox : undefined
+  const sidebarIntake = showIntake && intakeInSidebar ? inbox : undefined
 
   return (
     <RegionalProvider value={regional}>
@@ -72,7 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
               <ThemeNavigator />
               {showAssistant && !floatingAssistant && <ChatToggle />}
-              {sidebarIntake === undefined && <IntakeHeaderLink count={inbox} />}
+              {showIntake && !intakeInSidebar && <IntakeHeaderLink count={inbox} />}
               <NotificationBell notifications={notificationItems} />
               <UserMenu name={session.user.name ?? "User"} email={session.user.email ?? ""} />
             </div>

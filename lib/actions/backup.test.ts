@@ -11,7 +11,7 @@ vi.mock("@/lib/backup/settings-server", () => ({
   loadSecrets: vi.fn(), protectionConfig: vi.fn(), appVersion: async () => "t",
 }))
 vi.mock("@/lib/backup/overview-server", () => ({ loadBackupOverview: vi.fn() }))
-vi.mock("@/lib/features-server", () => ({ loadFeatures: async () => ({ health: true }) }))
+vi.mock("@/lib/features-server", () => ({ loadFeatures: async () => ({ health: true, rooms: true, equipmentTab: true }) }))
 vi.mock("@/lib/backup/alerts-server", () => ({ raiseBackupAlert: vi.fn(), resolveBackupAlerts: vi.fn() }))
 const fx = vi.hoisted(() => ({ stage: vi.fn(), hasPending: vi.fn(), restart: vi.fn() }))
 vi.mock("@/lib/backup/restore", async (orig) => ({

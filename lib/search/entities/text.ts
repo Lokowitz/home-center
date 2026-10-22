@@ -1,5 +1,6 @@
 import { DEFAULT_FORMAT, type Formatter } from "@/lib/regional"
 import { chunkPages } from "@/lib/documents/chunk"
+import { paintLabel } from "@/lib/rooms"
 
 // The text each database record is embedded as, so global search can find
 // records by meaning. Rules:
@@ -20,7 +21,7 @@ import { chunkPages } from "@/lib/documents/chunk"
 // `now`, so a record's text changes when one ticks over and it is re-embedded.
 
 export type EntityKind =
-  | "PROPERTY" | "VEHICLE" | "EQUIPMENT" | "PERSON"
+  | "PROPERTY" | "VEHICLE" | "EQUIPMENT" | "PERSON" | "ROOM"
   | "SERVICE" | "MAINTENANCE" | "WARRANTY" | "INSURANCE" | "PROVIDER"
   | "CONDITION" | "MEDICATION" | "ALLERGY" | "IMMUNIZATION" | "OBSERVATION"
 
@@ -152,6 +153,25 @@ export function equipmentDoc(e: EquipmentInput, now: Date, fmt: Formatter = DEFA
     since && `It is ${ageWords(since, now)}`,
   ])
   return { kind: "EQUIPMENT", id: e.id, chunks: compose(summary, [{ label: "Notes", text: e.notes, of: `equipment ${clean(e.name)}` }]) }
+}
+
+export type RoomInput = {
+  id: string; name: string; level: string | null; area: number | null; dimensions: string | null
+  flooringType: string | null; flooringProduct: string | null; notes: string | null
+  property: { name: string }
+  paints: { surface: string; brand: string | null; colorName: string | null; colorCode: string | null; finish: string | null }[]
+}
+
+export function roomDoc(r: RoomInput, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
+  const size = [r.area != null && `${num(r.area)} ${fmt.areaWords}`, r.dimensions && `(${clean(r.dimensions)})`].filter(Boolean).join(" ")
+  const summary = sentences([
+    `Room: ${clean(r.name)} at ${clean(r.property.name)}`,
+    r.level && `Level: ${clean(r.level)}`,
+    size,
+    (r.flooringType || r.flooringProduct) && `Flooring: ${list([r.flooringType, r.flooringProduct])}`,
+    r.paints.length > 0 && `Paint: ${r.paints.map((p) => clean(paintLabel(p))).join("; ")}`,
+  ])
+  return { kind: "ROOM", id: r.id, chunks: compose(summary, [{ label: "Notes", text: r.notes, of: `room ${clean(r.name)}` }]) }
 }
 
 export type PersonInput = {

@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useId } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -16,6 +16,8 @@ import { createEquipment, updateEquipment } from "@/lib/actions/equipment"
 import { EQUIPMENT_CATEGORIES, categoryLabel } from "./categories"
 import type { Equipment, EquipmentCategory } from "@/app/generated/prisma/client"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
+import { locationLabel, resolveRoomId } from "@/lib/rooms"
+import type { PropertyWithRooms } from "@/lib/rooms-server"
 
 // Base UI Select has no empty-string option, so "unassigned" needs a sentinel.
 const NO_PROPERTY = "__none__"
@@ -36,11 +38,17 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+export type EquipmentWithRoom = Equipment & { room?: { name: string } | null }
+
 interface Props {
   open: boolean
   onClose: () => void
-  equipment?: Equipment | null
-  properties: { id: string; name: string }[]
+  equipment?: EquipmentWithRoom | null
+  /** Rooms are the location suggestions for each property; empty when Rooms is off. */
+  properties: PropertyWithRooms[]
+  /** A new item's starting property and location text (the room dialog passes its own). */
+  defaultPropertyId?: string
+  defaultLocation?: string
 }
 
 function fmt(d: Date | null | undefined) {
@@ -52,8 +60,9 @@ const EMPTY: FormValues = {
   location: "", propertyId: NO_PROPERTY, purchaseDate: "", purchasePrice: "", installDate: "", notes: "",
 }
 
-export function EquipmentFormDialog({ open, onClose, equipment, properties }: Props) {
+export function EquipmentFormDialog({ open, onClose, equipment, properties, defaultPropertyId, defaultLocation }: Props) {
   const router = useRouter()
+  const roomListId = useId()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: EMPTY,
@@ -68,21 +77,27 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
             manufacturer: equipment.manufacturer ?? "",
             modelNumber: equipment.modelNumber ?? "",
             serialNumber: equipment.serialNumber ?? "",
-            location: equipment.location ?? "",
+            location: locationLabel(equipment) ?? "",
             propertyId: equipment.propertyId ?? NO_PROPERTY,
             purchaseDate: fmt(equipment.purchaseDate),
             purchasePrice: equipment.purchasePrice?.toString() ?? "",
             installDate: fmt(equipment.installDate),
             notes: equipment.notes ?? "",
           }
-        : EMPTY
+        : { ...EMPTY, propertyId: defaultPropertyId ?? EMPTY.propertyId, location: defaultLocation ?? EMPTY.location }
     )
-  }, [equipment, open, form])
+  }, [equipment, open, form, defaultPropertyId, defaultLocation])
+
+  const selectedPropertyId = useWatch({ control: form.control, name: "propertyId" })
+  const selectedRooms = properties.find((p) => p.id === selectedPropertyId)?.rooms ?? []
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
+    const propertyId = values.propertyId === NO_PROPERTY ? "" : values.propertyId
+    const roomId = resolveRoomId(values.location, propertyId, selectedRooms, equipment)
     const payload = {
       ...values,
-      propertyId: values.propertyId === NO_PROPERTY ? "" : values.propertyId,
+      propertyId,
+      roomId,
     } as unknown as Parameters<typeof createEquipment>[0]
 
     const result = equipment
@@ -95,6 +110,8 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
     }
     toast.success(equipment ? "Equipment updated." : "Equipment added.")
     onClose()
+    // Pages that list this item (a room's Equipment tab) re-read it without a navigation.
+    router.refresh()
     if (then === "reminders" && result && "id" in result && typeof result.id === "string") router.push(remindersHref("EQUIPMENT", result.id))
   }
 
@@ -174,7 +191,12 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
               <FormField control={form.control} name="location" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
-                  <FormControl><Input placeholder="Kitchen" {...field} /></FormControl>
+                  <FormControl><Input placeholder="Kitchen" list={selectedRooms.length ? roomListId : undefined} autoComplete="off" {...field} /></FormControl>
+                  {selectedRooms.length > 0 && (
+                    <datalist id={roomListId}>
+                      {selectedRooms.map((r) => <option key={r.id} value={r.name} />)}
+                    </datalist>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

@@ -28,6 +28,11 @@ describe("checkPasswordChange", () => {
     expect(await checkPasswordChange({ current: "old-password-123", next: short, confirm: short }, account, compare)).toBe("short")
   })
 
+  it("accepts any password of the minimum length, with no complexity rules", async () => {
+    const simple = "aaaa"
+    expect(await checkPasswordChange({ current: "old-password-123", next: simple, confirm: simple }, account, compare)).toBeNull()
+  })
+
   it("rejects a confirmation that doesn't match", async () => {
     expect(await checkPasswordChange({ current: "old-password-123", next: good, confirm: `${good}!` }, account, compare)).toBe("mismatch")
   })

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   documentAccess, groupHits, hiddenRecordTypes, isHealthDocument, listDocumentsDescription, listedDocument,
   searchDocumentsDescription,
-  toRecordType, visibleRecordTypes,
+  recordTypeFilter, toRecordType, visibleRecordTypes,
 } from "./tool-helpers"
 
 describe("isHealthDocument", () => {
@@ -58,7 +58,7 @@ describe("record type rules", () => {
   it("hides exactly the five health types unless health documents are on", () => {
     expect(hiddenRecordTypes(false)).toEqual(["CONDITION", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION"])
     expect(hiddenRecordTypes(true)).toEqual([])
-    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE", "DOCUMENT", "INBOX"])
+    expect(visibleRecordTypes(false)).toEqual(["SERVICE", "WARRANTY", "MAINTENANCE", "INSURANCE", "DOCUMENT", "INBOX", "ROOM"])
   })
 
   it("accepts the loose names models use", () => {
@@ -75,6 +75,22 @@ describe("record type rules", () => {
   it("rejects unknown types and health types while they're hidden, listing what's allowed", () => {
     expect(() => toRecordType("receipts", false)).toThrow(/Use one of: SERVICE, WARRANTY, MAINTENANCE, INSURANCE/)
     expect(() => toRecordType("medications", false)).toThrow(/Unknown recordType/)
+  })
+
+  it("hides room files with Rooms off", () => {
+    expect(hiddenRecordTypes(true, false)).toEqual(["ROOM"])
+    expect(hiddenRecordTypes(false, false)).toEqual(["CONDITION", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "ROOM"])
+    expect(visibleRecordTypes(false, false)).not.toContain("ROOM")
+    expect(visibleRecordTypes(false, true)).toContain("ROOM")
+    expect(toRecordType("rooms", false, true)).toBe("ROOM")
+    expect(() => toRecordType("rooms", false, false)).toThrow(/Unknown recordType/)
+  })
+
+  it("narrows an unfiltered listing to the visible types only while Rooms is off", () => {
+    expect(recordTypeFilter(undefined, false, true)).toBeNull()
+    expect(recordTypeFilter("warranties", false, false)).toEqual(["WARRANTY"])
+    expect(recordTypeFilter(undefined, true, false)).toEqual(visibleRecordTypes(true, false))
+    expect(recordTypeFilter(undefined, true, false)).not.toContain("ROOM")
   })
 
   it("only mentions medical documents in the description when they're included", () => {

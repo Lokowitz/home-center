@@ -2,15 +2,15 @@
 
 import { useState } from "react"
 import { Pencil } from "lucide-react"
-import { EquipmentFormDialog } from "./equipment-form-dialog"
-import type { Equipment } from "@/app/generated/prisma/client"
+import { EquipmentFormDialog, type EquipmentWithRoom } from "./equipment-form-dialog"
+import type { PropertyWithRooms } from "@/lib/rooms-server"
 
 export function EquipmentEditButton({
   equipment,
   properties,
 }: {
-  equipment: Equipment
-  properties: { id: string; name: string }[]
+  equipment: EquipmentWithRoom
+  properties: PropertyWithRooms[]
 }) {
   const [open, setOpen] = useState(false)
   return (

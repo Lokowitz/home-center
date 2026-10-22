@@ -5,6 +5,8 @@ import type { CostRow } from "@/lib/costs"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
 import { ageFrom } from "@/lib/health"
+import { loadFeatures } from "@/lib/features-server"
+import { locationLabel } from "@/lib/rooms"
 
 // Everything the printable asset report needs, in one place.
 //
@@ -62,6 +64,10 @@ const healthInclude = {
   observations: { include: { condition: { select: { name: true } } }, orderBy: [{ date: "desc" }, { time: "desc" }] },
 } satisfies Prisma.PersonInclude
 
+const roomInclude = { paints: { orderBy: { sortOrder: "asc" } } } as const
+
+export type ReportRoom = Prisma.RoomGetPayload<{ include: typeof roomInclude }>
+
 export type ReportPerson = Prisma.PersonGetPayload<{ include: typeof healthInclude }>
 export type ReportHealth = { person: ReportPerson; careTeam: Provider[] }
 
@@ -75,6 +81,8 @@ export type ReportData = {
   schedules: ReportSchedule[]
   costRows: CostRow[]
   health: ReportHealth | null
+  /// A property's rooms; empty for other assets and while Rooms is off.
+  rooms: ReportRoom[]
   generatedAt: Date
 }
 
@@ -131,8 +139,12 @@ export async function loadReport(assetType: AssetType, assetId: string): Promise
     }))
 
   const health = assetType === "PERSON" ? await loadHealth(assetId) : null
+  const rooms =
+    assetType === "PROPERTY" && (await loadFeatures()).rooms
+      ? await prisma.room.findMany({ where: { propertyId: assetId }, include: roomInclude, orderBy: { name: "asc" } })
+      : []
 
-  return { asset, services, warranties, schedules, costRows, health, generatedAt: new Date() }
+  return { asset, services, warranties, schedules, costRows, health, rooms, generatedAt: new Date() }
 }
 
 async function loadHealth(personId: string): Promise<ReportHealth | null> {
@@ -250,14 +262,15 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
 
   const e = await prisma.equipment.findUnique({
     where: { id: assetId },
-    include: { property: { select: { name: true } } },
+    include: { property: { select: { name: true } }, room: { select: { name: true } } },
   })
   if (!e) return null
+  const location = locationLabel(e)
   return {
     type: "EQUIPMENT",
     id: e.id,
     name: e.name,
-    subtitle: [equipmentCategoryLabel(e.category), e.location].filter(Boolean).join(" · ") || null,
+    subtitle: [equipmentCategoryLabel(e.category), location].filter(Boolean).join(" · ") || null,
     imageFilename: e.imageFilename,
     purchaseDate: e.purchaseDate,
     purchasePrice: e.purchasePrice,
@@ -269,7 +282,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       ...(e.manufacturer ? [{ label: "Manufacturer", value: e.manufacturer }] : []),
       ...(e.modelNumber ? [{ label: "Model number", value: e.modelNumber }] : []),
       ...(e.serialNumber ? [{ label: "Serial number", value: e.serialNumber }] : []),
-      ...(e.location ? [{ label: "Location", value: e.location }] : []),
+      ...(location ? [{ label: "Location", value: location }] : []),
       ...(e.property ? [{ label: "Property", value: e.property.name }] : []),
       ...(e.installDate ? [{ label: "Installed", value: formatDate(e.installDate, fmt) }] : []),
       { label: "Purchased", value: formatDate(e.purchaseDate, fmt) },

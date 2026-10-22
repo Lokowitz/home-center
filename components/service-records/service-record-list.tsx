@@ -1,9 +1,10 @@
 "use client"
 
-import { Fragment, useCallback, useState } from "react"
+import { Fragment, useCallback, useMemo, useState } from "react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ChevronDown, Pencil, Trash2 } from "lucide-react"
@@ -18,7 +19,10 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
-import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import { ScopeToggle } from "@/components/rooms/scope-toggle"
+import { scopeRecords, type HistoryScope } from "@/lib/rooms"
+import type { Attachment,ServiceRecord, MeterUnit, AssetType } from "@/app/generated/prisma/client"
+import type { RoomOption } from "@/lib/rooms-server"
 
 type RecordWithAttachments = ServiceRecord & { attachments: Attachment[] }
 
@@ -37,8 +41,12 @@ interface Props {
   assetId: string
   assetType: AssetType
   /** Property's equipment, for the Source column and the "For" picker when adding/editing. */
-  equipment?: { id: string; name: string }[]
+  equipment?: { id: string; name: string; roomId: string | null }[]
   propertyName?: string
+  /** Rooms of the property, for the room select and the rows' room badges. Empty with Rooms off. */
+  roomOptions?: RoomOption[]
+  /** A new record's room (on an equipment page: the equipment's own). */
+  defaultRoomId?: string | null
   /** Vehicle's odometer unit, for the Mileage column header/suffix. Defaults to miles. */
   meterUnit?: MeterUnit
   /** People only: the provider directory and this person's conditions. */
@@ -47,12 +55,15 @@ interface Props {
   /** Active reminders a new record can mark complete. */
   reminders?: { id: string; title: string; assetType: AssetType; assetId: string }[]
   openId?: string
+  /** Property only: show a "this property / with its equipment" filter, labelled as given. */
+  scopeToggle?: { ownLabel: string; withLabel: string }
 }
 
-export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId }: Props) {
+export function ServiceRecordList({ records: initialRecords, assetId, assetType, equipment, propertyName, roomOptions = [], defaultRoomId, meterUnit = "MILES", providerOptions, conditionOptions, reminders, openId, scopeToggle }: Props) {
   const fmt = useFormat()
   const isPerson = assetType === "PERSON"
   const equipmentNames = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.name])) : undefined
+  const roomNames: Record<string, string> = Object.fromEntries(roomOptions.map((r) => [r.id, r.name]))
   const [records, setRecords] = useState(initialRecords)
   const [prevInitialRecords, setPrevInitialRecords] = useState(initialRecords)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -72,8 +83,15 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
     else if (openId && initialRecords.some((r) => r.id === openId)) { setEditingId(openId); setDialogOpen(true) }
   }
 
+  const [scope, setScope] = useState<HistoryScope>("withEquipment")
+  // Memoized: the table re-sorts whenever its rows array changes identity.
+  const scopedRecords = useMemo(
+    () => (scopeToggle ? scopeRecords(records, scope, { assetType: "PROPERTY", assetId }) : records),
+    [records, scope, scopeToggle, assetId],
+  )
+
   const table = useClientTable({
-    rows: records,
+    rows: scopedRecords,
     accessors: ACCESSORS,
     defaultSort: "date",
     defaultDir: "desc",
@@ -82,7 +100,12 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
 
   const editing = editingId ? records.find((r) => r.id === editingId) ?? null : null
   const showSource = !!equipmentNames
-  const columnCount = 6 + (assetType === "VEHICLE" ? 1 : 0) + (showSource ? 1 : 0)
+  const isProperty = assetType === "PROPERTY"
+  // The property listing trades Notes for Room (the dialog still shows notes).
+  const showNotes = !isProperty
+  const showRoom = isProperty && roomOptions.length > 0
+  const equipmentRooms = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.roomId])) : {}
+  const columnCount = 5 + (assetType === "VEHICLE" ? 1 : 0) + (showSource ? 1 : 0) + (showNotes ? 1 : 0) + (showRoom ? 1 : 0)
 
   const handleAttachmentDeleted = useCallback((recordId: string, attachmentId: string) => {
     setRecords((prev) =>
@@ -103,7 +126,10 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
   return (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-muted-foreground">{records.length} {isPerson ? "visit" : "record"}{records.length !== 1 ? "s" : ""}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground">{scopedRecords.length} {isPerson ? "visit" : "record"}{scopedRecords.length !== 1 ? "s" : ""}</p>
+          {scopeToggle && <ScopeToggle scope={scope} onChange={(s) => { setScope(s); table.setPage(1) }} ownLabel={scopeToggle.ownLabel} withLabel={scopeToggle.withLabel} />}
+        </div>
         <AddSplitButton
           label={isPerson ? "Add visit" : "Add record"}
           menuLabel={isPerson ? "More ways to add a visit" : "More ways to add a record"}
@@ -112,7 +138,7 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
         />
       </div>
 
-      {records.length === 0 ? (
+      {scopedRecords.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
           {emptyStateCopy(isPerson ? "visits" : "service")}
         </div>
@@ -123,8 +149,9 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
               <TableRow>
                 <SortableTableHead column="date" label="Date" sortState={table.sortState} onToggle={table.toggleSort} />
                 <SortableTableHead column="title" label="Title" sortState={table.sortState} onToggle={table.toggleSort} />
-                <TableHead>Notes</TableHead>
+                {showNotes && <TableHead>Notes</TableHead>}
                 {showSource && <TableHead>Source</TableHead>}
+                {showRoom && <TableHead>Room</TableHead>}
                 <SortableTableHead column="cost" label="Cost" sortState={table.sortState} onToggle={table.toggleSort} />
                 {assetType === "VEHICLE" && (
                   <SortableTableHead column="mileage" label={fmt.meterNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
@@ -137,6 +164,9 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
               {table.rows.map((record) => {
                 const expanded = expandedId === record.id
                 const isForeign = showSource && record.assetType !== assetType
+                // A record's own room, else the room its equipment sits in.
+                const roomId = record.roomId ?? (record.assetType === "EQUIPMENT" ? equipmentRooms[record.assetId] : null)
+                const roomName = roomId ? roomNames[roomId] : undefined
                 return (
                   <Fragment key={record.id}>
                     <TableRow
@@ -147,21 +177,26 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                         {fmt.date(record.date, { utc: true })}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{record.title}</div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{record.title}</span>
+                          {!showRoom && record.roomId && roomNames[record.roomId] && <Badge variant="outline" className="text-xs">{roomNames[record.roomId]}</Badge>}
+                        </div>
                         {record.vendor && <div className="text-xs text-muted-foreground">{record.vendor}</div>}
                       </TableCell>
-                      <TableCell className="max-w-[220px]">
-                        {record.description ? (
-                          <Tooltip>
-                            <TooltipTrigger className="block w-full truncate border-0 bg-transparent p-0 text-left text-muted-foreground">
-                              {record.description}
-                            </TooltipTrigger>
-                            <TooltipContent align="start" className="whitespace-pre-wrap">{record.description}</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {showNotes && (
+                        <TableCell className="max-w-[220px]">
+                          {record.description ? (
+                            <Tooltip>
+                              <TooltipTrigger className="block w-full truncate border-0 bg-transparent p-0 text-left text-muted-foreground">
+                                {record.description}
+                              </TooltipTrigger>
+                              <TooltipContent align="start" className="whitespace-pre-wrap">{record.description}</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      )}
                       {showSource && (
                         <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {isForeign ? (
@@ -174,6 +209,11 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                           ) : (
                             <span className="text-sm text-muted-foreground">Property</span>
                           )}
+                        </TableCell>
+                      )}
+                      {showRoom && (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {roomName ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap">
@@ -246,6 +286,8 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
         onAttachmentDeleted={handleAttachmentDeleted}
         equipmentOptions={equipment}
         propertyName={propertyName}
+        roomOptions={roomOptions}
+        defaultRoomId={defaultRoomId}
         meterUnit={meterUnit}
         providerOptions={providerOptions}
         conditionOptions={conditionOptions}

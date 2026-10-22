@@ -12,6 +12,7 @@ import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/t
 import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { RecordEditLink } from "@/components/service-records/record-edit-link"
 import { RecordsAddButton } from "@/components/service-records/records-add-button"
 import { emptyStateCopy } from "@/lib/intake-ui"
 import { getFormat } from "@/lib/regional-server"
@@ -152,16 +153,13 @@ export default async function RecordsPage({
                         </Link>
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={`${assetHref(r.assetType, r.assetId)}?tab=${serviceTab(r.assetType)}&open=${r.id}`}
-                          className="flex items-center gap-2 hover:underline"
-                        >
+                        <RecordEditLink id={r.id}>
                           <Wrench className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                           {r.title}
                           {r._count.attachments > 0 && (
                             <Badge variant="outline" className="h-4 px-1.5 text-xs">{r._count.attachments}</Badge>
                           )}
-                        </Link>
+                        </RecordEditLink>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{r.vendor}</td>
                       <td className="px-4 py-3 text-right tabular-nums">

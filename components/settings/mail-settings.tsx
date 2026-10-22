@@ -35,7 +35,7 @@ export function MailSettings({
   configured,
   dryRun,
 }: {
-  initial: { host: string; port: string; username: string; secure: string; fromAddress: string; digestHour: string }
+  initial: { host: string; port: string; username: string; secure: string; fromAddress: string; digestHour: string; publicUrl: string }
   sources: Sources
   hasStoredPassword: boolean
   passwordUnreadable: boolean
@@ -203,6 +203,18 @@ export function MailSettings({
                     Many providers require this to match the account you signed in with.
                   </FormDescription>
                   <SourceNote source={sources.from} />
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="publicUrl" render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Public address</FormLabel>
+                  <FormControl><Input placeholder="https://home.example.com" {...field} /></FormControl>
+                  <FormDescription className="text-xs">
+                    Where links in emails point, such as password reset. Use the address people type in their browser.
+                  </FormDescription>
+                  <SourceNote source={sources.publicUrl} />
                   <FormMessage />
                 </FormItem>
               )} />

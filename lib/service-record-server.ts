@@ -4,6 +4,7 @@ import { ASSET_TYPES, assetHref } from "@/lib/assets"
 import { SERVICE_CATEGORY_VALUES } from "@/lib/costs"
 import type { MaintenanceSchedule } from "@/app/generated/prisma/client"
 import { scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
+import { checkRoom } from "@/lib/rooms-server"
 import { z } from "zod"
 
 // Shared by the service record actions and the capture inbox, which files a
@@ -23,6 +24,8 @@ export const serviceRecordSchema = z.object({
   mileageAtService: z.literal("").or(z.coerce.number().int().min(0)).optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
+  /// Must be a room on the target's property; checked with `checkRoom` before saving.
+  roomId: z.string().optional(),
   /// New records only: the maintenance reminder this service completes.
   scheduleId: z.string().optional(),
 })
@@ -43,6 +46,7 @@ export function cleanServiceRecord(v: ServiceRecordInput, userId: string) {
     mileageAtService: v.mileageAtService === "" || v.mileageAtService === undefined ? null : Number(v.mileageAtService),
     providerId: v.providerId || null,
     conditionId: v.conditionId || null,
+    roomId: v.roomId || null,
     createdById: userId,
   }
 }
@@ -67,7 +71,9 @@ export async function prepareNewServiceRecord(
   const parsed = serviceRecordSchema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  const row = await withProviderVendor(cleanServiceRecord(parsed.data, userId))
+  const room = await checkRoom(parsed.data.roomId, parsed.data.assetType, parsed.data.assetId)
+  if ("error" in room) return { error: { roomId: [room.error] } }
+  const row = await withProviderVendor({ ...cleanServiceRecord(parsed.data, userId), roomId: room.roomId })
 
   // "Completes reminder": the reminder must belong to the same asset, so a
   // stale form can't advance some other asset's schedule.

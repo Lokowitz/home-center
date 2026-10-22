@@ -49,7 +49,7 @@ export async function createExport(i: ExportInput): Promise<{ path: string; file
     await writeReadableLayer(writer, data, regional)
     const counts = {
       assets: data.assets.length, serviceRecords: data.serviceRecords.length, warranties: data.warranties.length,
-      reminders: data.reminders.length, documents: data.documents.length, files: files.length,
+      reminders: data.reminders.length, documents: data.documents.length, rooms: data.rooms.length, files: files.length,
     }
     await writer.finish({
       formatVersion: FORMAT_VERSION, kind: "export", scope: i.scope, appVersion: i.appVersion, migration: null,

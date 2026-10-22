@@ -8,14 +8,15 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, MapPin, Building2, Pencil, Trash2 } from "lucide-react"
 import { deleteEquipment } from "@/lib/actions/equipment"
-import { EquipmentFormDialog } from "./equipment-form-dialog"
+import { EquipmentFormDialog, type EquipmentWithRoom as Equipment } from "./equipment-form-dialog"
 import { categoryLabel } from "./categories"
 import { AssetCollection, type AssetColumn } from "@/components/assets/asset-collection"
 import { AssetViewToggle } from "@/components/assets/asset-view-toggle"
 import { useAssetView } from "@/components/assets/use-asset-view"
 import type { Accessor } from "@/lib/use-client-table"
 import type { AssetView } from "@/lib/asset-view"
-import type { Equipment } from "@/app/generated/prisma/client"
+import type { PropertyWithRooms } from "@/lib/rooms-server"
+import { locationLabel } from "@/lib/rooms"
 
 // Everything except `property`, whose value comes from the property lookup and
 // so has to be built inside the component.
@@ -23,7 +24,7 @@ const BASE_ACCESSORS: Record<string, Accessor<Equipment>> = {
   name: (e) => e.name,
   category: (e) => categoryLabel(e.category),
   manufacturer: (e) => [e.manufacturer, e.modelNumber].filter(Boolean).join(" ") || null,
-  location: (e) => e.location,
+  location: (e) => locationLabel(e),
   serialNumber: (e) => e.serialNumber,
   purchaseDate: (e) => (e.purchaseDate ? new Date(e.purchaseDate).getTime() : null),
 }
@@ -32,7 +33,7 @@ const INITIAL_DIRS = { purchaseDate: "desc" as const }
 
 interface Props {
   equipment: Equipment[]
-  properties: { id: string; name: string }[]
+  properties: PropertyWithRooms[]
   initialView: AssetView
 }
 
@@ -62,18 +63,19 @@ export function EquipmentList({ equipment, properties, initialView }: Props) {
     { key: "name", label: "Name", cell: (e) => <span className="font-medium">{e.name}</span> },
     { key: "category", label: "Category", cell: (e) => <Badge variant="secondary" className="text-xs">{categoryLabel(e.category)}</Badge> },
     { key: "manufacturer", label: "Make / Model", className: "text-muted-foreground", cell: (e) => [e.manufacturer, e.modelNumber].filter(Boolean).join(" ") || "—" },
-    { key: "location", label: "Location", className: "text-muted-foreground", cell: (e) => e.location ?? "—" },
+    { key: "location", label: "Location", className: "text-muted-foreground", cell: (e) => locationLabel(e) ?? "—" },
     { key: "property", label: "Property", className: "text-muted-foreground", cell: (e) => (e.propertyId ? propertyNames[e.propertyId] ?? "—" : "—") },
     { key: "serialNumber", label: "Serial", className: "text-muted-foreground font-mono text-xs max-w-[160px] truncate", cell: (e) => e.serialNumber ?? "—" },
   ]
 
   function toCard(e: Equipment) {
+    const location = locationLabel(e)
     return {
       name: e.name,
       badge: categoryLabel(e.category),
       subtitle: [e.manufacturer, e.modelNumber].filter(Boolean).join(" ") || null,
       meta: [
-        ...(e.location ? [{ icon: MapPin, text: e.location }] : []),
+        ...(location ? [{ icon: MapPin, text: location }] : []),
         ...(e.propertyId && propertyNames[e.propertyId] ? [{ icon: Building2, text: propertyNames[e.propertyId] }] : []),
       ],
       mono: e.serialNumber ? `S/N: ${e.serialNumber}` : null,
