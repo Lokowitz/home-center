@@ -12,7 +12,7 @@ export default auth((req) => {
   if (nextUrl.pathname === "/api/health") return NextResponse.next()
 
   // Public routes
-  const publicPaths = ["/login", "/setup"]
+  const publicPaths = ["/login", "/setup", "/forgot-password", "/reset-password"]
   if (publicPaths.includes(nextUrl.pathname)) {
     if (session) return NextResponse.redirect(new URL("/", req.url))
     return NextResponse.next()

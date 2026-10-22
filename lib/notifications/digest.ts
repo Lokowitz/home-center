@@ -48,12 +48,7 @@ export function digestDue(
   return lastDigestAt < cutoff
 }
 
-function baseUrl() {
-  return (process.env.AUTH_URL || process.env.APP_URL || "").replace(/\/$/, "")
-}
-
-function renderDigest(name: string, notifications: Notification[]) {
-  const url = baseUrl()
+function renderDigest(name: string, notifications: Notification[], url: string) {
   const heading = notifications.length === 1
     ? "1 item needs your attention"
     : `${notifications.length} items need your attention`
@@ -137,7 +132,7 @@ export async function sendPendingDigests(now: Date = new Date()): Promise<number
     const items = byUser.get(user.id)
     if (!items?.length) continue
 
-    const { text, html } = renderDigest(user.name.split(" ")[0], items)
+    const { text, html } = renderDigest(user.name.split(" ")[0], items, config.publicUrl ?? "")
     const subject = items.length === 1 ? items[0].title : `HomeCenter: ${items.length} items need attention`
 
     try {

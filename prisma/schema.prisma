@@ -178,6 +178,21 @@ model User {
   observations   Observation[]
   attachments    Attachment[]
   inboxItems     InboxItem[]
+  passwordResets PasswordResetToken[]
+}
+
+/// A one-time "forgot password" link. Only the SHA-256 of the token is stored, so
+/// a copy of the database can't be used to reset anyone's password. A user has at
+/// most one live row: asking again replaces it.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ─── Assets ───────────────────────────────────────────────────────────────────
@@ -587,6 +602,8 @@ model MailSettings {
   secure      Boolean?
   fromAddress String?
   digestHour  Int?
+  /// Where links in emails point (password reset, digest). null falls back to AUTH_URL.
+  publicUrl   String?
   updatedAt   DateTime @updatedAt
 }
 

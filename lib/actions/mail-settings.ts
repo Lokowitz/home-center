@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { encrypt } from "@/lib/secret-box"
-import { loadMailConfig, SETTINGS_ID } from "@/lib/notifications/mail-config"
+import { loadMailConfig, normalizePublicUrl, SETTINGS_ID } from "@/lib/notifications/mail-config"
 import { resetMailTransport, sendMail, verifyMail, isMailConfigured } from "@/lib/notifications/mailer"
 
 async function requireAdmin() {
@@ -27,6 +27,7 @@ const schema = z.object({
   secure: z.enum(["auto", "true", "false"]),
   fromAddress: z.string().trim().optional(),
   digestHour: z.string().trim().optional(),
+  publicUrl: z.string().trim().optional(),
 })
 
 export type MailSettingsInput = z.infer<typeof schema>
@@ -51,6 +52,9 @@ export async function updateMailSettings(data: MailSettingsInput) {
   const digestHour = optionalInt(v.digestHour, 0, 23)
   if (digestHour === undefined) return { error: "Digest hour must be between 0 and 23." }
 
+  const publicUrl = normalizePublicUrl(v.publicUrl)
+  if (v.publicUrl && !publicUrl) return { error: "Public address must start with http:// or https://, e.g. https://home.example.com." }
+
   // Blank fields clear the override and fall back to the environment variable.
   const base = {
     host: v.host || null,
@@ -59,6 +63,7 @@ export async function updateMailSettings(data: MailSettingsInput) {
     secure: v.secure === "auto" ? null : v.secure === "true",
     fromAddress: v.fromAddress || null,
     digestHour,
+    publicUrl,
   }
 
   const passwordEnc = v.clearPassword

@@ -69,7 +69,7 @@ export default async function EquipmentDetailPage({
           )}
         </div>
 
-        <AssetCostPanel assetType="EQUIPMENT" assetId={id} purchasePrice={equipment.purchasePrice} />
+        <AssetCostPanel assetType="EQUIPMENT" assetId={id} purchasePrice={equipment.purchasePrice} ownedSince={equipment.purchaseDate ?? equipment.installDate} />
 
         {equipment.notes && (
           <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground whitespace-pre-wrap">
@@ -85,7 +85,6 @@ export default async function EquipmentDetailPage({
             <EquipmentEditButton equipment={equipment} properties={properties} />
             <Link
               href={`/reports/equipment/${id}`}
-              target="_blank"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               <FileText className="h-3.5 w-3.5" /> Report

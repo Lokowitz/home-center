@@ -11,8 +11,10 @@ export type MailConfig = {
   secure: boolean
   from: string
   digestHour: number
+  /** Where links in emails point: the Settings value, else AUTH_URL; null when neither is usable. */
+  publicUrl: string | null
   /** Where each visible field's value came from, so the UI can say so. */
-  sources: Record<"host" | "port" | "username" | "password" | "secure" | "from" | "digestHour", MailFieldSource>
+  sources: Record<"host" | "port" | "username" | "password" | "secure" | "from" | "digestHour" | "publicUrl", MailFieldSource>
   /** True when a password is stored but AUTH_SECRET can no longer decrypt it. */
   passwordUnreadable: boolean
   dryRun: boolean
@@ -22,6 +24,23 @@ export const DEFAULT_FROM = "HomeCenter <no-reply@homecenter.local>"
 export const DEFAULT_PORT = 587
 export const DEFAULT_DIGEST_HOUR = 8
 export const SETTINGS_ID = "singleton"
+
+/**
+ * An address to build links from: http(s) only, no trailing slash. Null when the
+ * value isn't one. It comes from Settings or AUTH_URL, never from a request — a
+ * forged Host header would otherwise put an attacker's address in an email.
+ */
+export function normalizePublicUrl(raw: string | null | undefined): string | null {
+  const value = raw?.trim()
+  if (!value) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null
+    return url.origin + url.pathname.replace(/\/+$/, "")
+  } catch {
+    return null
+  }
+}
 
 function envNumber(raw: string | undefined) {
   if (raw === undefined || raw === "") return null
@@ -58,6 +77,8 @@ export async function loadMailConfig(): Promise<MailConfig> {
   const from = pick("from", row?.fromAddress || null, process.env.MAIL_FROM || null, DEFAULT_FROM)!
   const digestHour = pick("digestHour", row?.digestHour, envNumber(process.env.DIGEST_HOUR), DEFAULT_DIGEST_HOUR)!
 
+  const publicUrl = pick("publicUrl", normalizePublicUrl(row?.publicUrl), normalizePublicUrl(process.env.AUTH_URL), null)
+
   // secure has a third state: unset means "decide from the port", which is what
   // the env var did before this was configurable.
   const envSecure = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : null
@@ -83,6 +104,7 @@ export async function loadMailConfig(): Promise<MailConfig> {
     password,
     secure,
     from,
+    publicUrl,
     digestHour: digestHour >= 0 && digestHour <= 23 ? digestHour : DEFAULT_DIGEST_HOUR,
     sources,
     passwordUnreadable,

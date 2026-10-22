@@ -6,6 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Home } from "lucide-react"
+import Link from "next/link"
+import { loadMailConfig } from "@/lib/notifications/mail-config"
+import { isMailConfigured } from "@/lib/notifications/mailer"
 
 async function login(formData: FormData) {
   "use server"
@@ -32,6 +35,9 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; message?: string }>
 }) {
   const { error, message } = await searchParams
+  // Offered after a failed sign-in, and only when there's a mail server to send the new password.
+  const mailConfig = error === "1" ? await loadMailConfig() : null
+  const canReset = mailConfig !== null && isMailConfigured(mailConfig) && !mailConfig.passwordUnreadable
 
   return (
     <div className="min-h-svh flex items-center justify-center bg-muted/40 p-4">
@@ -86,6 +92,11 @@ export default async function LoginPage({
               <Button type="submit" className="w-full">
                 Sign in
               </Button>
+              {canReset && (
+                <Link href="/forgot-password" className="block text-center text-sm text-muted-foreground hover:underline">
+                  Reset password
+                </Link>
+              )}
             </form>
           </CardContent>
         </Card>

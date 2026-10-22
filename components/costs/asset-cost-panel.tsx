@@ -1,13 +1,14 @@
 import { TrendChart } from "@/components/charts/trend-chart"
 import { Meter } from "@/components/charts/meter"
 import { loadCostRecords } from "@/lib/costs-server"
+import { prisma } from "@/lib/prisma"
+import { costPerYearOwned, nextDueMeter, warrantyMeter, type StatusMeter, type Tone } from "@/lib/asset-status"
 import {
   costPerMeter, costRange, stackedBuckets, sum, yearToDate,
   type Granularity,
 } from "@/lib/costs"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { getFormat } from "@/lib/regional-server"
-import type { Formatter } from "@/lib/regional"
 
 /// Below this many years of history, yearly columns would be one or two marks —
 /// not a chart, just a number drawn tall. Short histories get quarters instead.
@@ -22,11 +23,14 @@ export async function AssetCostPanel({
   assetType,
   assetId,
   purchasePrice,
+  ownedSince,
   meterUnit,
 }: {
   assetType: AssetType
   assetId: string
   purchasePrice?: number | null
+  /// When it was bought or installed. Without it there is no cost per year.
+  ownedSince?: Date | null
   /// Vehicles only. Its presence is what turns on the cost-per-unit row.
   meterUnit?: MeterUnit
 }) {
@@ -37,7 +41,20 @@ export async function AssetCostPanel({
   if (rows.length === 0) return null
 
   const now = new Date()
+  const [schedules, warranties] = await Promise.all([
+    prisma.maintenanceSchedule.findMany({
+      where: { assetId, assetType, isActive: true, nextDueDate: { not: null } },
+      select: { title: true, nextDueDate: true, lastCompletedDate: true, createdAt: true, reminderDaysBefore: true },
+    }),
+    prisma.warranty.findMany({
+      where: { assetId, assetType, expirationDate: { gt: now } },
+      select: { productName: true, purchaseDate: true, expirationDate: true },
+    }),
+  ])
   const lifetime = sum(rows)
+  const ownedCost = lifetime + (purchasePrice ?? 0)
+  const perYear = costPerYearOwned(ownedCost, ownedSince ?? null, now)
+  const statuses = [nextDueMeter(schedules, now), warrantyMeter(warranties, now)].filter((m): m is StatusMeter => m !== null)
   const perMeter = meterUnit ? costPerMeter(rows) : null
 
   const range = costRange(rows, now)
@@ -81,44 +98,30 @@ export async function AssetCostPanel({
         {purchasePrice != null && (
           <>
             <Row label="Purchase" value={fmt.money(purchasePrice)} />
-            <Row label="Total owned cost" value={fmt.money(purchasePrice + lifetime)} strong />
+            <Row label="Total owned cost" value={fmt.money(ownedCost)} strong />
           </>
         )}
+        {perYear != null && <Row label="Per year owned" value={fmt.money(perYear)} />}
       </dl>
 
-      {/* The panel already knows both numbers; this makes the ratio between them
-          visible, which is the shape the question "is this still worth keeping"
-          actually takes. */}
-      {purchasePrice != null && purchasePrice > 0 ? (
-        <ServiceShare lifetime={lifetime} purchasePrice={purchasePrice} fmt={fmt} />
-      ) : null}
+      {/* Looking ahead rather than back: what is due next, and how long the
+          warranty still covers it. Each is shown only when there is one. */}
+      {statuses.map((m) => (
+        <Status key={m.label} meter={m} />
+      ))}
     </div>
   )
 }
 
-function ServiceShare({ lifetime, purchasePrice, fmt }: { lifetime: number; purchasePrice: number; fmt: Formatter }) {
-  const share = lifetime / purchasePrice
-  // Severity is the caller's to decide, and here it is a judgement about money
-  // rather than a fact about the data: service approaching what the thing cost is
-  // worth noticing, and service past it is worth saying plainly.
-  const color =
-    share >= 1 ? "var(--destructive)" : share >= 0.5 ? "var(--cost-inspection)" : "var(--cost-bar)"
-  const percent = Math.round(share * 100)
+const TONE_COLOR: Record<Tone, string> = {
+  ok: "var(--cost-bar)",
+  soon: "var(--cost-inspection)",
+  late: "var(--destructive)",
+}
 
-  return (
-    <Meter
-      value={lifetime}
-      max={purchasePrice}
-      color={color}
-      label="Service vs purchase price"
-      valueLabel={`${percent}%`}
-      note={
-        share >= 1
-          ? "Service has cost more than the purchase price."
-          : `${fmt.money(purchasePrice - lifetime)} of the purchase price left to match.`
-      }
-    />
-  )
+function Status({ meter }: { meter: StatusMeter }) {
+  if (meter.fraction === null) return <Row label={meter.label} value={meter.valueLabel} />
+  return <Meter value={meter.fraction} max={1} color={TONE_COLOR[meter.tone]} label={meter.label} valueLabel={meter.valueLabel} note={meter.note} />
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

@@ -16,7 +16,7 @@ function Sketch({ prefKey, value, chosen }: { prefKey: PlacementKey; value: stri
   const mark = chosen ? "bg-primary text-primary-foreground" : "bg-muted-foreground/60 text-background"
   const line = "rounded bg-muted-foreground/20"
   return (
-    <div aria-hidden="true" className="relative flex h-20 overflow-hidden rounded-md border bg-background">
+    <div aria-hidden="true" className="pointer-events-none relative flex h-20 overflow-hidden rounded-md border bg-background">
       <div className="flex w-7 shrink-0 flex-col gap-1.5 border-r bg-card p-1.5">
         <span className={cn("h-1.5", line)} />
         {value === "sidebar" && (
