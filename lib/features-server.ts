@@ -12,6 +12,7 @@ export const loadFeatures = cache(async (): Promise<Features> => {
   return {
     health: row?.healthEnabled ?? DEFAULT_FEATURES.health,
     rooms: row?.roomsEnabled ?? DEFAULT_FEATURES.rooms,
+    equipmentTab: row?.equipmentTabEnabled ?? DEFAULT_FEATURES.equipmentTab,
   }
 })
 

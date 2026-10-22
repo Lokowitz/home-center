@@ -46,6 +46,9 @@ interface Props {
   equipment?: EquipmentWithRoom | null
   /** Rooms are the location suggestions for each property; empty when Rooms is off. */
   properties: PropertyWithRooms[]
+  /** A new item's starting property and location text (the room dialog passes its own). */
+  defaultPropertyId?: string
+  defaultLocation?: string
 }
 
 function fmt(d: Date | null | undefined) {
@@ -57,7 +60,7 @@ const EMPTY: FormValues = {
   location: "", propertyId: NO_PROPERTY, purchaseDate: "", purchasePrice: "", installDate: "", notes: "",
 }
 
-export function EquipmentFormDialog({ open, onClose, equipment, properties }: Props) {
+export function EquipmentFormDialog({ open, onClose, equipment, properties, defaultPropertyId, defaultLocation }: Props) {
   const router = useRouter()
   const roomListId = useId()
   const form = useForm<FormValues>({
@@ -81,9 +84,9 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
             installDate: fmt(equipment.installDate),
             notes: equipment.notes ?? "",
           }
-        : EMPTY
+        : { ...EMPTY, propertyId: defaultPropertyId ?? EMPTY.propertyId, location: defaultLocation ?? EMPTY.location }
     )
-  }, [equipment, open, form])
+  }, [equipment, open, form, defaultPropertyId, defaultLocation])
 
   const selectedPropertyId = useWatch({ control: form.control, name: "propertyId" })
   const selectedRooms = properties.find((p) => p.id === selectedPropertyId)?.rooms ?? []
@@ -107,6 +110,8 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties }: Pr
     }
     toast.success(equipment ? "Equipment updated." : "Equipment added.")
     onClose()
+    // Pages that list this item (a room's Equipment tab) re-read it without a navigation.
+    router.refresh()
     if (then === "reminders" && result && "id" in result && typeof result.id === "string") router.push(remindersHref("EQUIPMENT", result.id))
   }
 

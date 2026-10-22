@@ -18,7 +18,11 @@ import { createRoom, updateRoom, deleteRoom } from "@/lib/actions/rooms"
 import { FLOORING_SUGGESTIONS, PAINT_SURFACES, type RoomInput } from "@/lib/rooms"
 import { uploadAll } from "@/lib/upload-client"
 import { Plus, Trash2 } from "lucide-react"
-import { RoomEquipment, RoomFiles, RoomHistory, StagedFiles } from "./room-panels"
+import { RoomEquipment, RoomFiles, RoomReminders, RoomServiceRecords, StagedFiles } from "./room-panels"
+import { ServiceRecordFormDialog } from "@/components/service-records/service-record-form-dialog"
+import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog"
+import type { RoomOption } from "@/lib/rooms-server"
+import type { AssetType } from "@/app/generated/prisma/client"
 import type { RoomSchedule, RoomServiceRecord, RoomWithDetails } from "./room-list"
 
 const paintSchema = z
@@ -71,9 +75,15 @@ interface Props {
   room: RoomWithDetails | null
   serviceRecords: RoomServiceRecord[]
   schedules: RoomSchedule[]
+  propertyName: string
+  /** The property's rooms: location suggestions in the equipment dialog, the room select in the record dialog. */
+  roomOptions: RoomOption[]
+  propertyEquipment: { id: string; name: string; roomId: string | null }[]
+  reminderOptions: { id: string; title: string; assetType: AssetType; assetId: string }[]
+  showEquipment: boolean
 }
 
-export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords, schedules }: Props) {
+export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords, schedules, propertyName, roomOptions, propertyEquipment, reminderOptions, showEquipment }: Props) {
   const [filePickerOpen, setFilePickerOpen] = useState(false)
 
   // The native OS file picker moves focus outside the dialog's DOM, which would
@@ -87,7 +97,8 @@ export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()} disablePointerDismissal={filePickerOpen}>
-      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+      {/* An existing room has tabs of different lengths: a fixed height keeps the dialog from resizing as you switch. */}
+      <DialogContent className={room ? "h-[85vh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-5xl" : "sm:max-w-5xl max-h-[90vh] overflow-y-auto"}>
         {/* Keyed so the form, tab and staged files start fresh for each room. */}
         <RoomDialogBody
           key={room?.id ?? "new"}
@@ -97,6 +108,11 @@ export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords
           room={room}
           serviceRecords={serviceRecords}
           schedules={schedules}
+          propertyName={propertyName}
+          roomOptions={roomOptions}
+          propertyEquipment={propertyEquipment}
+          reminderOptions={reminderOptions}
+          showEquipment={showEquipment}
           openFilePicker={openFilePicker}
         />
       </DialogContent>
@@ -104,13 +120,21 @@ export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords
   )
 }
 
-function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, schedules, openFilePicker }: Props & { openFilePicker: (input: HTMLInputElement | null) => void }) {
+function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, schedules, propertyName, roomOptions, propertyEquipment, reminderOptions, showEquipment, openFilePicker }: Props & { openFilePicker: (input: HTMLInputElement | null) => void }) {
   const fmt = useFormat()
   const router = useRouter()
   const [tab, setTab] = useState("details")
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [createdRoomId, setCreatedRoomId] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  // "new" adds to this room; an id edits that item. Looked up per render so a refresh shows saved data.
+  // The target outlives `open` so the dialog keeps its content while it fades out.
+  const [equipmentDialog, setEquipmentDialog] = useState<"new" | string>("new")
+  const [equipmentOpen, setEquipmentOpen] = useState(false)
+  // Same pattern for the service record dialog.
+  const [recordTarget, setRecordTarget] = useState<"new" | string>("new")
+  const [recordOpen, setRecordOpen] = useState(false)
+  const editingRecord = recordTarget !== "new" ? serviceRecords.find((r) => r.id === recordTarget) ?? null : null
   const stagedInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toValues(propertyId, room) })
@@ -318,24 +342,62 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
         <DialogTitle>{room ? room.name : "Add room"}</DialogTitle>
       </DialogHeader>
       {room ? (
-        <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
+        <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="min-h-0 flex-col">
           <TabsList variant="line" className="w-full justify-start border-b">
             <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="service">Service records</TabsTrigger>
+            {showEquipment && <TabsTrigger value="equipment">Equipment ({room.equipment.length})</TabsTrigger>}
+            <TabsTrigger value="reminders">Maintenance reminders</TabsTrigger>
             <TabsTrigger value="files">Files ({room.attachments.length})</TabsTrigger>
-            <TabsTrigger value="equipment">Equipment ({room.equipment.length})</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
           {/* keepMounted so unsaved Details edits survive a look at another tab. */}
-          <TabsContent value="details" keepMounted className="mt-4">{details}</TabsContent>
-          <TabsContent value="files" className="mt-4">
-            <RoomFiles room={room} uploading={uploading} onUpload={uploadNow} onPick={openFilePicker} onChanged={() => router.refresh()} />
+          <TabsContent value="details" keepMounted className="mt-4 min-h-0 overflow-y-auto">{details}</TabsContent>
+          <TabsContent value="service" className="mt-4 min-h-0 overflow-y-auto">
+            <RoomServiceRecords
+              room={room}
+              serviceRecords={serviceRecords}
+              onAdd={() => { setRecordTarget("new"); setRecordOpen(true) }}
+              onEdit={(r) => { setRecordTarget(r.id); setRecordOpen(true) }}
+            />
           </TabsContent>
-          <TabsContent value="equipment" className="mt-4"><RoomEquipment room={room} /></TabsContent>
-          <TabsContent value="history" className="mt-4">
-            <RoomHistory room={room} serviceRecords={serviceRecords} schedules={schedules} />
+          {showEquipment && (
+            <TabsContent value="equipment" className="mt-4 min-h-0 overflow-y-auto"><RoomEquipment room={room} onAdd={() => { setEquipmentDialog("new"); setEquipmentOpen(true) }} onEdit={(e) => { setEquipmentDialog(e.id); setEquipmentOpen(true) }} /></TabsContent>
+          )}
+          <TabsContent value="reminders" className="mt-4 min-h-0 overflow-y-auto">
+            <RoomReminders room={room} schedules={schedules} />
+          </TabsContent>
+          <TabsContent value="files" className="mt-4 min-h-0 overflow-y-auto">
+            <RoomFiles room={room} uploading={uploading} onUpload={uploadNow} onPick={openFilePicker} onChanged={() => router.refresh()} />
           </TabsContent>
         </Tabs>
       ) : details}
+      {room && (
+        // Stacked over this dialog like the equipment one: the user stays on the page. A new record starts in this room.
+        <ServiceRecordFormDialog
+          open={recordOpen}
+          onClose={() => setRecordOpen(false)}
+          assetId={propertyId}
+          assetType="PROPERTY"
+          record={editingRecord}
+          attachments={editingRecord?.attachments ?? []}
+          equipmentOptions={propertyEquipment}
+          propertyName={propertyName}
+          roomOptions={roomOptions}
+          defaultRoomId={room.id}
+          reminderOptions={reminderOptions}
+        />
+      )}
+      {room && showEquipment && (
+        // Stacked over this dialog, so the user stays on the page; the location starts as this room.
+        <EquipmentFormDialog
+          open={equipmentOpen}
+          onClose={() => setEquipmentOpen(false)}
+          equipment={equipmentDialog !== "new" ? room.equipment.find((e) => e.id === equipmentDialog) ?? null : null}
+          properties={[{ id: propertyId, name: propertyName, rooms: roomOptions }]}
+          defaultPropertyId={propertyId}
+          defaultLocation={room.name}
+        />
+      )}
     </>
   )
 }

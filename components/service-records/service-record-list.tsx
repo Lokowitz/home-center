@@ -100,7 +100,12 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
 
   const editing = editingId ? records.find((r) => r.id === editingId) ?? null : null
   const showSource = !!equipmentNames
-  const columnCount = 6 + (assetType === "VEHICLE" ? 1 : 0) + (showSource ? 1 : 0)
+  const isProperty = assetType === "PROPERTY"
+  // The property listing trades Notes for Room (the dialog still shows notes).
+  const showNotes = !isProperty
+  const showRoom = isProperty && roomOptions.length > 0
+  const equipmentRooms = equipment ? Object.fromEntries(equipment.map((e) => [e.id, e.roomId])) : {}
+  const columnCount = 5 + (assetType === "VEHICLE" ? 1 : 0) + (showSource ? 1 : 0) + (showNotes ? 1 : 0) + (showRoom ? 1 : 0)
 
   const handleAttachmentDeleted = useCallback((recordId: string, attachmentId: string) => {
     setRecords((prev) =>
@@ -144,8 +149,9 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
               <TableRow>
                 <SortableTableHead column="date" label="Date" sortState={table.sortState} onToggle={table.toggleSort} />
                 <SortableTableHead column="title" label="Title" sortState={table.sortState} onToggle={table.toggleSort} />
-                <TableHead>Notes</TableHead>
+                {showNotes && <TableHead>Notes</TableHead>}
                 {showSource && <TableHead>Source</TableHead>}
+                {showRoom && <TableHead>Room</TableHead>}
                 <SortableTableHead column="cost" label="Cost" sortState={table.sortState} onToggle={table.toggleSort} />
                 {assetType === "VEHICLE" && (
                   <SortableTableHead column="mileage" label={fmt.meterNoun(meterUnit)} sortState={table.sortState} onToggle={table.toggleSort} />
@@ -158,6 +164,9 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
               {table.rows.map((record) => {
                 const expanded = expandedId === record.id
                 const isForeign = showSource && record.assetType !== assetType
+                // A record's own room, else the room its equipment sits in.
+                const roomId = record.roomId ?? (record.assetType === "EQUIPMENT" ? equipmentRooms[record.assetId] : null)
+                const roomName = roomId ? roomNames[roomId] : undefined
                 return (
                   <Fragment key={record.id}>
                     <TableRow
@@ -170,22 +179,24 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="font-medium">{record.title}</span>
-                          {record.roomId && roomNames[record.roomId] && <Badge variant="outline" className="text-xs">{roomNames[record.roomId]}</Badge>}
+                          {!showRoom && record.roomId && roomNames[record.roomId] && <Badge variant="outline" className="text-xs">{roomNames[record.roomId]}</Badge>}
                         </div>
                         {record.vendor && <div className="text-xs text-muted-foreground">{record.vendor}</div>}
                       </TableCell>
-                      <TableCell className="max-w-[220px]">
-                        {record.description ? (
-                          <Tooltip>
-                            <TooltipTrigger className="block w-full truncate border-0 bg-transparent p-0 text-left text-muted-foreground">
-                              {record.description}
-                            </TooltipTrigger>
-                            <TooltipContent align="start" className="whitespace-pre-wrap">{record.description}</TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {showNotes && (
+                        <TableCell className="max-w-[220px]">
+                          {record.description ? (
+                            <Tooltip>
+                              <TooltipTrigger className="block w-full truncate border-0 bg-transparent p-0 text-left text-muted-foreground">
+                                {record.description}
+                              </TooltipTrigger>
+                              <TooltipContent align="start" className="whitespace-pre-wrap">{record.description}</TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      )}
                       {showSource && (
                         <TableCell className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {isForeign ? (
@@ -198,6 +209,11 @@ export function ServiceRecordList({ records: initialRecords, assetId, assetType,
                           ) : (
                             <span className="text-sm text-muted-foreground">Property</span>
                           )}
+                        </TableCell>
+                      )}
+                      {showRoom && (
+                        <TableCell className="whitespace-nowrap text-sm">
+                          {roomName ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap">

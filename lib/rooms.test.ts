@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { locationLabel, matchRoom, paintLabel, paintRows, resolveRoomId, roomData, roomSchema, scopeRecords } from "./rooms"
+import { locationLabel, matchRoom, paintLabel, paintRows, planRoomLinks, resolveRoomId, roomData, roomSchema, scopeRecords } from "./rooms"
 
 describe("paintRows", () => {
   it("drops all-blank rows and numbers sortOrder from 0", () => {
@@ -129,5 +129,31 @@ describe("resolveRoomId", () => {
     expect(resolveRoomId("Garage", "p1", rooms, undefined)).toBe("r2")
     expect(resolveRoomId("Shed", "p1", rooms, undefined)).toBe("")
     expect(resolveRoomId("", "p1", rooms, linked)).toBe("")
+  })
+})
+
+describe("planRoomLinks", () => {
+  const rooms = [{ id: "r1", name: "Kitchen" }, { id: "r2", name: "Garage" }]
+
+  it("links unlinked equipment whose location is exactly a room's name", () => {
+    const plan = planRoomLinks(rooms, [
+      { id: "e1", roomId: null, location: "kitchen" },
+      { id: "e2", roomId: null, location: "  Garage " },
+    ])
+    expect(plan).toEqual([{ equipmentId: "e1", roomId: "r1" }, { equipmentId: "e2", roomId: "r2" }])
+  })
+
+  it("leaves linked, blank and non-matching equipment alone", () => {
+    expect(planRoomLinks(rooms, [
+      { id: "e1", roomId: "r2", location: "Kitchen" },
+      { id: "e2", roomId: null, location: null },
+      { id: "e3", roomId: null, location: "" },
+      { id: "e4", roomId: null, location: "Under kitchen sink" },
+    ])).toEqual([])
+  })
+
+  it("skips a name two rooms share, since either could be meant", () => {
+    const twins = [{ id: "r1", name: "Bedroom" }, { id: "r2", name: "bedroom" }]
+    expect(planRoomLinks(twins, [{ id: "e1", roomId: null, location: "Bedroom" }])).toEqual([])
   })
 })

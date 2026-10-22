@@ -78,6 +78,26 @@ export function matchRoom<T extends { name: string }>(text: string | null | unde
 }
 
 /**
+ * Which unlinked equipment already names a room: a location that is, ignoring case and spaces, exactly one
+ * room's name. A name two rooms share is skipped, since either could be meant. Pure; the caller saves it.
+ */
+export function planRoomLinks(
+  rooms: { id: string; name: string }[],
+  equipment: { id: string; roomId: string | null; location: string | null }[],
+): { equipmentId: string; roomId: string }[] {
+  const key = (s: string) => s.trim().toLowerCase()
+  const byName = new Map<string, string[]>()
+  for (const r of rooms) byName.set(key(r.name), [...(byName.get(key(r.name)) ?? []), r.id])
+  const plan: { equipmentId: string; roomId: string }[] = []
+  for (const e of equipment) {
+    if (e.roomId || !e.location?.trim()) continue
+    const ids = byName.get(key(e.location))
+    if (ids?.length === 1) plan.push({ equipmentId: e.id, roomId: ids[0] })
+  }
+  return plan
+}
+
+/**
  * The room an equipment form's location links on save: text naming one of the chosen
  * property's rooms links that room; anything else is free text (""). With Rooms off there
  * are no rooms to offer, so the current room counts as the only one and saving its name

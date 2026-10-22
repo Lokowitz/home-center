@@ -452,6 +452,21 @@
   html {
     @apply font-sans;
   }
+  /* Tailwind's reset gives buttons the arrow cursor; anything clickable should
+     show the hand. Disabled controls keep their own cursor. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="switch"]:not(:disabled),
+  [role="checkbox"]:not(:disabled),
+  summary,
+  select:not(:disabled),
+  input:is([type="checkbox"], [type="radio"], [type="file"], [type="submit"], [type="button"]):not(:disabled),
+  label[for] {
+    cursor: pointer;
+  }
 }
 /* Chart motion lives here, in one place, rather than as inline styles spread
    across the chart components — that way the reduced-motion opt-out is a single

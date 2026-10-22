@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { loadFeatures } from "@/lib/features-server"
+import { planRoomLinks } from "@/lib/rooms"
 import type { AssetType } from "@/app/generated/prisma/client"
 
 export type RoomOption = { id: string; name: string }
@@ -20,6 +21,23 @@ export async function roomOptionsFor(assetType: AssetType, assetId: string): Pro
   const propertyId = await targetPropertyId(assetType, assetId)
   if (!propertyId) return []
   return prisma.room.findMany({ where: { propertyId }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+}
+
+/**
+ * Links a property's equipment whose free-text location names one of its rooms (before there were rooms, or
+ * before this room existed). The text becomes the link: location is cleared, as for any room-linked item.
+ * Returns how many items were linked.
+ */
+export async function linkEquipmentToRooms(propertyId: string): Promise<number> {
+  const [rooms, equipment] = await Promise.all([
+    prisma.room.findMany({ where: { propertyId }, select: { id: true, name: true } }),
+    prisma.equipment.findMany({ where: { propertyId, roomId: null, location: { not: null } }, select: { id: true, roomId: true, location: true } }),
+  ])
+  const plan = planRoomLinks(rooms, equipment)
+  if (plan.length) {
+    await prisma.$transaction(plan.map((p) => prisma.equipment.update({ where: { id: p.equipmentId }, data: { roomId: p.roomId, location: null } })))
+  }
+  return plan.length
 }
 
 export type PropertyWithRooms = { id: string; name: string; rooms: RoomOption[] }

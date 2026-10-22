@@ -13,7 +13,9 @@ import { deleteAttachment } from "@/lib/actions/attachments"
 import { scopeRecords, type HistoryScope } from "@/lib/rooms"
 import { cn } from "@/lib/utils"
 import { ScopeToggle } from "./scope-toggle"
-import { FileText, Image, Paperclip, Trash2, Upload, X } from "lucide-react"
+import { FileText, Image, Paperclip, Plus, Trash2, Upload, X } from "lucide-react"
+import { EquipmentRows } from "@/components/equipment/equipment-rows"
+import type { EquipmentWithRoom } from "@/components/equipment/equipment-form-dialog"
 import type { Attachment } from "@/app/generated/prisma/client"
 import type { RoomSchedule, RoomServiceRecord, RoomWithDetails } from "./room-list"
 
@@ -146,78 +148,89 @@ export function RoomFiles({ room, uploading, onUpload, onPick, onChanged }: {
   )
 }
 
-export function RoomEquipment({ room }: { room: RoomWithDetails }) {
-  if (room.equipment.length === 0) {
-    return <p className="text-sm text-muted-foreground">No equipment in this room yet. Set a piece of equipment&apos;s location to this room to list it here.</p>
-  }
+export function RoomEquipment({ room, onAdd, onEdit }: { room: RoomWithDetails; onAdd: () => void; onEdit: (equipment: EquipmentWithRoom) => void }) {
   return (
-    <ul className="divide-y rounded-md border">
-      {room.equipment.map((e) => (
-        <li key={e.id}>
-          <Link href={`/assets/equipment/${e.id}`} className="block px-3 py-2 text-sm hover:bg-muted/40 hover:underline">{e.name}</Link>
-        </li>
-      ))}
-    </ul>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {room.equipment.length === 0 ? "No equipment in this room yet." : `${room.equipment.length} in this room`}
+        </p>
+        <Button type="button" size="sm" onClick={onAdd}><Plus className="mr-1 h-3.5 w-3.5" /> Add equipment</Button>
+      </div>
+      {room.equipment.length > 0 && <EquipmentRows equipment={room.equipment} onEdit={onEdit} />}
+    </div>
   )
 }
 
-/** Service records and reminders for the room, optionally with those for equipment in it. Read-only; each links to its own page. */
-export function RoomHistory({ room, serviceRecords, schedules }: { room: RoomWithDetails; serviceRecords: RoomServiceRecord[]; schedules: RoomSchedule[] }) {
-  const fmt = useFormat()
+function useScopedHistory<T extends { assetType: string; assetId: string; roomId: string | null }>(room: RoomWithDetails, rows: T[]) {
   const [scope, setScope] = useState<HistoryScope>("own")
   const equipmentIds = room.equipment.map((e) => e.id)
-  const equipmentNames = Object.fromEntries(room.equipment.map((e) => [e.id, e.name]))
-  const records = scopeRecords(serviceRecords, scope, { roomId: room.id }, equipmentIds)
-  const reminders = scopeRecords(schedules, scope, { roomId: room.id }, equipmentIds)
+  return { scope, setScope, rows: scopeRecords(rows, scope, { roomId: room.id }, equipmentIds) }
+}
 
-  function href(r: { id: string; assetType: string; assetId: string }, tab: "service" | "maintenance") {
-    return r.assetType === "EQUIPMENT"
-      ? `/assets/equipment/${r.assetId}?tab=${tab}&open=${r.id}`
-      : `/assets/properties/${room.propertyId}?tab=${tab}&open=${r.id}`
-  }
+function SourceBadge({ room, r }: { room: RoomWithDetails; r: { assetType: string; assetId: string } }) {
+  if (r.assetType !== "EQUIPMENT") return null
+  return <Badge variant="outline" className="shrink-0">{room.equipment.find((e) => e.id === r.assetId)?.name ?? "Equipment"}</Badge>
+}
 
-  function source(r: { assetType: string; assetId: string }) {
-    if (r.assetType !== "EQUIPMENT") return null
-    return <Badge variant="outline" className="shrink-0">{equipmentNames[r.assetId] ?? "Equipment"}</Badge>
-  }
-
+/** The room's service records, optionally with those for equipment in it. Click one to edit it; the dialog stacks over this one. */
+export function RoomServiceRecords({ room, serviceRecords, onAdd, onEdit }: { room: RoomWithDetails; serviceRecords: RoomServiceRecord[]; onAdd: () => void; onEdit: (record: RoomServiceRecord) => void }) {
+  const fmt = useFormat()
+  const { scope, setScope, rows } = useScopedHistory(room, serviceRecords)
   return (
-    <div className="space-y-4">
-      <ScopeToggle scope={scope} onChange={setScope} ownLabel="Room only" withLabel="Room + its equipment" />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm text-muted-foreground">{rows.length} record{rows.length !== 1 ? "s" : ""}</p>
+          <ScopeToggle scope={scope} onChange={setScope} ownLabel="Room only" withLabel="Room + its equipment" />
+        </div>
+        <Button type="button" size="sm" onClick={onAdd}><Plus className="mr-1 h-3.5 w-3.5" /> Add service record</Button>
+      </div>
+      {rows.length === 0 ? <p className="text-sm text-muted-foreground">No service records for this room yet.</p> : (
+        <ul className="divide-y rounded-md border bg-card">
+          {rows.map((r) => (
+            <li key={r.id}>
+              <button type="button" onClick={() => onEdit(r)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring">
+                <span className="w-24 shrink-0 text-muted-foreground">{fmt.date(r.date, { utc: true })}</span>
+                <span className="flex-1 truncate">{r.title}</span>
+                <SourceBadge room={room} r={r} />
+                {r.cost != null && <span className="shrink-0 text-muted-foreground">{fmt.money(r.cost)}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
-      <section className="space-y-1.5">
-        <h3 className="text-sm font-medium">Service records ({records.length})</h3>
-        {records.length === 0 ? <p className="text-sm text-muted-foreground">None.</p> : (
-          <ul className="divide-y rounded-md border">
-            {records.map((r) => (
-              <li key={r.id}>
-                <Link href={href(r, "service")} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
-                  <span className="w-24 shrink-0 text-muted-foreground">{fmt.date(r.date, { utc: true })}</span>
-                  <span className="flex-1 truncate">{r.title}</span>
-                  {source(r)}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-1.5">
-        <h3 className="text-sm font-medium">Maintenance reminders ({reminders.length})</h3>
-        {reminders.length === 0 ? <p className="text-sm text-muted-foreground">None.</p> : (
-          <ul className="divide-y rounded-md border">
-            {reminders.map((s) => (
-              <li key={s.id}>
-                <Link href={href(s, "maintenance")} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
-                  <span className="flex-1 truncate">{s.title}</span>
-                  {source(s)}
-                  <span className="shrink-0 text-muted-foreground">{s.nextDueDate ? `Due ${fmt.date(s.nextDueDate)}` : "No due date"}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+/** The room's maintenance reminders, optionally with those for equipment in it. Each links to its own page. */
+export function RoomReminders({ room, schedules }: { room: RoomWithDetails; schedules: RoomSchedule[] }) {
+  const fmt = useFormat()
+  const { scope, setScope, rows } = useScopedHistory(room, schedules)
+  const href = (s: RoomSchedule) =>
+    s.assetType === "EQUIPMENT"
+      ? `/assets/equipment/${s.assetId}?tab=maintenance&open=${s.id}`
+      : `/assets/properties/${room.propertyId}?tab=maintenance&open=${s.id}`
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-muted-foreground">{rows.length} reminder{rows.length !== 1 ? "s" : ""}</p>
+        <ScopeToggle scope={scope} onChange={setScope} ownLabel="Room only" withLabel="Room + its equipment" />
+      </div>
+      {rows.length === 0 ? <p className="text-sm text-muted-foreground">No maintenance reminders for this room.</p> : (
+        <ul className="divide-y rounded-md border bg-card">
+          {rows.map((s) => (
+            <li key={s.id}>
+              <Link href={href(s)} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
+                <span className="flex-1 truncate">{s.title}</span>
+                <SourceBadge room={room} r={s} />
+                <span className="shrink-0 text-muted-foreground">{s.nextDueDate ? `Due ${fmt.date(s.nextDueDate)}` : "No due date"}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

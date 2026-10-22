@@ -7,6 +7,7 @@ import { redirect } from "next/navigation"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { requireRooms } from "@/lib/features-server"
 import { roomSchema, roomData, paintRows, type RoomInput } from "@/lib/rooms"
+import { linkEquipmentToRooms } from "@/lib/rooms-server"
 
 export async function createRoom(data: RoomInput) {
   const session = await auth()
@@ -22,7 +23,10 @@ export async function createRoom(data: RoomInput) {
   const room = await prisma.room.create({
     data: { ...roomData(parsed.data), paints: { create: paintRows(parsed.data.paints) } },
   })
+  // Equipment already located "Kitchen" joins the new Kitchen.
+  await linkEquipmentToRooms(room.propertyId)
   revalidatePath(`/assets/properties/${room.propertyId}`)
+  revalidatePath("/assets/equipment")
   return { success: true, id: room.id }
 }
 
@@ -43,7 +47,10 @@ export async function updateRoom(id: string, data: RoomInput) {
     prisma.room.update({ where: { id }, data: roomData(parsed.data) }),
     prisma.roomPaint.createMany({ data: paintRows(parsed.data.paints).map((p) => ({ ...p, roomId: id })) }),
   ])
+  // A rename can make a room match locations typed before.
+  await linkEquipmentToRooms(existing.propertyId)
   revalidatePath(`/assets/properties/${existing.propertyId}`)
+  revalidatePath("/assets/equipment")
   return { success: true }
 }
 
