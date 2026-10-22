@@ -24,6 +24,7 @@ export type AttachmentOwnerRow = AttachmentLocation & {
   allergy: ({ substance: string } & OnPerson) | null
   immunization: ({ vaccine: string } & OnPerson) | null
   insurancePolicy: { carrier: string } | null
+  room: { name: string; propertyId: string } | null
   assetType: AssetType | null
 }
 
@@ -111,8 +112,10 @@ function owner(a: AttachmentOwnerRow): Owner {
         ? { record: { type: "insurance policy", title: a.insurancePolicy.carrier, href: "/insurance" }, asset: null }
         : missing("insurance policy")
     case "ROOM":
-      // Room files get their owner link in a later task.
-      return missing("room")
+      // A room's files belong to its property; its Rooms tab opens the room.
+      return a.room
+        ? { record: { type: "room", title: a.room.name, href: tabHref(assetHref("PROPERTY", a.room.propertyId), "rooms", a.roomId) }, asset: { type: "PROPERTY", id: a.room.propertyId } }
+        : missing("room")
   }
 }
 

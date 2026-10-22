@@ -13,6 +13,7 @@ export type AttachmentLocation = {
   immunizationId: string | null
   assetId: string | null
   inboxItemId: string | null
+  roomId: string | null
 }
 
 /// Where an attachment's file lives, read from the attachment's own foreign
@@ -31,6 +32,7 @@ export function attachmentDir(a: AttachmentLocation): [string, string] | null {
     : a.recordType === "IMMUNIZATION" ? a.immunizationId
     : a.recordType === "DOCUMENT" ? a.assetId
     : a.recordType === "INBOX" ? a.inboxItemId
+    : a.recordType === "ROOM" ? a.roomId
     : null
   return id ? [a.recordType.toLowerCase(), id] : null
 }

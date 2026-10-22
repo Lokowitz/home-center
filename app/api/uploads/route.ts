@@ -13,7 +13,7 @@ import { loadDocumentSettings } from "@/lib/documents/settings"
 import { processInboxItem } from "@/lib/capture-server"
 import type { AssetType } from "@/app/generated/prisma/client"
 
-const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX"] as const
+const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX", "ROOM"] as const
 type RecordType = (typeof RECORD_TYPES)[number]
 
 function isRecordType(v: string | null): v is RecordType {
@@ -34,6 +34,7 @@ async function recordExists(type: Exclude<RecordType, "DOCUMENT">, id: string): 
   if (type === "IMMUNIZATION") return !!(await prisma.immunization.findUnique(where))
   // Any signed-in member of the household may add to the shared inbox.
   if (type === "INBOX") return !!(await prisma.inboxItem.findUnique(where))
+  if (type === "ROOM") return !!(await prisma.room.findUnique(where))
   return !!(await prisma.insurancePolicy.findUnique(where))
 }
 
@@ -76,6 +77,9 @@ export async function POST(request: NextRequest) {
   if (!ext) {
     return NextResponse.json({ error: "File type not allowed." }, { status: 400 })
   }
+  if (recordType === "ROOM" && !(await loadFeatures()).rooms) {
+    return NextResponse.json({ error: "Record not found" }, { status: 404 })
+  }
   const documentOn = recordType === "DOCUMENT" ? await documentAssetType(recordId) : null
   if (recordType === "DOCUMENT" ? !documentOn : !(await recordExists(recordType, recordId))) {
     return NextResponse.json({ error: "Record not found" }, { status: 404 })
@@ -106,6 +110,7 @@ export async function POST(request: NextRequest) {
       assetType: documentOn,
       assetId: recordType === "DOCUMENT" ? recordId : null,
       inboxItemId: recordType === "INBOX" ? recordId : null,
+      roomId: recordType === "ROOM" ? recordId : null,
       // Every upload is indexed in the background; the response doesn't wait.
       text: { create: {} },
     },

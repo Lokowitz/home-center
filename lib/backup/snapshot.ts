@@ -89,8 +89,11 @@ export async function referencedFiles(dbPath: string): Promise<{ files: string[]
       if (SEGMENT.test(dir) && SEGMENT.test(id) && SEGMENT.test(name) && name !== ".." && name !== ".") files.add(rel)
       else skipped.push(rel)
     }
+    // Backups from before rooms have no roomId column; those rows have no room files.
+    const columns = (await c.execute(`PRAGMA table_info("Attachment")`)).rows.map((r) => String(r.name))
+    const roomId = columns.includes("roomId") ? "roomId" : "NULL AS roomId"
     const att = await c.execute(`SELECT recordType, filename, serviceRecordId, warrantyId, maintenanceScheduleId, healthConditionId,
-      insurancePolicyId, observationId, medicationId, allergyId, immunizationId, assetId, inboxItemId FROM "Attachment"`)
+      insurancePolicyId, observationId, medicationId, allergyId, immunizationId, assetId, inboxItemId, ${roomId} FROM "Attachment"`)
     for (const row of att.rows) {
       const dir = attachmentDir(row as unknown as AttachmentLocation)
       if (dir) add(dir[0], dir[1], String(row.filename))
@@ -126,7 +129,7 @@ export async function maxSessionVersion(dbPath: string): Promise<number | null> 
 
 export const COUNTED_MODELS = [
   "User", "Property", "Vehicle", "Equipment", "Person", "Provider", "ServiceRecord", "Warranty", "MaintenanceSchedule",
-  "InsurancePolicy", "HealthCondition", "Observation", "Medication", "Allergy", "Immunization", "Attachment", "InboxItem",
+  "InsurancePolicy", "HealthCondition", "Observation", "Medication", "Allergy", "Immunization", "Attachment", "InboxItem", "Room", "RoomPaint",
 ] as const
 
 export async function modelCounts(dbPath: string): Promise<Record<string, number>> {

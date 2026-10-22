@@ -14,12 +14,20 @@ const none = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null, insurancePolicyId: null,
   observationId: null, medicationId: null, allergyId: null, immunizationId: null, inboxItemId: null,
   serviceRecord: null, warranty: null, maintenanceSchedule: null, healthCondition: null, observation: null,
-  medication: null, allergy: null, immunization: null, insurancePolicy: null,
+  medication: null, allergy: null, immunization: null, insurancePolicy: null, roomId: null, room: null,
 }
 const row = (over: Partial<AttachmentOwnerRow>): AttachmentOwnerRow =>
   ({ id: "att1", filename: "3f2a.pdf", originalName: "Manual.pdf", recordType: "SERVICE", ...none, ...over }) as AttachmentOwnerRow
 
 describe("describeAttachment", () => {
+  it("links a room file to its property's Rooms tab, opened on the room", () => {
+    const r = describeAttachment(row({ recordType: "ROOM", roomId: "r1", room: { name: "Kitchen", propertyId: "p1" } }))
+    expect(r.fileHref).toBe("/api/files/room/r1/3f2a.pdf")
+    expect(r.record).toEqual({ type: "room", title: "Kitchen", href: "/assets/properties/p1?tab=rooms&open=r1" })
+    expect(r.asset).toEqual({ type: "PROPERTY", id: "p1" })
+    expect(describeAttachment(row({ recordType: "ROOM" })).record.href).toBeNull()
+  })
+
   it("links a warranty file to its asset page and the file route", () => {
     const r = describeAttachment(row({
       recordType: "WARRANTY", warrantyId: "w1",

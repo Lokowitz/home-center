@@ -3,7 +3,7 @@ import { attachmentDir } from "./attachment-location"
 
 const base = {
   serviceRecordId: null, warrantyId: null, maintenanceScheduleId: null, healthConditionId: null,
-  insurancePolicyId: null, observationId: null, medicationId: null, allergyId: null, immunizationId: null, assetId: null, inboxItemId: null,
+  insurancePolicyId: null, observationId: null, medicationId: null, allergyId: null, immunizationId: null, assetId: null, inboxItemId: null, roomId: null,
 }
 
 describe("attachmentDir", () => {
@@ -40,5 +40,10 @@ describe("attachmentDir", () => {
   it("locates files waiting in the capture inbox", () => {
     expect(attachmentDir({ ...base, recordType: "INBOX", inboxItemId: "x1" })).toEqual(["inbox", "x1"])
     expect(attachmentDir({ ...base, recordType: "INBOX", assetId: "v1" })).toBeNull()
+  })
+
+  it("locates room files", () => {
+    expect(attachmentDir({ ...base, recordType: "ROOM", roomId: "r1" })).toEqual(["room", "r1"])
+    expect(attachmentDir({ ...base, recordType: "ROOM", assetId: "p1" })).toBeNull()
   })
 })

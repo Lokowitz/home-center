@@ -38,7 +38,7 @@ Readers must ignore fields they do not know.
 | migration | null | Always null in an export. |
 | createdAt | string | ISO time. |
 | protection | "none" \| "password" | |
-| counts | object | Number of assets, serviceRecords, warranties, reminders, documents and files. |
+| counts | object | Number of assets, serviceRecords, warranties, reminders, documents, rooms and files. |
 | files | array | `{ path, size, sha256 }` for every entry except `manifest.json`. |
 | warnings | string[] | For example a file that was missing on disk. |
 | hasReadable | boolean | True when `readable/` is present. |
@@ -55,6 +55,7 @@ A file reference (`FileRef`) is `{ name, path, size, mimeType }`. `path` is rela
 - `warranties.json`: `id`, `assetId`, `assetType`, `product`, `purchased`, `expires`, `vendor`, `phone`, `email`, `notes`, `files`.
 - `reminders.json`: `id`, `assetId`, `assetType`, `title`, `everyDays`, `everyMiles`, `lastDone`, `nextDue`, `nextDueMileage`, `active`, `files`.
 - `documents.json`: `id`, `assetId`, `assetType`, `uploaded`, plus the `FileRef` fields.
+- `rooms.json`: `id`, `assetId` (the property), `assetType` (always `property`), `name`, `level`, `area` (the number as stored, in the household's area unit), `dimensions`, `flooringType`, `flooringProduct`, `flooringInstalled`, `notes`, `paints` (each `surface`, `brand`, `colorName`, `colorCode`, `finish`), `files`.
 - `health.json`: only when health records are included. Holds `providers`, `conditions`, `medications`, `allergies`, `immunizations`, `observations` and `insurance`. Each item has an `id`, the fields named in its CSV below, and `files`. Items for a person carry `personId`. Insurance carries `personIds`.
 
 ## CSV files
@@ -68,6 +69,8 @@ The first row holds the column names. `asset` and `person` hold the name instead
 | service-records.csv | date, asset, assetType, title, vendor, cost, category, mileage, notes, id |
 | warranties.csv | asset, product, purchased, expires, vendor, phone, email, notes, id |
 | reminders.csv | asset, title, everyDays, everyMiles, lastDone, nextDue, nextDueMileage, active, id |
+| rooms.csv | asset, name, level, area, dimensions, flooringType, flooringProduct, flooringInstalled, notes, id |
+| room-paints.csv | asset, room, surface, brand, colorName, colorCode, finish, roomId |
 | documents.csv | asset, name, uploaded, size, mimeType, path, id |
 | providers.csv | name, specialty, practice, phone, email, address, notes, id |
 | conditions.csv | person, name, status, diagnosed, resolved, notes, id |

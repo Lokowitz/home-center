@@ -8,7 +8,7 @@ import type { DocumentRef } from "./owner"
 // Rules for the assistant's document tools that don't need the database.
 
 export const RECORD_TYPES = [
-  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX",
+  "SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX", "ROOM",
 ] as const satisfies readonly AttachmentRecordType[]
 
 export function hiddenRecordTypes(includeHealth: boolean): AttachmentRecordType[] {
@@ -42,6 +42,7 @@ const ALIASES: Record<string, AttachmentRecordType> = {
   immunization: "IMMUNIZATION", vaccine: "IMMUNIZATION", vaccination: "IMMUNIZATION",
   document: "DOCUMENT", assetdocument: "DOCUMENT",
   intake: "INBOX", intakeitem: "INBOX", inbox: "INBOX", inboxitem: "INBOX", unfiled: "INBOX",
+  room: "ROOM",
 }
 
 /** A recordType argument as models send it ("warranties", "Service records") → the enum, if visible. */

@@ -23,6 +23,9 @@ export async function GET(
   if (!(await loadFeatures()).health && (segments[0] === "people" || (segments[0] === "document" && (await isPerson(segments[1]))))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
+  if (!(await loadFeatures()).rooms && segments[0] === "room") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
   let filePath: string
   try {
     filePath = resolveUploadPath(...segments)
