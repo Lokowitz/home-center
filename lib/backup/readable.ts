@@ -1,6 +1,7 @@
 // Engine file: relative imports and npm packages only.
 // The public, documented shape of an export (docs/export-format.md). Read with
 // plain SQL from a snapshot so it never depends on the Prisma client's shape.
+import { repeatsLabel } from "../maintenance-schedule"
 import path from "node:path"
 import type { Client, Row } from "@libsql/client"
 import { attachmentDir, type AttachmentLocation } from "../attachment-location"
@@ -14,7 +15,7 @@ export type PublicAsset = { id: string; type: AssetType; name: string; details: 
 type Owned = { assetId: string; assetType: AssetType }
 export type PublicRecord = Owned & { id: string; date: string | null; title: string; vendor: string | null; cost: number | null; category: string | null; mileage: number | null; notes: string | null; files: FileRef[] }
 export type PublicWarranty = Owned & { id: string; product: string; purchased: string | null; expires: string | null; vendor: string | null; phone: string | null; email: string | null; notes: string | null; files: FileRef[] }
-export type PublicReminder = Owned & { id: string; title: string; everyDays: number | null; everyMiles: number | null; lastDone: string | null; nextDue: string | null; nextDueMileage: number | null; active: boolean; files: FileRef[] }
+export type PublicReminder = Owned & { id: string; title: string; repeats: string; estimatedCost: number | null; everyDays: number | null; everyMiles: number | null; lastDone: string | null; nextDue: string | null; nextDueMileage: number | null; active: boolean; files: FileRef[] }
 export type PublicRoomPaint = { surface: string; brand: string | null; colorName: string | null; colorCode: string | null; finish: string | null }
 export type PublicRoom = Owned & { id: string; name: string; level: string | null; area: number | null; dimensions: string | null; flooringType: string | null; flooringProduct: string | null; flooringInstalled: string | null; notes: string | null; paints: PublicRoomPaint[]; files: FileRef[] }
 export type PublicDocument = Owned & FileRef & { id: string; uploaded: string | null }
@@ -183,7 +184,9 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
       phone: str(r.vendorPhone), email: str(r.vendorEmail), notes: str(r.notes), files: attachedTo("warrantyId", r.id, byId.get(String(r.assetId)) ?? null, "warranties"),
     }))
     const reminders = (await all(c, `SELECT * FROM "MaintenanceSchedule"`)).filter(ownedOk).map((r) => ({
-      ...owner(r), id: String(r.id), title: String(r.title), everyDays: num(r.intervalDays), everyMiles: num(r.intervalMiles), lastDone: iso(r.lastCompletedDate),
+      ...owner(r), id: String(r.id), title: String(r.title),
+      repeats: repeatsLabel({ intervalDays: num(r.intervalDays), intervalMiles: num(r.intervalMiles), dueMonths: str(r.dueMonths), dueDay: num(r.dueDay) }, byId.get(String(r.assetId))?.details?.Unit === "HOURS" ? "hr" : "mi"),
+      estimatedCost: num(r.estimatedCost), everyDays: num(r.intervalDays), everyMiles: num(r.intervalMiles), lastDone: iso(r.lastCompletedDate),
       nextDue: iso(r.nextDueDate), nextDueMileage: num(r.nextDueMileage), active: Boolean(Number(r.isActive)),
       files: attachedTo("maintenanceScheduleId", r.id, byId.get(String(r.assetId)) ?? null, "reminders"),
     }))
@@ -254,7 +257,7 @@ export function csvTables(d: ReadableData): Record<string, string> {
     "assets.csv": toCsv(d.assets.map((a) => ({ id: a.id, type: a.type, name: a.name, ...a.details })), ["id", "type", "name", ...new Set(d.assets.flatMap((a) => Object.keys(a.details)))]),
     "service-records.csv": toCsv(withAsset(d.serviceRecords), ["date", "asset", "assetType", "title", "vendor", "cost", "category", "mileage", "notes", "id"]),
     "warranties.csv": toCsv(withAsset(d.warranties), ["asset", "product", "purchased", "expires", "vendor", "phone", "email", "notes", "id"]),
-    "reminders.csv": toCsv(withAsset(d.reminders), ["asset", "title", "everyDays", "everyMiles", "lastDone", "nextDue", "nextDueMileage", "active", "id"]),
+    "reminders.csv": toCsv(withAsset(d.reminders), ["asset", "title", "repeats", "estimatedCost", "everyDays", "everyMiles", "lastDone", "nextDue", "nextDueMileage", "active", "id"]),
     "rooms.csv": toCsv(withAsset(d.rooms), ["asset", "name", "level", "area", "dimensions", "flooringType", "flooringProduct", "flooringInstalled", "notes", "id"]),
     "room-paints.csv": toCsv(d.rooms.flatMap((r) => r.paints.map((p) => ({ ...p, asset: name.get(r.assetId) ?? r.assetId, room: r.name, roomId: r.id }))), ["asset", "room", "surface", "brand", "colorName", "colorCode", "finish", "roomId"]),
     "documents.csv": toCsv(withAsset(d.documents), ["asset", "name", "uploaded", "size", "mimeType", "path", "id"]),

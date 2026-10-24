@@ -12,13 +12,13 @@ const ALL: TemplateAsset[] = [
 ]
 
 describe("templatesFor", () => {
-  it.each(ALL.map((a) => [JSON.stringify(a), a] as const))("%s: non-empty, unique keys, each has an interval", (_, asset) => {
+  it.each(ALL.map((a) => [JSON.stringify(a), a] as const))("%s: non-empty, unique keys, each repeats", (_, asset) => {
     const list = templatesFor(asset)
     expect(list.length).toBeGreaterThan(0)
     expect(new Set(list.map((t) => t.key)).size).toBe(list.length)
     for (const t of list) {
       expect(t.title.trim()).not.toBe("")
-      expect((t.intervalDays ?? 0) > 0 || (t.intervalMiles ?? 0) > 0).toBe(true)
+      expect((t.intervalDays ?? 0) > 0 || (t.intervalMiles ?? 0) > 0 || (t.dueMonths?.length ?? 0) > 0).toBe(true)
     }
   })
 
@@ -40,6 +40,19 @@ describe("templatesFor", () => {
     }
   })
 
+  it("houses get the seasonal reminders on set months, with no interval", () => {
+    const house = templatesFor({ type: "PROPERTY", propertyType: "HOUSE" })
+    const months = (key: string) => house.find((t) => t.key === key)
+    expect(months("service-ac")?.dueMonths).toEqual([4])
+    expect(months("sprinklers-start")?.dueMonths).toEqual([4])
+    expect(months("sprinklers-winterize")?.dueMonths).toEqual([10])
+    expect(months("furnace-service")?.dueMonths).toEqual([10])
+    for (const key of ["service-ac", "sprinklers-start", "sprinklers-winterize", "furnace-service"]) {
+      expect(months(key)?.intervalDays).toBeUndefined()
+      expect(months(key)?.intervalMiles).toBeUndefined()
+    }
+  })
+
   it("condos skip what the building handles", () => {
     const keys = templatesFor({ type: "PROPERTY", propertyType: "CONDO" }).map((t) => t.key)
     expect(keys).not.toContain("gutters")
@@ -49,6 +62,11 @@ describe("templatesFor", () => {
 
 describe("firstDue", () => {
   const today = new Date("2026-10-10T12:00:00Z")
+
+  it("puts a calendar reminder on its next listed month", () => {
+    expect(firstDue({ dueMonths: [4], dueDay: 1 }, today, null).nextDueDate?.toISOString()).toBe("2027-04-01T12:00:00.000Z")
+    expect(firstDue({ dueMonths: [10], dueDay: 15 }, today, null).nextDueDate?.toISOString()).toBe("2026-10-15T12:00:00.000Z")
+  })
 
   it("puts the date one interval out", () => {
     expect(firstDue({ intervalDays: 90 }, today, null).nextDueDate?.toISOString()).toBe("2027-01-08T12:00:00.000Z")

@@ -11,6 +11,7 @@ import { canSkip, completionRecordData, skipSchedule } from "@/lib/maintenance-c
 import { dismissScheduleNotifications, scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
 import { snoozeEnd, type SnoozeFor } from "@/lib/maintenance-due"
 import { firstDue, templatesFor } from "@/lib/maintenance-templates"
+import { alignCalendarDue, firstCalendarDue, formatDueMonths, normalizeRepeats, parseDueMonths } from "@/lib/maintenance-schedule"
 import { loadTemplateTarget } from "@/lib/maintenance-templates-server"
 import { checkRoom } from "@/lib/rooms-server"
 
@@ -22,6 +23,10 @@ const schema = z.object({
   // "" is tried first: coerce would turn a blank field into 0.
   intervalDays: z.literal("").or(z.coerce.number().int().min(1)).optional(),
   intervalMiles: z.literal("").or(z.coerce.number().int().min(1)).optional(),
+  /// "4,10": months of the year for a calendar schedule. Blank for the other kinds.
+  dueMonths: z.string().optional(),
+  dueDay: z.literal("").or(z.coerce.number().int().min(1).max(28)).optional(),
+  estimatedCost: z.literal("").or(z.coerce.number().min(0)).optional(),
   nextDueDate: z.string().optional(),
   nextDueMileage: z.literal("").or(z.coerce.number().int().min(0)).optional(),
   reminderDaysBefore: z.coerce.number().int().min(1).default(14),
@@ -38,14 +43,33 @@ async function roomFor(v: z.infer<typeof schema>) {
 }
 
 function clean(v: z.infer<typeof schema>) {
+  const repeats = normalizeRepeats({
+    intervalDays: v.intervalDays === "" || !v.intervalDays ? null : Number(v.intervalDays),
+    intervalMiles: v.intervalMiles === "" || !v.intervalMiles ? null : Number(v.intervalMiles),
+    dueMonths: parseDueMonths(v.dueMonths),
+    dueDay: v.dueDay === "" || !v.dueDay ? null : Number(v.dueDay),
+  })
+  if (!repeats.ok) return { error: { dueMonths: [repeats.error] } }
+  const { dueMonths, dueDay } = repeats.value
   return {
     assetId: v.assetId,
     assetType: v.assetType,
     title: v.title,
     description: v.description || null,
-    intervalDays: v.intervalDays === "" || !v.intervalDays ? null : Number(v.intervalDays),
-    intervalMiles: v.intervalMiles === "" || !v.intervalMiles ? null : Number(v.intervalMiles),
-    nextDueDate: v.nextDueDate ? new Date(v.nextDueDate) : null,
+    intervalDays: repeats.value.intervalDays,
+    intervalMiles: repeats.value.intervalMiles,
+    dueMonths,
+    dueDay,
+    estimatedCost: v.estimatedCost === "" || v.estimatedCost === undefined ? null : Number(v.estimatedCost),
+    // A calendar reminder with no typed date starts on its next listed month.
+    // A typed date outside the chosen months (an interval reminder just switched over) moves to the next listed month.
+    nextDueDate: v.nextDueDate
+      ? dueMonths
+        ? alignCalendarDue(parseDueMonths(dueMonths), dueDay ?? 1, new Date(v.nextDueDate))
+        : new Date(v.nextDueDate)
+      : dueMonths
+        ? firstCalendarDue(parseDueMonths(dueMonths), dueDay ?? 1, new Date())
+        : null,
     nextDueMileage: v.nextDueMileage === "" || !v.nextDueMileage ? null : Number(v.nextDueMileage),
     reminderDaysBefore: Number(v.reminderDaysBefore) || 14,
     reminderMilesBefore: Number(v.reminderMilesBefore) || 500,
@@ -59,7 +83,9 @@ export async function createMaintenanceSchedule(data: z.infer<typeof schema>) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
   const room = await roomFor(parsed.data)
   if ("error" in room) return { error: room.error }
-  const row = await prisma.maintenanceSchedule.create({ data: { ...clean(parsed.data), roomId: room.roomId } })
+  const fields = clean(parsed.data)
+  if ("error" in fields) return { error: fields.error }
+  const row = await prisma.maintenanceSchedule.create({ data: { ...fields, roomId: room.roomId } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")
@@ -73,7 +99,9 @@ export async function updateMaintenanceSchedule(id: string, data: z.infer<typeof
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
   const room = await roomFor(parsed.data)
   if ("error" in room) return { error: room.error }
-  await prisma.maintenanceSchedule.update({ where: { id }, data: { ...clean(parsed.data), roomId: room.roomId } })
+  const fields = clean(parsed.data)
+  if ("error" in fields) return { error: fields.error }
+  await prisma.maintenanceSchedule.update({ where: { id }, data: { ...fields, roomId: room.roomId } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")
@@ -242,15 +270,23 @@ export async function addTemplateSchedules(assetType: AssetType, assetId: string
     if (!t) return { error: "Invalid input" }
     const intervalDays = pick.intervalDays === undefined ? t.intervalDays ?? null : pick.intervalDays === "" ? null : pick.intervalDays
     const intervalMiles = pick.intervalMiles === undefined ? t.intervalMiles ?? null : pick.intervalMiles === "" ? null : pick.intervalMiles
-    if (!intervalDays && !intervalMiles) return { error: `"${t.title}" needs an interval.` }
+    // A set-month template ignores interval picks: the picker only shows its months.
+    const dueMonths = t.dueMonths ?? []
+    if (!dueMonths.length && !intervalDays && !intervalMiles) return { error: `"${t.title}" needs an interval.` }
     rows.push({
       assetType,
       assetId,
       title: t.title,
       description: t.description ?? null,
-      intervalDays,
-      intervalMiles,
-      ...firstDue({ intervalDays, intervalMiles }, today, target.currentReading),
+      intervalDays: dueMonths.length ? null : intervalDays,
+      intervalMiles: dueMonths.length ? null : intervalMiles,
+      dueMonths: formatDueMonths(dueMonths),
+      dueDay: dueMonths.length ? t.dueDay ?? 1 : null,
+      ...firstDue(
+        dueMonths.length ? { dueMonths, dueDay: t.dueDay ?? 1 } : { intervalDays, intervalMiles },
+        today,
+        target.currentReading
+      ),
       ...(t.reminderMilesBefore ? { reminderMilesBefore: t.reminderMilesBefore } : {}),
     })
   }

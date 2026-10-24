@@ -1,4 +1,5 @@
 import type { EquipmentCategory, MeterUnit, PropertyType } from "@/app/generated/prisma/client"
+import { firstCalendarDue } from "@/lib/maintenance-schedule"
 
 // Generic starting reminders offered after an asset is created. They're common
 // rules of thumb, not manufacturer schedules: the picker says so, and every
@@ -12,6 +13,10 @@ export type MaintenanceTemplate = {
   intervalDays?: number
   /** Miles, or hours for a vehicle tracked in hours. */
   intervalMiles?: number
+  /** Months 1–12 for a reminder on set months, in place of an interval. */
+  dueMonths?: number[]
+  /** Day of month (1–28) for dueMonths; 1 when left out. */
+  dueDay?: number
   /** Warning window on the meter side; the schedule default (500) suits miles only. */
   reminderMilesBefore?: number
 }
@@ -29,10 +34,14 @@ const HOUSE: MaintenanceTemplate[] = [
   { key: "water-heater-flush", title: "Flush water heater", intervalDays: 365 },
   { key: "dryer-vent", title: "Clean dryer vent", intervalDays: 365 },
   { key: "hvac-service", title: "HVAC professional service", intervalDays: 365 },
+  { key: "service-ac", title: "Service A/C", dueMonths: [4] },
+  { key: "sprinklers-start", title: "Start up sprinklers", dueMonths: [4] },
+  { key: "sprinklers-winterize", title: "Winterize sprinklers", dueMonths: [10] },
+  { key: "furnace-service", title: "Service furnace", dueMonths: [10] },
 ]
 
 // A condo's roof, gutters and usually its central plant belong to the building.
-const CONDO_SKIP = new Set(["gutters", "hvac-service"])
+const CONDO_SKIP = new Set(["gutters", "hvac-service", "sprinklers-start", "sprinklers-winterize"])
 
 const LOT: MaintenanceTemplate[] = [
   { key: "property-walk", title: "Walk the property line", description: "Check fences, drainage and markers.", intervalDays: 180 },
@@ -103,10 +112,11 @@ export function templatesFor(asset: TemplateAsset): MaintenanceTemplate[] {
  * side is set; the next completion fills in the meter.
  */
 export function firstDue(
-  interval: { intervalDays?: number | null; intervalMiles?: number | null },
+  interval: { intervalDays?: number | null; intervalMiles?: number | null; dueMonths?: number[] | null; dueDay?: number | null },
   today: Date,
   currentReading: number | null
 ): { nextDueDate: Date | null; nextDueMileage: number | null } {
+  if (interval.dueMonths?.length) return { nextDueDate: firstCalendarDue(interval.dueMonths, interval.dueDay ?? 1, today), nextDueMileage: null }
   const nextDueDate = interval.intervalDays ? new Date(today.getTime() + interval.intervalDays * 86400000) : null
   const nextDueMileage = interval.intervalMiles && currentReading != null ? currentReading + interval.intervalMiles : null
   return { nextDueDate, nextDueMileage }

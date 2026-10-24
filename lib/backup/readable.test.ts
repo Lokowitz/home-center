@@ -179,7 +179,7 @@ describe("readable", () => {
           ('a3', 'SERVICE', 'f-a3.pdf', 'filter.pdf', 'application/pdf', 1, 'u2', 's3'),
           ('a4', 'SERVICE', 'f-a4.pdf', 'blade.pdf', 'application/pdf', 1, 'u2', 's4');
         INSERT INTO "Warranty" (id, assetId, assetType, productName, updatedAt) VALUES ('w1', 'e1', 'EQUIPMENT', 'Furnace plan', '${t}'), ('w2', 'v1', 'VEHICLE', 'Car plan', '${t}');
-        INSERT INTO "MaintenanceSchedule" (id, assetId, assetType, title, updatedAt) VALUES ('m1x', 'e2', 'EQUIPMENT', 'Sharpen', '${t}'), ('m2x', 'e1', 'EQUIPMENT', 'Change filter', '${t}');
+        INSERT INTO "MaintenanceSchedule" (id, assetId, assetType, title, dueMonths, dueDay, estimatedCost, updatedAt) VALUES ('m1x', 'e2', 'EQUIPMENT', 'Sharpen', NULL, NULL, NULL, '${t}'), ('m2x', 'e1', 'EQUIPMENT', 'Change filter', '4,10', 1, 120.5, '${t}');
       `)
     } finally {
       c.close()
@@ -190,6 +190,7 @@ describe("readable", () => {
     expect(data.serviceRecords.map((r) => r.title)).toEqual(["Filter"])
     expect(data.warranties.map((w) => w.id)).toEqual(["w1"])
     expect(data.reminders.map((r) => r.title)).toEqual(["Change filter"])
+    expect(data.reminders[0]).toMatchObject({ repeats: "Apr, Oct", estimatedCost: 120.5 })
     expect(files.map((f) => f.rel).sort()).toEqual(["properties/p1/img-p1.jpg", "service/s3/f-a3.pdf"])
     expect(data.health).toBeNull()
   })

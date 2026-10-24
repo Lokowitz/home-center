@@ -91,7 +91,7 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="complete-cost" className="text-sm font-medium">{`Cost (${fmt.currencySymbol})`}</label>
-                <Input id="complete-cost" type="number" step="0.01" min="0" placeholder="89.99" {...register("cost")} />
+                <Input id="complete-cost" type="number" step="0.01" min="0" placeholder={schedule.estimatedCost != null ? `Est. ${fmt.money(schedule.estimatedCost)}` : "89.99"} {...register("cost")} />
               </div>
               <div className="col-span-2 space-y-1.5">
                 <label htmlFor="complete-notes" className="text-sm font-medium">Notes</label>

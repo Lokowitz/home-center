@@ -20,6 +20,7 @@ import { existsSync } from "fs"
 import { createInterface } from "readline"
 import path from "path"
 import zlib from "zlib"
+import { firstCalendarDue, parseDueMonths } from "../lib/maintenance-schedule"
 
 const url = process.env.DATABASE_URL ?? "file:./prisma/dev.db"
 const prisma = new PrismaClient({ adapter: new PrismaLibSql({ url }) })
@@ -538,18 +539,21 @@ const WARRANTIES: {
 const MAINTENANCE: {
   ref: Ref; title: string; description?: string; intervalDays: number | null; dueInDays: number | null
   intervalMiles?: number; dueInMiles?: number; reminderDaysBefore?: number
+  estimatedCost?: number; dueMonths?: string; dueDay?: number
 }[] = [
   // Overdue
-  { ref: E(8), title: "Replace humidifier water panel", description: "Aprilaire #35 panel. Takes ten minutes.", intervalDays: 365, dueInDays: -21 },
+  { ref: E(8), title: "Replace humidifier water panel", description: "Aprilaire #35 panel. Takes ten minutes.", intervalDays: 365, dueInDays: -21, estimatedCost: 24 },
   { ref: E(23), title: "Rental smoke alarm battery check", intervalDays: 182, dueInDays: -9, reminderDaysBefore: 14 },
   { ref: V(2), title: "Oil change", intervalDays: 180, dueInDays: -4, intervalMiles: 7500, dueInMiles: 500 },
 
   // Due soon
-  { ref: E(6), title: "Replace furnace filter", description: "16x25x4 media filter — the thick one.", intervalDays: 90, dueInDays: 6, reminderDaysBefore: 14 },
+  { ref: E(6), title: "Replace furnace filter", description: "16x25x4 media filter — the thick one.", intervalDays: 90, dueInDays: 6, reminderDaysBefore: 14, estimatedCost: 38 },
+  { ref: P(0), title: "Winterize sprinklers", description: "Blow out the lines before the first hard freeze.", intervalDays: null, dueInDays: null, dueMonths: "10", dueDay: 15, estimatedCost: 85 },
+  { ref: P(0), title: "Replace roof", description: "Shingles are rated for 30 years. Get quotes two years out.", intervalDays: null, dueInDays: 1095, estimatedCost: 14000 },
   { ref: E(11), title: "Test sump pump", description: "Pour a bucket into the pit and confirm it kicks on.", intervalDays: 90, dueInDays: 11 },
   { ref: P(1), title: "Winterize cabin — blow out water lines", description: "Before first hard freeze. Geneva Well & Pump does it, book two weeks ahead.", intervalDays: 365, dueInDays: 19, reminderDaysBefore: 30 },
   { ref: E(16), title: "Chimney sweep", intervalDays: 365, dueInDays: 24, reminderDaysBefore: 30 },
-  { ref: V(0), title: "Oil change", intervalDays: 180, dueInDays: 27, intervalMiles: 7500, dueInMiles: 4900 },
+  { ref: V(0), title: "Oil change", intervalDays: 180, dueInDays: 27, intervalMiles: 7500, dueInMiles: 4900, estimatedCost: 89 },
 
   // Comfortably ahead
   { ref: E(10), title: "Refill softener salt", intervalDays: 60, dueInDays: 38 },
@@ -739,7 +743,12 @@ async function main() {
       data: {
         ...asset, title: m.title, description: m.description ?? null,
         intervalDays: m.intervalDays, intervalMiles: m.intervalMiles ?? null,
-        nextDueDate: m.dueInDays === null ? null : at(m.dueInDays),
+        estimatedCost: m.estimatedCost ?? null,
+        dueMonths: m.dueMonths ?? null,
+        dueDay: m.dueMonths ? m.dueDay ?? 1 : null,
+        nextDueDate: m.dueMonths
+          ? firstCalendarDue(parseDueMonths(m.dueMonths), m.dueDay ?? 1, new Date())
+          : m.dueInDays === null ? null : at(m.dueInDays),
         nextDueMileage: m.dueInMiles != null && vehicle?.currentMileage != null
           ? vehicle.currentMileage + m.dueInMiles
           : null,

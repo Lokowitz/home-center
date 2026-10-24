@@ -1,3 +1,4 @@
+import { repeatsLabel } from "@/lib/maintenance-schedule"
 import { z } from "zod/v4"
 import { prisma } from "@/lib/prisma"
 import { loadAssetIndex } from "@/lib/assets-server"
@@ -391,6 +392,8 @@ export const maintenanceStatusTool = defineTool({
           meterLeft: due.milesLeft,
           meterUnit: due.meterUnit,
           lastCompletedDate: dayOrNull(s.lastCompletedDate),
+          repeats: repeatsLabel(s, mileage.get(s.assetId)?.unit === "HOURS" ? "hr" : "mi"),
+          estimatedCost: s.estimatedCost,
           intervalDays: s.intervalDays,
           intervalMeter: s.intervalMiles,
           snoozedUntil: isSnoozed(s, ctx.now) ? dayOrNull(s.snoozedUntil) : null,

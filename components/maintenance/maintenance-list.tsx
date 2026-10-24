@@ -12,6 +12,7 @@ import { ChevronDown, Pencil, Trash2, CheckCircle2, AlertTriangle, Clock, Pause,
 import { deleteMaintenanceSchedule, setMaintenanceScheduleActive } from "@/lib/actions/maintenance"
 import { MaintenanceFormDialog } from "./maintenance-form-dialog"
 import { CompleteDialog } from "./complete-dialog"
+import { isDoneOnce, repeatsLabel } from "@/lib/maintenance-schedule"
 import { SnoozeMenu } from "./snooze-menu"
 import { remindersHref } from "./add-reminders-submit"
 import { AttachmentList } from "@/components/attachments/attachment-list"
@@ -166,7 +167,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                 {showSource && <TableHead>Source</TableHead>}
                 <SortableTableHead column="status" label="Status" sortState={table.sortState} onToggle={table.toggleSort} />
                 <SortableTableHead column="nextDue" label="Next Due" sortState={table.sortState} onToggle={table.toggleSort} />
-                <TableHead>Interval</TableHead>
+                <TableHead>Repeats</TableHead>
                 <SortableTableHead column="lastCompleted" label="Last Completed" sortState={table.sortState} onToggle={table.toggleSort} />
                 <TableHead>Files</TableHead>
                 <TableHead className={`text-right ${stickyActions}`}>Actions</TableHead>
@@ -188,6 +189,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                         <span className="font-medium">{s.title}</span>
                         {s.roomId && roomNames[s.roomId] && <Badge variant="outline" className="text-xs">{roomNames[s.roomId]}</Badge>}
                       </div>
+                      {s.estimatedCost != null && <div className="text-xs text-muted-foreground">Est. {fmt.money(s.estimatedCost)}</div>}
                     </TableCell>
                     <TableCell className="max-w-[220px]">
                       {s.description ? (
@@ -223,12 +225,10 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {s.nextDueDate && <div>{fmt.date(s.nextDueDate)}</div>}
                       {s.nextDueMileage != null && <div>{s.nextDueMileage.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
-                      {!s.nextDueDate && s.nextDueMileage == null && "—"}
+                      {!s.nextDueDate && s.nextDueMileage == null && (isDoneOnce(s) ? "Done" : "—")}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {s.intervalDays && <div>Every {s.intervalDays}d</div>}
-                      {s.intervalMiles && <div>Every {s.intervalMiles.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
-                      {!s.intervalDays && !s.intervalMiles && "—"}
+                      {repeatsLabel(s, fmt.meterShort(meterUnit))}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "—"}

@@ -553,6 +553,12 @@ model MaintenanceSchedule {
   isActive             Boolean   @default(true)
   /// Hidden from the dashboard and notifications until then. The due date doesn't move.
   snoozedUntil         DateTime?
+  /// What one occurrence is expected to cost.
+  estimatedCost        Float?
+  /// Calendar schedule: months 1–12, comma-separated and sorted. Can't be combined with an interval.
+  dueMonths            String?
+  /// Day of month (1–28) for a calendar schedule.
+  dueDay               Int?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 

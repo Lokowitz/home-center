@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -17,6 +17,7 @@ import { createMaintenanceSchedule, updateMaintenanceSchedule } from "@/lib/acti
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { ASSET_TYPES } from "@/lib/assets"
 import { useFormat } from "@/components/regional-provider"
+import { formatDueMonths, monthsMissing, parseDueMonths, scheduleKind } from "@/lib/maintenance-schedule"
 import { RoomSelect } from "@/components/rooms/room-select"
 import type { RoomOption } from "@/lib/rooms-server"
 import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
@@ -29,6 +30,10 @@ const schema = z.object({
   description: z.string().optional(),
   intervalDays: z.string().optional(),
   intervalMiles: z.string().optional(),
+  repeat: z.enum(["every", "months", "once"]),
+  dueMonths: z.string().optional(),
+  dueDay: z.string().optional(),
+  estimatedCost: z.string().optional(),
   nextDueDate: z.string().optional(),
   nextDueMileage: z.string().optional(),
   reminderDaysBefore: z.string().optional(),
@@ -37,6 +42,19 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const INTERVAL_PRESETS = [
+  { label: "Monthly", days: 30 },
+  { label: "Quarterly", days: 91 },
+  { label: "Twice a year", days: 182 },
+  { label: "Yearly", days: 365 },
+]
+const REPEAT_OPTIONS = [
+  { value: "every", label: "Every" },
+  { value: "months", label: "On set months" },
+  { value: "once", label: "Once" },
+] as const
 
 interface Props {
   open: boolean
@@ -94,8 +112,11 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "" },
+    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "" },
   })
+
+  const [repeat, dueMonthsValue] = useWatch({ control: form.control, name: ["repeat", "dueMonths"] })
+  const selectedMonths = parseDueMonths(dueMonthsValue)
 
   // A room that isn't one of the options (the equipment moved property since) would only fail to save, so it opens as None.
   const roomKey = roomOptions.map((r) => r.id).join(" ")
@@ -106,13 +127,17 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       description: schedule.description ?? "",
       intervalDays: schedule.intervalDays?.toString() ?? "",
       intervalMiles: schedule.intervalMiles?.toString() ?? "",
+      repeat: ({ interval: "every", calendar: "months", once: "once" } as const)[scheduleKind(schedule)],
+      dueMonths: schedule.dueMonths ?? "",
+      dueDay: schedule.dueDay?.toString() ?? "",
+      estimatedCost: schedule.estimatedCost?.toString() ?? "",
       nextDueDate: schedule.nextDueDate ? new Date(schedule.nextDueDate).toISOString().split("T")[0] : "",
       nextDueMileage: schedule.nextDueMileage?.toString() ?? "",
       reminderDaysBefore: schedule.reminderDaysBefore.toString(),
       reminderMilesBefore: schedule.reminderMilesBefore.toString(),
       roomId: schedule.roomId && roomKey.split(" ").includes(schedule.roomId) ? schedule.roomId : "",
     } : {
-      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
+      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
     })
   }, [schedule, open, form, assetId, assetType, defaultRoomId, roomKey])
 
@@ -145,8 +170,18 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
   }
 
   async function onSubmit(values: FormValues) {
+    const { repeat: chosenRepeat, ...rest } = values
+    if (monthsMissing(chosenRepeat, values.dueMonths)) {
+      toast.error("Pick at least one month, or choose a different repeat.")
+      return
+    }
     const payload = {
-      ...values,
+      ...rest,
+      // Only the chosen kind of repeat is sent; the others are cleared so an edit can switch kinds.
+      intervalDays: chosenRepeat === "every" ? values.intervalDays : "",
+      intervalMiles: chosenRepeat === "every" ? values.intervalMiles : "",
+      dueMonths: chosenRepeat === "months" ? values.dueMonths : "",
+      dueDay: chosenRepeat === "months" ? values.dueDay : "",
       // No room select shown: send nothing, so an edit keeps the schedule's room.
       roomId: roomOptions.length > 0 ? values.roomId : undefined,
     } as unknown as Parameters<typeof createMaintenanceSchedule>[0]
@@ -157,7 +192,8 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
     if (result?.error) {
       const roomError = "roomId" in result.error ? result.error.roomId?.[0] : undefined
-      toast.error(roomError ?? "Please fix the errors and try again.")
+      const monthsError = "dueMonths" in result.error ? result.error.dueMonths?.[0] : undefined
+      toast.error(roomError ?? monthsError ?? "Please fix the errors and try again.")
       return
     }
 
@@ -255,25 +291,103 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="intervalDays" render={({ field }) => (
+              <div className="col-span-2 space-y-2">
+                <FormLabel>Repeats</FormLabel>
+                <div role="group" aria-label="Repeats" className="flex flex-wrap gap-2">
+                  {REPEAT_OPTIONS.map((o) => (
+                    <Button
+                      key={o.value}
+                      type="button"
+                      size="sm"
+                      variant={repeat === o.value ? "default" : "outline"}
+                      aria-pressed={repeat === o.value}
+                      onClick={() => form.setValue("repeat", o.value, { shouldDirty: true })}
+                    >
+                      {o.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {repeat === "every" && (
+                <>
+                  <FormField control={form.control} name="intervalDays" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repeat Every (days)</FormLabel>
+                      <FormControl><Input type="number" placeholder="90" {...field} /></FormControl>
+                      <FormDescription className="text-xs">
+                        {INTERVAL_PRESETS.map((p, i) => (
+                          <span key={p.days}>
+                            {i > 0 && " · "}
+                            <button type="button" className="underline hover:text-foreground" onClick={() => form.setValue("intervalDays", String(p.days), { shouldDirty: true })}>
+                              {p.label}
+                            </button>
+                          </span>
+                        ))}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {assetType === "VEHICLE" && (
+                    <FormField control={form.control} name="intervalMiles" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Repeat Every ({fmt.meterShort(meterUnit)})</FormLabel>
+                        <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "50" : "5000"} {...field} /></FormControl>
+                        <FormDescription className="text-xs">{meterUnit === "HOURS" ? "e.g. 50 for an oil change" : "e.g. 5000 for oil change"}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  )}
+                </>
+              )}
+
+              {repeat === "months" && (
+                <>
+                  <div className="col-span-2 space-y-2">
+                    <FormLabel>Months</FormLabel>
+                    <div role="group" aria-label="Months" className="grid grid-cols-6 gap-1.5">
+                      {MONTHS.map((name, i) => {
+                        const on = selectedMonths.includes(i + 1)
+                        return (
+                          <Button
+                            key={name}
+                            type="button"
+                            size="sm"
+                            variant={on ? "default" : "outline"}
+                            aria-pressed={on}
+                            onClick={() =>
+                              form.setValue(
+                                "dueMonths",
+                                formatDueMonths(on ? selectedMonths.filter((m) => m !== i + 1) : [...selectedMonths, i + 1]) ?? "",
+                                { shouldDirty: true }
+                              )
+                            }
+                          >
+                            {name}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                    {selectedMonths.length === 0 && <p className="text-xs text-muted-foreground">Pick at least one month.</p>}
+                  </div>
+                  <FormField control={form.control} name="dueDay" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Day of month</FormLabel>
+                      <FormControl><Input type="number" min={1} max={28} placeholder="1" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </>
+              )}
+
+              <FormField control={form.control} name="estimatedCost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Repeat Every (days)</FormLabel>
-                  <FormControl><Input type="number" placeholder="90" {...field} /></FormControl>
-                  <FormDescription className="text-xs">e.g. 90 for quarterly</FormDescription>
+                  <FormLabel>{`Estimated cost (${fmt.currencySymbol})`}</FormLabel>
+                  <FormControl><Input type="number" step="0.01" min="0" placeholder="150" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-
-              {assetType === "VEHICLE" && (
-                <FormField control={form.control} name="intervalMiles" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Repeat Every ({fmt.meterShort(meterUnit)})</FormLabel>
-                    <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "50" : "5000"} {...field} /></FormControl>
-                    <FormDescription className="text-xs">{meterUnit === "HOURS" ? "e.g. 50 for an oil change" : "e.g. 5000 for oil change"}</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              )}
 
               <FormField control={form.control} name="nextDueDate" render={({ field }) => (
                 <FormItem>

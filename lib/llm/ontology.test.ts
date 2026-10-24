@@ -6,6 +6,11 @@ import { compileInclude, compileWhere, entityDef, relationNames, withLocationSel
 const FORBIDDEN = ["passwordHash", "passwordEnc", "apiKeyEnc", "imageFilename", "createdById", "createdBy", "uploadedBy", "attachments", "user", "userId"]
 
 describe("ontology", () => {
+  it("lets the assistant see a reminder's cost and set months", () => {
+    const fields = ENTITIES.maintenanceSchedule.fields
+    expect(Object.keys(fields)).toEqual(expect.arrayContaining(["estimatedCost", "dueMonths", "dueDay"]))
+  })
+
   it("defines every key", () => {
     expect(Object.keys(ENTITIES).sort()).toEqual([...ENTITY_KEYS].sort())
   })

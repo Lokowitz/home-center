@@ -53,7 +53,7 @@ A file reference (`FileRef`) is `{ name, path, size, mimeType }`. `path` is rela
 - `assets.json`: `id`, `type`, `name`, `details` (labels and values, such as Make or Address), `photo` (path or null), `propertyId` (for equipment).
 - `service-records.json`: `id`, `assetId`, `assetType`, `date`, `title`, `vendor`, `cost`, `category`, `mileage`, `notes`, `files`.
 - `warranties.json`: `id`, `assetId`, `assetType`, `product`, `purchased`, `expires`, `vendor`, `phone`, `email`, `notes`, `files`.
-- `reminders.json`: `id`, `assetId`, `assetType`, `title`, `everyDays`, `everyMiles`, `lastDone`, `nextDue`, `nextDueMileage`, `active`, `files`.
+- `reminders.json`: `id`, `assetId`, `assetType`, `title`, `repeats` (for example "Every 90 days", "Apr, Oct" or "Once"), `estimatedCost`, `everyDays`, `everyMiles`, `lastDone`, `nextDue`, `nextDueMileage`, `active`, `files`.
 - `documents.json`: `id`, `assetId`, `assetType`, `uploaded`, plus the `FileRef` fields.
 - `rooms.json`: `id`, `assetId` (the property), `assetType` (always `property`), `name`, `level`, `area` (the number as stored, in the household's area unit), `dimensions`, `flooringType`, `flooringProduct`, `flooringInstalled`, `notes`, `paints` (each `surface`, `brand`, `colorName`, `colorCode`, `finish`), `files`.
 - `health.json`: only when health records are included. Holds `providers`, `conditions`, `medications`, `allergies`, `immunizations`, `observations` and `insurance`. Each item has an `id`, the fields named in its CSV below, and `files`. Items for a person carry `personId`. Insurance carries `personIds`.
@@ -68,7 +68,7 @@ The first row holds the column names. `asset` and `person` hold the name instead
 | assets.csv | id, type, name, then every detail label |
 | service-records.csv | date, asset, assetType, title, vendor, cost, category, mileage, notes, id |
 | warranties.csv | asset, product, purchased, expires, vendor, phone, email, notes, id |
-| reminders.csv | asset, title, everyDays, everyMiles, lastDone, nextDue, nextDueMileage, active, id |
+| reminders.csv | asset, title, repeats, estimatedCost, everyDays, everyMiles, lastDone, nextDue, nextDueMileage, active, id |
 | rooms.csv | asset, name, level, area, dimensions, flooringType, flooringProduct, flooringInstalled, notes, id |
 | room-paints.csv | asset, room, surface, brand, colorName, colorCode, finish, roomId |
 | documents.csv | asset, name, uploaded, size, mimeType, path, id |
