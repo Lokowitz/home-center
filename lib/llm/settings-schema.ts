@@ -153,6 +153,37 @@ export function originChanged(saved: string | null, next: string | null): boolea
   }
 }
 
+/**
+ * True when the LLM server is outside this machine and the home network, so
+ * questions and records leave the house. Blank or unreadable URLs are false.
+ */
+export function isOffNetworkUrl(url: string): boolean {
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, "")
+  } catch {
+    return false
+  }
+  // Docker service names and other single-label hosts only resolve locally.
+  if (!host.includes(".") && !host.includes(":")) return false
+  if (/\.(localhost|local|lan|internal|home\.arpa)$/.test(host)) return false
+  if (host === "::1" || /^f[cd]/.test(host) || host.startsWith("fe80:")) return false
+  const ip = host.split(".").map(Number)
+  if (ip.length === 4 && ip.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
+    const [a, b] = ip
+    return !(
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      // Tailscale and other carrier-grade NAT ranges.
+      (a === 100 && b >= 64 && b <= 127)
+    )
+  }
+  return true
+}
+
 /** A stored or typed extra-request JSON object; null when blank or not an object. */
 export function parseExtraBody(raw: string | null | undefined): Record<string, unknown> | null {
   if (!raw) return null

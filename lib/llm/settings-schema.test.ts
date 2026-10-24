@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isLlmReady, LLM_PRESETS, originChanged, parseExtraBody, parseLlmSettings, type LlmSettingsInput } from "./settings-schema"
+import { isLlmReady, isOffNetworkUrl, LLM_PRESETS, originChanged, parseExtraBody, parseLlmSettings, type LlmSettingsInput } from "./settings-schema"
 
 const base: LlmSettingsInput = {
   enabled: true,
@@ -142,5 +142,37 @@ describe("time limit and extra request JSON", () => {
     expect(parseExtraBody('{"a":1}')).toEqual({ a: 1 })
     expect(parseExtraBody(null)).toBeNull()
     expect(parseExtraBody("garbage")).toBeNull()
+  })
+})
+
+describe("isOffNetworkUrl", () => {
+  it("is false for this machine, the LAN and Docker hostnames", () => {
+    for (const url of [
+      "http://localhost:11434/v1",
+      "http://127.0.0.1:1234/v1",
+      "http://[::1]:8080/v1",
+      "http://192.168.1.20:11434/v1",
+      "http://10.0.0.5/v1",
+      "http://172.20.0.3:11434/v1",
+      "http://100.101.102.103/v1",
+      "http://[fd12::5]/v1",
+      "http://ollama:11434/v1",
+      "http://host.docker.internal:11434/v1",
+      "http://nas.local:1234/v1",
+      "http://llm.home.arpa/v1",
+      "http://box.lan/v1",
+    ]) expect(isOffNetworkUrl(url), url).toBe(false)
+  })
+
+  it("is true for public hosts and public IPs", () => {
+    expect(isOffNetworkUrl("https://api.openai.com/v1")).toBe(true)
+    expect(isOffNetworkUrl("https://openrouter.ai/api/v1")).toBe(true)
+    expect(isOffNetworkUrl("http://172.32.0.1/v1")).toBe(true)
+    expect(isOffNetworkUrl("http://8.8.8.8/v1")).toBe(true)
+  })
+
+  it("is false when the URL is blank or can't be read", () => {
+    expect(isOffNetworkUrl("")).toBe(false)
+    expect(isOffNetworkUrl("not a url")).toBe(false)
   })
 })

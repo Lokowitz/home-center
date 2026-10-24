@@ -10,10 +10,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form"
-import { Check } from "lucide-react"
+import { Check, TriangleAlert } from "lucide-react"
 import { settingsHref } from "@/lib/settings-sections"
 import { testLlmConnection, updateLlmSettings, updateLlmSwitches, type LlmSwitches } from "@/lib/actions/llm-settings"
-import { DEFAULT_TIMEOUT_SECONDS, DEFAULT_TOOL_ROUNDS, TOOL_ROUNDS_RANGE, LLM_PRESETS } from "@/lib/llm/settings-schema"
+import { DEFAULT_TIMEOUT_SECONDS, DEFAULT_TOOL_ROUNDS, TOOL_ROUNDS_RANGE, LLM_PRESETS, isOffNetworkUrl } from "@/lib/llm/settings-schema"
 
 type Values = {
   enabled: boolean
@@ -53,9 +53,9 @@ export function LlmSettings({
   const [testing, startTest] = useTransition()
   const [switchPending, startSwitch] = useTransition()
   const [switchStatus, setSwitchStatus] = useState<"idle" | "saved">("idle")
-  const [enabled, hidden, documentsEnabled, healthDocumentsEnabled] = useWatch({
+  const [enabled, hidden, documentsEnabled, healthDocumentsEnabled, baseUrl] = useWatch({
     control: form.control,
-    name: ["enabled", "hidden", "documentsEnabled", "healthDocumentsEnabled"],
+    name: ["enabled", "hidden", "documentsEnabled", "healthDocumentsEnabled", "baseUrl"],
   })
 
   useEffect(() => {
@@ -217,6 +217,16 @@ export function LlmSettings({
                     ))}
                     . In Docker, use the host&apos;s address instead of localhost.
                   </FormDescription>
+                  {isOffNetworkUrl(baseUrl) && (
+                    <p className="flex items-start gap-1.5 rounded-md border border-amber-500/50 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                      <TriangleAlert className="mt-px size-3.5 shrink-0" />
+                      <span>
+                        This server is outside your network. Questions, the records needed to answer them and receipts
+                        sent for reading will go to this provider{healthEnabled ? ", including health records" : ""}.
+                        Check its privacy terms, or use a local model such as Ollama or LM Studio.
+                      </span>
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />
