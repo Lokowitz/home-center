@@ -56,7 +56,7 @@ const OPS_BY_TYPE: Record<FieldType, Op[]> = {
   money: ["eq", "ne", "gt", "gte", "lt", "lte", "isNull"],
   date: ["eq", "ne", "gt", "gte", "lt", "lte", "isNull"],
   boolean: ["eq"],
-  enum: ["eq", "ne", "in"],
+  enum: ["eq", "ne", "in", "isNull"],
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "")

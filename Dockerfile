@@ -68,6 +68,7 @@ COPY --from=builder /app/lib/backup ./lib/backup
 COPY --from=builder /app/lib/attachment-location.ts ./lib/attachment-location.ts
 COPY --from=builder /app/lib/secret-box.ts ./lib/secret-box.ts
 COPY --from=builder /app/lib/maintenance-schedule.ts ./lib/maintenance-schedule.ts
+COPY --from=builder /app/lib/equipment-value.ts ./lib/equipment-value.ts
 COPY --from=builder /app/scripts ./scripts
 # Document extractors, loaded with tsx by workers/extract-worker.mjs (not bundled by Next).
 COPY --from=builder /app/lib/documents/extract ./lib/documents/extract

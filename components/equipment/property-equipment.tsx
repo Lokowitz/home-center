@@ -5,6 +5,7 @@ import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EquipmentFormDialog, type EquipmentWithRoom } from "./equipment-form-dialog"
 import { EquipmentRows } from "./equipment-rows"
+import { EquipmentValueSummary } from "./equipment-value-summary"
 import type { PropertyWithRooms } from "@/lib/rooms-server"
 
 /** A property's equipment tab: every item at the property, added and edited in a dialog over the page. */
@@ -27,6 +28,8 @@ export function PropertyEquipment({ equipment, property, openId }: { equipment: 
           <Plus className="mr-1 h-3.5 w-3.5" /> Add equipment
         </Button>
       </div>
+
+      {equipment.length > 0 && <EquipmentValueSummary equipment={equipment} />}
 
       {equipment.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">

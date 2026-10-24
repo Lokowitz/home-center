@@ -115,6 +115,10 @@ describe("compileWhere", () => {
     )
   })
 
+  it("lets an enum be filtered on null, so equipment left on the category default can be found", () => {
+    expect(compileWhere("equipment", [{ field: "valueClass", op: "isNull", value: true }], ctx).where).toEqual({ AND: [{ valueClass: null }] })
+  })
+
   it("handles isNull both ways and 'in' needing an array", () => {
     expect(compileWhere("medication", [{ field: "endDate", op: "isNull", value: true }], ctx).where).toEqual({ AND: [{ endDate: null }] })
     expect(compileWhere("medication", [{ field: "endDate", op: "isNull", value: false }], ctx).where).toEqual({ AND: [{ endDate: { not: null } }] })

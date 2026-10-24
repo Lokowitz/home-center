@@ -17,10 +17,13 @@ import { EQUIPMENT_CATEGORIES, categoryLabel } from "./categories"
 import type { Equipment, EquipmentCategory } from "@/app/generated/prisma/client"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 import { locationLabel, resolveRoomId } from "@/lib/rooms"
+import { VALUE_CLASSES, defaultValueClass, valueClassLabel, type ValueClass } from "@/lib/equipment-value"
 import type { PropertyWithRooms } from "@/lib/rooms-server"
 
 // Base UI Select has no empty-string option, so "unassigned" needs a sentinel.
 const NO_PROPERTY = "__none__"
+// Same for "Counts as": Default means the category decides, and is saved as no value.
+const DEFAULT_CLASS = "__default__"
 
 const schema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -33,6 +36,9 @@ const schema = z.object({
   purchaseDate: z.string().optional(),
   purchasePrice: z.string().optional(),
   installDate: z.string().optional(),
+  valueClass: z.string().optional(),
+  expectedLifeYears: z.string().optional(),
+  replacementCost: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -57,7 +63,7 @@ function fmt(d: Date | null | undefined) {
 
 const EMPTY: FormValues = {
   name: "", category: "APPLIANCE", manufacturer: "", modelNumber: "", serialNumber: "",
-  location: "", propertyId: NO_PROPERTY, purchaseDate: "", purchasePrice: "", installDate: "", notes: "",
+  location: "", propertyId: NO_PROPERTY, purchaseDate: "", purchasePrice: "", installDate: "", valueClass: DEFAULT_CLASS, expectedLifeYears: "", replacementCost: "", notes: "",
 }
 
 export function EquipmentFormDialog({ open, onClose, equipment, properties, defaultPropertyId, defaultLocation }: Props) {
@@ -82,6 +88,9 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
             purchaseDate: fmt(equipment.purchaseDate),
             purchasePrice: equipment.purchasePrice?.toString() ?? "",
             installDate: fmt(equipment.installDate),
+            valueClass: equipment.valueClass ?? DEFAULT_CLASS,
+            expectedLifeYears: equipment.expectedLifeYears?.toString() ?? "",
+            replacementCost: equipment.replacementCost?.toString() ?? "",
             notes: equipment.notes ?? "",
           }
         : { ...EMPTY, propertyId: defaultPropertyId ?? EMPTY.propertyId, location: defaultLocation ?? EMPTY.location }
@@ -89,6 +98,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
   }, [equipment, open, form, defaultPropertyId, defaultLocation])
 
   const selectedPropertyId = useWatch({ control: form.control, name: "propertyId" })
+  const selectedCategory = useWatch({ control: form.control, name: "category" })
   const selectedRooms = properties.find((p) => p.id === selectedPropertyId)?.rooms ?? []
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
@@ -98,6 +108,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
       ...values,
       propertyId,
       roomId,
+      valueClass: values.valueClass === DEFAULT_CLASS ? "" : values.valueClass,
     } as unknown as Parameters<typeof createEquipment>[0]
 
     const result = equipment
@@ -221,6 +232,44 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
                 <FormItem>
                   <FormLabel>Purchase Price</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="2499" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="replacementCost" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Replacement Cost</FormLabel>
+                  <FormControl><Input type="number" step="0.01" min="0" placeholder="2800" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="expectedLifeYears" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Expected Life (years)</FormLabel>
+                  <FormControl><Input type="number" step="1" min="1" max="100" placeholder="15" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="valueClass" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Counts As</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {(v: string) => (v === DEFAULT_CLASS ? `Default (${valueClassLabel(defaultValueClass(selectedCategory))})` : valueClassLabel(v as ValueClass))}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value={DEFAULT_CLASS}>{`Default (${valueClassLabel(defaultValueClass(selectedCategory))})`}</SelectItem>
+                      {VALUE_CLASSES.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />

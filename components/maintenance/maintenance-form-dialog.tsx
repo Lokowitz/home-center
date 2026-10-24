@@ -43,6 +43,9 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
+/** Starting values for a new reminder, such as the one "Plan replacement" prefills. */
+export type MaintenanceFormDefaults = Partial<Pick<FormValues, "title" | "repeat" | "nextDueDate" | "estimatedCost">>
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const INTERVAL_PRESETS = [
   { label: "Monthly", days: 30 },
@@ -73,6 +76,8 @@ interface Props {
   defaultRoomId?: string | null
   /** Vehicle's odometer unit, for the mileage field labels. Defaults to miles. */
   meterUnit?: MeterUnit
+  /** A new schedule's starting values. Pass a stable object (state or memo): a new object resets the form. */
+  defaults?: MaintenanceFormDefaults
 }
 
 function targetKey(assetType: AssetType, assetId: string) {
@@ -90,7 +95,7 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES" }: Props) {
+export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES", defaults }: Props) {
   const fmt = useFormat()
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
@@ -138,8 +143,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       roomId: schedule.roomId && roomKey.split(" ").includes(schedule.roomId) ? schedule.roomId : "",
     } : {
       assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
+      ...defaults,
     })
-  }, [schedule, open, form, assetId, assetType, defaultRoomId, roomKey])
+  }, [schedule, open, form, assetId, assetType, defaultRoomId, roomKey, defaults])
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files

@@ -3,13 +3,15 @@ import { DropPageAsset } from "@/components/drop/drop-provider"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar, Download, Factory, Tag, Fingerprint, MapPin, Building2, DollarSign, Wrench, FileText } from "lucide-react"
+import { Calendar, Download, Factory, Tag, Fingerprint, MapPin, Building2, DollarSign, Wrench, FileText, Hourglass } from "lucide-react"
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { EquipmentEditButton } from "@/components/equipment/equipment-edit-button"
+import { PlanReplacementButton } from "@/components/equipment/plan-replacement-button"
+import { ageLabel, equipmentAge, localDay } from "@/lib/equipment-life"
 import { categoryLabel } from "@/components/equipment/categories"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { getFormat } from "@/lib/regional-server"
@@ -42,6 +44,8 @@ export default async function EquipmentDetailPage({
     roomOptionsFor("EQUIPMENT", id),
   ])
 
+  const age = equipmentAge(equipment, localDay(new Date()))
+
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
       {/* Files dropped anywhere on this page go to Intake for this equipment. */}
@@ -68,6 +72,13 @@ export default async function EquipmentDetailPage({
           )}
           {equipment.installDate && <Stat icon={Calendar} label="Installed" value={fmt.date(equipment.installDate)} />}
           {equipment.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(equipment.purchaseDate)} />}
+          {age && (
+            <Stat
+              icon={Hourglass}
+              label="Age"
+              value={age.pastLife ? <span className="text-amber-700 dark:text-amber-400">{ageLabel(age)}</span> : ageLabel(age)}
+            />
+          )}
           {equipment.purchasePrice != null && (
             <Stat icon={DollarSign} label="Price" value={fmt.moneyWhole(equipment.purchasePrice)} />
           )}
@@ -87,6 +98,7 @@ export default async function EquipmentDetailPage({
           <h1 className="font-heading text-2xl font-semibold">{equipment.name}</h1>
           <div className="flex shrink-0 items-center gap-2">
             <EquipmentEditButton equipment={equipment} properties={properties} />
+            <PlanReplacementButton equipment={equipment} roomOptions={roomOptions} />
             <Link
               href={`/reports/equipment/${id}`}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"

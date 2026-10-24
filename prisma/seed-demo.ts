@@ -417,18 +417,19 @@ const VEHICLES: {
 const EQUIPMENT: {
   house: number; name: string; category: EquipmentCategory; manufacturer: string; model: string
   location: string; installedDaysAgo: number; price: number | null; photo: string; notes?: string
+  life?: number; replace?: number; valueClass?: "FIXTURE" | "CONTENTS"
 }[] = [
   // ── Maple Street House ──
-  { house: 0, name: "Kitchen Refrigerator", category: "APPLIANCE", manufacturer: "LG", model: "LRFVS3006S", location: "Kitchen", installedDaysAgo: 640, price: 2499, photo: "refrigerator kitchen" },
-  { house: 0, name: "Dishwasher", category: "APPLIANCE", manufacturer: "Bosch", model: "SHPM88Z75N", location: "Kitchen", installedDaysAgo: 1180, price: 1049, photo: "dishwasher" },
+  { house: 0, name: "Kitchen Refrigerator", category: "APPLIANCE", manufacturer: "LG", model: "LRFVS3006S", location: "Kitchen", installedDaysAgo: 640, price: 2499, photo: "refrigerator kitchen", life: 13, replace: 2700 },
+  { house: 0, name: "Dishwasher", category: "APPLIANCE", manufacturer: "Bosch", model: "SHPM88Z75N", location: "Kitchen", installedDaysAgo: 1180, price: 1049, photo: "dishwasher", life: 10, valueClass: "FIXTURE" },
   { house: 0, name: "Gas Range", category: "APPLIANCE", manufacturer: "GE", model: "JGB735SPSS", location: "Kitchen", installedDaysAgo: 1180, price: 899, photo: "gas stove kitchen" },
   { house: 0, name: "Over-Range Microwave", category: "APPLIANCE", manufacturer: "Panasonic", model: "NN-SN67KS", location: "Kitchen", installedDaysAgo: 420, price: 289, photo: "microwave oven" },
   { house: 0, name: "Washing Machine", category: "APPLIANCE", manufacturer: "Whirlpool", model: "WFW5620HW", location: "Laundry Room", installedDaysAgo: 1460, price: 799, photo: "washing machine top load" },
   { house: 0, name: "Clothes Dryer", category: "APPLIANCE", manufacturer: "Whirlpool", model: "WED5620HW", location: "Laundry Room", installedDaysAgo: 1460, price: 749, photo: "clothes dryer" },
-  { house: 0, name: "Gas Furnace", category: "HVAC", manufacturer: "Carrier", model: "59SC5A100", location: "Basement", installedDaysAgo: 2190, price: 4200, photo: "gas furnace", notes: "96% AFUE. Filter is 16x25x4 — takes the thick media filter, not the cheap ones." },
-  { house: 0, name: "Central Air Conditioner", category: "HVAC", manufacturer: "Trane", model: "XR16", location: "Side Yard", installedDaysAgo: 2190, price: 5100, photo: "air conditioner condenser unit" },
-  { house: 0, name: "Whole-House Humidifier", category: "HVAC", manufacturer: "Aprilaire", model: "700M", location: "Basement", installedDaysAgo: 1830, price: 320, photo: "humidifier" },
-  { house: 0, name: "Water Heater", category: "WATER", manufacturer: "Rheem", model: "XE50T10H45U0", location: "Basement", installedDaysAgo: 1290, price: 1450, photo: "water heater tank" },
+  { house: 0, name: "Gas Furnace", category: "HVAC", manufacturer: "Carrier", model: "59SC5A100", location: "Basement", installedDaysAgo: 2190, price: 4200, photo: "gas furnace", notes: "96% AFUE. Filter is 16x25x4 — takes the thick media filter, not the cheap ones.", life: 18, replace: 5200 },
+  { house: 0, name: "Central Air Conditioner", category: "HVAC", manufacturer: "Trane", model: "XR16", location: "Side Yard", installedDaysAgo: 2190, price: 5100, photo: "air conditioner condenser unit", life: 15, replace: 6500 },
+  { house: 0, name: "Whole-House Humidifier", category: "HVAC", manufacturer: "Aprilaire", model: "700M", location: "Basement", installedDaysAgo: 1830, price: 320, photo: "humidifier", life: 5, replace: 450 },
+  { house: 0, name: "Water Heater", category: "WATER", manufacturer: "Rheem", model: "XE50T10H45U0", location: "Basement", installedDaysAgo: 1290, price: 1450, photo: "water heater tank", life: 12, replace: 1800 },
   { house: 0, name: "Water Softener", category: "WATER", manufacturer: "Culligan", model: "HE 1.25", location: "Basement", installedDaysAgo: 980, price: 1890, photo: "water softener" },
   { house: 0, name: "Sump Pump", category: "WATER", manufacturer: "Zoeller", model: "M53", location: "Basement", installedDaysAgo: 730, price: 240, photo: "sump pump", notes: "Battery backup was added at the same time — battery is the part that ages out." },
   { house: 0, name: "Garage Door Opener", category: "SECURITY", manufacturer: "Chamberlain", model: "B4643T", location: "Garage", installedDaysAgo: 560, price: 329, photo: "garage door opener" },
@@ -450,8 +451,8 @@ const EQUIPMENT: {
   { house: 2, name: "Rental Range", category: "APPLIANCE", manufacturer: "Hotpoint", model: "RBS360DMWW", location: "Kitchen", installedDaysAgo: 760, price: 549, photo: "electric stove" },
   { house: 2, name: "Rental Washer", category: "APPLIANCE", manufacturer: "Maytag", model: "MVWC565FW", location: "Basement", installedDaysAgo: 520, price: 679, photo: "washing machine top load" },
   { house: 2, name: "Rental Dryer", category: "APPLIANCE", manufacturer: "Maytag", model: "MEDC465HW", location: "Basement", installedDaysAgo: 520, price: 629, photo: "clothes dryer laundry room" },
-  { house: 2, name: "Boiler", category: "HVAC", manufacturer: "Weil-McLain", model: "CGa-4-PIDN", location: "Basement", installedDaysAgo: 2920, price: 3900, photo: "boiler heating", notes: "Cast iron, original to the 1990s remodel. Annual service is not optional at this age." },
-  { house: 2, name: "Rental Water Heater", category: "WATER", manufacturer: "A. O. Smith", model: "GCR-40", location: "Basement", installedDaysAgo: 1980, price: 890, photo: "water heater basement" },
+  { house: 2, name: "Boiler", category: "HVAC", manufacturer: "Weil-McLain", model: "CGa-4-PIDN", location: "Basement", installedDaysAgo: 2920, price: 3900, photo: "boiler heating", notes: "Cast iron, original to the 1990s remodel. Annual service is not optional at this age.", life: 25, replace: 7800 },
+  { house: 2, name: "Rental Water Heater", category: "WATER", manufacturer: "A. O. Smith", model: "GCR-40", location: "Basement", installedDaysAgo: 1980, price: 890, photo: "water heater basement", life: 10, replace: 1500 },
   { house: 2, name: "Smoke & CO Alarms", category: "SECURITY", manufacturer: "First Alert", model: "SC9120B", location: "Hallways", installedDaysAgo: 760, price: 180, photo: "smoke detector" },
 ]
 
@@ -680,6 +681,7 @@ async function main() {
           location: e.location, propertyId: properties[e.house].id,
           purchaseDate: at(-e.installedDaysAgo - 3), installDate: at(-e.installedDaysAgo),
           purchasePrice: e.price, notes: e.notes ?? null,
+          expectedLifeYears: e.life ?? null, replacementCost: e.replace ?? null, valueClass: e.valueClass ?? null,
         },
       })
     )

@@ -11,6 +11,13 @@ describe("ontology", () => {
     expect(Object.keys(fields)).toEqual(expect.arrayContaining(["estimatedCost", "dueMonths", "dueDay"]))
   })
 
+  it("lets the assistant see equipment value and lifespan", () => {
+    const fields = ENTITIES.equipment.fields
+    expect(Object.keys(fields)).toEqual(expect.arrayContaining(["valueClass", "expectedLifeYears", "replacementCost"]))
+    expect(fields.valueClass.values).toEqual(["FIXTURE", "CONTENTS"])
+    expect(fields.valueClass.description).toMatch(/category/i)
+  })
+
   it("defines every key", () => {
     expect(Object.keys(ENTITIES).sort()).toEqual([...ENTITY_KEYS].sort())
   })

@@ -25,6 +25,32 @@ describe("equipment input", () => {
     expect(equipmentSchema.safeParse({ ...base, purchasePrice: "-1" }).success).toBe(false)
   })
 
+  it("saves the value class as picked, and none for Default", () => {
+    expect(parse({ valueClass: "FIXTURE" }).valueClass).toBe("FIXTURE")
+    expect(parse({ valueClass: "CONTENTS" }).valueClass).toBe("CONTENTS")
+    expect(parse({ valueClass: "" }).valueClass).toBeNull()
+    expect(parse({}).valueClass).toBeNull()
+    expect(equipmentSchema.safeParse({ ...base, valueClass: "HOUSE" }).success).toBe(false)
+  })
+
+  it("saves no replacement cost or expected life when left empty, not 0", () => {
+    for (const v of blanks) {
+      expect(parse({ replacementCost: v }).replacementCost).toBeNull()
+      expect(parse({ expectedLifeYears: v }).expectedLifeYears).toBeNull()
+    }
+  })
+
+  it("keeps a replacement cost and an expected life", () => {
+    expect(parse({ replacementCost: "1800.50" }).replacementCost).toBe(1800.5)
+    expect(parse({ replacementCost: "0" }).replacementCost).toBe(0)
+    expect(parse({ expectedLifeYears: "15" }).expectedLifeYears).toBe(15)
+  })
+
+  it("rejects an expected life outside whole years 1-100 and a negative replacement cost", () => {
+    for (const v of ["0", "12.5", "101", "abc"]) expect(equipmentSchema.safeParse({ ...base, expectedLifeYears: v }).success, v).toBe(false)
+    expect(equipmentSchema.safeParse({ ...base, replacementCost: "-1" }).success).toBe(false)
+  })
+
   it("keeps a picked room and saves no room for a blank one", () => {
     expect(parse({ roomId: "room1" }).roomId).toBe("room1")
     expect(parse({ roomId: "" }).roomId).toBeNull()

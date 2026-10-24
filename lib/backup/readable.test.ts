@@ -53,6 +53,28 @@ describe("readable", () => {
   })
 
 
+  it("equipment details: counts as, expected life, replacement cost", async () => {
+    const db = await snap()
+    const t = "2026-01-01T00:00:00.000Z"
+    const c = createClient({ url: fileUrl(db) })
+    try {
+      await c.executeMultiple(`
+        INSERT INTO "Equipment" (id, name, category, valueClass, expectedLifeYears, replacementCost, propertyId, updatedAt) VALUES
+          ('e7', 'Gas Furnace', 'HVAC', NULL, 18, 5200, 'p1', '${t}'),
+          ('e8', 'Built-in Oven', 'APPLIANCE', 'FIXTURE', NULL, NULL, 'p1', '${t}'),
+          ('e6', 'Chest Freezer', 'APPLIANCE', NULL, NULL, NULL, 'p1', '${t}');
+      `)
+    } finally {
+      c.close()
+    }
+    await releaseDbHandles()
+    const { data } = await loadReadable(db, { kind: "all", includeHealth: false }, rawPlacement)
+    const details = (id: string) => data.assets.find((a) => a.id === id)!.details
+    expect(details("e7")).toMatchObject({ "Counts as": "Part of the home", "Expected life (years)": 18, "Replacement cost": 5200 })
+    expect(details("e8")).toMatchObject({ "Counts as": "Part of the home", "Expected life (years)": null, "Replacement cost": null })
+    expect(details("e6")).toMatchObject({ "Counts as": "Belongings" })
+  })
+
   it("everything: assets, records with file links, health", async () => {
     const { data, files } = await loadReadable(await snap(), { kind: "all", includeHealth: true }, rawPlacement)
     expect(data.assets.map((a) => a.name).sort()).toEqual(["Daily Driver", "Main House", "Pat"])

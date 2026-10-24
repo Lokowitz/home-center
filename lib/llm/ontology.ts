@@ -1,5 +1,5 @@
 import {
-  AllergySeverity, AssetType, ConditionStatus, EquipmentCategory, InsuranceKind, MeterUnit,
+  AllergySeverity, AssetType, ConditionStatus, EquipmentCategory, EquipmentValueClass, InsuranceKind, MeterUnit,
   NotificationType, PropertyType, Relationship, ServiceCategory,
 } from "@/app/generated/prisma/enums"
 import { assetHref } from "@/lib/assets"
@@ -116,12 +116,15 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
   },
   equipment: {
     model: "equipment", label: "Equipment", plural: "equipment",
-    description: "Appliances, HVAC, tools, electronics, usually tied to a property.",
+    description: "Appliances, HVAC, tools, electronics, usually tied to a property, with optional expected life and replacement cost.",
     nameField: "name", searchFields: ["name", "manufacturer", "modelNumber", "location"], keys: ["propertyId", "roomId"],
     assetType: "EQUIPMENT",
     fields: {
       name: s, category: enumOf(EquipmentCategory), manufacturer: s, modelNumber: s, serialNumber: s,
       location: s, purchaseDate: date, purchasePrice: money, installDate: date, notes: s,
+      valueClass: enumOf(EquipmentValueClass, "Part of the home (FIXTURE) or belongings (CONTENTS). Null means the category default: HVAC, WATER and SECURITY are FIXTURE, the rest CONTENTS. To select by class, do not filter on this field alone: list the equipment and classify null rows by category, or combine valueClass with category."),
+      expectedLifeYears: { type: "int", description: "Years it should last, counted from installDate, else purchaseDate" },
+      replacementCost: money,
     },
     relations: { property: { kind: "one", entity: "property" }, room: { kind: "one", entity: "room" }, ...assetChildren },
     defaultSort: { field: "name", dir: "asc" },

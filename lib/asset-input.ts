@@ -21,6 +21,10 @@ export const equipmentSchema = z.object({
   purchaseDate: z.string().optional(),
   purchasePrice: optionalNumber(z.coerce.number().min(0)),
   installDate: z.string().optional(),
+  /// "" is Default: the category decides (lib/equipment-value.ts).
+  valueClass: z.enum(["", "FIXTURE", "CONTENTS"]).optional(),
+  expectedLifeYears: optionalNumber(z.coerce.number().int().min(1).max(100)),
+  replacementCost: optionalNumber(z.coerce.number().min(0)),
   notes: z.string().optional(),
 })
 
@@ -40,6 +44,9 @@ export function equipmentData(v: z.infer<typeof equipmentSchema>) {
     purchaseDate: v.purchaseDate ? new Date(v.purchaseDate) : null,
     purchasePrice: v.purchasePrice ?? null,
     installDate: v.installDate ? new Date(v.installDate) : null,
+    valueClass: v.valueClass || null,
+    expectedLifeYears: v.expectedLifeYears ?? null,
+    replacementCost: v.replacementCost ?? null,
     notes: v.notes || null,
   }
 }

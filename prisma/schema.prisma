@@ -77,6 +77,13 @@ enum EquipmentCategory {
   OTHER
 }
 
+enum EquipmentValueClass {
+  /// Part of the home: insured with the dwelling.
+  FIXTURE
+  /// Belongings: insured as personal property.
+  CONTENTS
+}
+
 enum Relationship {
   SELF
   SPOUSE
@@ -282,20 +289,26 @@ model Vehicle {
 }
 
 model Equipment {
-  id            String            @id @default(cuid())
-  name          String
-  category      EquipmentCategory @default(APPLIANCE)
-  manufacturer  String?
-  modelNumber   String?
-  serialNumber  String?
-  location      String?
-  purchaseDate  DateTime?
-  purchasePrice Float?
-  installDate   DateTime?
-  notes         String?
-  imageFilename String?
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                String               @id @default(cuid())
+  name              String
+  category          EquipmentCategory    @default(APPLIANCE)
+  manufacturer      String?
+  modelNumber       String?
+  serialNumber      String?
+  location          String?
+  purchaseDate      DateTime?
+  purchasePrice     Float?
+  installDate       DateTime?
+  /// Part of the home or belongings. Null means the category's default (lib/equipment-value.ts).
+  valueClass        EquipmentValueClass?
+  /// How many years it should last, counted from installDate, else purchaseDate.
+  expectedLifeYears Int?
+  /// What replacing it would cost today.
+  replacementCost   Float?
+  notes             String?
+  imageFilename     String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   propertyId String?
   property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)

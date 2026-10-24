@@ -7,6 +7,8 @@ import type { Formatter } from "@/lib/regional"
 import { ageFrom } from "@/lib/health"
 import { loadFeatures } from "@/lib/features-server"
 import { locationLabel } from "@/lib/rooms"
+import { effectiveValueClass, valueClassLabel } from "@/lib/equipment-value"
+import { ageLabel, equipmentAge, localDay } from "@/lib/equipment-life"
 
 // Everything the printable asset report needs, in one place.
 //
@@ -268,6 +270,7 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
   })
   if (!e) return null
   const location = locationLabel(e)
+  const age = equipmentAge(e, localDay(new Date()))
   return {
     type: "EQUIPMENT",
     id: e.id,
@@ -291,6 +294,10 @@ async function loadAsset(assetType: AssetType, assetId: string): Promise<ReportA
       ...(e.purchasePrice != null
         ? [{ label: "Purchase price", value: fmt.moneyWhole(e.purchasePrice) }]
         : []),
+      { label: "Counts as", value: valueClassLabel(effectiveValueClass(e)) },
+      ...(e.expectedLifeYears ? [{ label: "Expected life", value: `${e.expectedLifeYears} ${e.expectedLifeYears === 1 ? "year" : "years"}` }] : []),
+      ...(age ? [{ label: "Age", value: ageLabel(age) }] : []),
+      ...(e.replacementCost != null ? [{ label: "Replacement cost", value: fmt.moneyWhole(e.replacementCost) }] : []),
     ],
   }
 }

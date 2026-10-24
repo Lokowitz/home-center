@@ -50,7 +50,7 @@ Files are in `readable/data/`. All dates are ISO 8601 text. A value that is not 
 `assetType` is `property`, `vehicle`, `equipment` or `person`.
 A file reference (`FileRef`) is `{ name, path, size, mimeType }`. `path` is relative to the zip root, for example `files/Vehicles/Truck/service/receipt.pdf`.
 
-- `assets.json`: `id`, `type`, `name`, `details` (labels and values, such as Make or Address), `photo` (path or null), `propertyId` (for equipment).
+- `assets.json`: `id`, `type`, `name`, `details` (labels and values, such as Make or Address), `photo` (path or null), `propertyId` (for equipment). Equipment details include "Counts as" (Part of the home or Belongings; the category's default when none was picked), "Expected life (years)" and "Replacement cost".
 - `service-records.json`: `id`, `assetId`, `assetType`, `date`, `title`, `vendor`, `cost`, `category`, `mileage`, `notes`, `files`.
 - `warranties.json`: `id`, `assetId`, `assetType`, `product`, `purchased`, `expires`, `vendor`, `phone`, `email`, `notes`, `files`.
 - `reminders.json`: `id`, `assetId`, `assetType`, `title`, `repeats` (for example "Every 90 days", "Apr, Oct" or "Once"), `estimatedCost`, `everyDays`, `everyMiles`, `lastDone`, `nextDue`, `nextDueMileage`, `active`, `files`.

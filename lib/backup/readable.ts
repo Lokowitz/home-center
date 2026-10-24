@@ -2,6 +2,7 @@
 // The public, documented shape of an export (docs/export-format.md). Read with
 // plain SQL from a snapshot so it never depends on the Prisma client's shape.
 import { repeatsLabel } from "../maintenance-schedule"
+import { effectiveValueClass, valueClassLabel, type ValueClass } from "../equipment-value"
 import path from "node:path"
 import type { Client, Row } from "@libsql/client"
 import { attachmentDir, type AttachmentLocation } from "../attachment-location"
@@ -134,7 +135,9 @@ export async function loadReadable(snapshot: string, scope: ExportScope, place: 
       ...vehicles.map((r) => ({ id: String(r.id), type: "vehicle" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Make: str(r.make), Model: str(r.model), Year: num(r.year), VIN: str(r.vin), Color: str(r.color), "Current reading": num(r.currentMileage), Unit: str(r.meterUnit), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
       ...equipment.map((r) => ({ id: String(r.id), type: "equipment" as const, name: String(r.name), propertyId: str(r.propertyId), photo: str(r.imageFilename),
-        details: { Category: str(r.category), Manufacturer: str(r.manufacturer), Model: str(r.modelNumber), Serial: str(r.serialNumber), Location: roomName.get(String(r.roomId)) ?? str(r.location), Installed: iso(r.installDate), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice), Notes: str(r.notes) } })),
+        details: { Category: str(r.category), Manufacturer: str(r.manufacturer), Model: str(r.modelNumber), Serial: str(r.serialNumber), Location: roomName.get(String(r.roomId)) ?? str(r.location), Installed: iso(r.installDate), Purchased: iso(r.purchaseDate), "Purchase price": num(r.purchasePrice),
+          "Counts as": valueClassLabel(effectiveValueClass({ category: String(r.category), valueClass: str(r.valueClass) as ValueClass | null })),
+          "Expected life (years)": num(r.expectedLifeYears), "Replacement cost": num(r.replacementCost), Notes: str(r.notes) } })),
       ...people.map((r) => ({ id: String(r.id), type: "person" as const, name: String(r.name), propertyId: null, photo: str(r.imageFilename),
         details: { Relationship: str(r.relationship), Born: iso(r.dateOfBirth), Sex: str(r.sex), "Blood type": str(r.bloodType), Notes: str(r.notes) } })),
     ]
