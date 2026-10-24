@@ -34,8 +34,9 @@ export function documentIndexer(): Indexer {
   state.indexer ??= createIndexer({
     store: prismaIndexerStore,
     index: searchIndex,
-    extract: async (filePath, ext, opts) => (await import("./extract")).extractFile(filePath, ext, opts),
-    idle: async () => (await import("./extract/ocr")).terminateOcr(),
+    // Uploads are untrusted: each file is read in its own worker thread, which
+    // also ends any OCR worker with it, so there's nothing to free when idle.
+    extract: async (filePath, ext, opts) => (await import("./extract/isolated")).extractInWorker(filePath, ext, opts),
     // A capture-inbox file is read for its receipt fields once its text is in.
     processed: async (job) => {
       if (job.recordType === "INBOX") await (await import("@/lib/capture-server")).processInboxAttachment(job.attachmentId)

@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { requireHealth } from "@/lib/features-server"
 import { insuranceSchema } from "@/lib/health-schemas"
 import { removeUploadDir } from "@/lib/upload-fs"
 import type { ActionResult, FormValues } from "@/lib/form-types"
@@ -18,6 +19,7 @@ function revalidateInsurance() {
 export async function createInsurancePolicy(values: FormValues): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const parsed = insuranceSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -33,6 +35,7 @@ export async function createInsurancePolicy(values: FormValues): Promise<ActionR
 export async function updateInsurancePolicy(id: string, values: FormValues): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const parsed = insuranceSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -51,6 +54,7 @@ export async function updateInsurancePolicy(id: string, values: FormValues): Pro
 export async function deleteInsurancePolicy(id: string): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const existing = await prisma.insurancePolicy.findUnique({ where: { id }, select: { id: true } })
   if (!existing) return { error: "Not found" }

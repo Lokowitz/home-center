@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { requireHealth } from "@/lib/features-server"
 import { personSchema } from "@/lib/health-schemas"
 import { removeUploadDir } from "@/lib/upload-fs"
 import type { ActionResult, FormValues } from "@/lib/form-types"
@@ -11,6 +12,7 @@ import type { ActionResult, FormValues } from "@/lib/form-types"
 export async function createPerson(values: FormValues): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const parsed = personSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -23,6 +25,7 @@ export async function createPerson(values: FormValues): Promise<ActionResult> {
 export async function updatePerson(id: string, values: FormValues): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const parsed = personSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
@@ -36,6 +39,7 @@ export async function updatePerson(id: string, values: FormValues): Promise<Acti
 export async function deletePerson(id: string): Promise<ActionResult> {
   const session = await auth()
   if (!session) redirect("/login")
+  await requireHealth()
 
   const person = await prisma.person.findUnique({
     where: { id },

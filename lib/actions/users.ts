@@ -20,15 +20,33 @@ function generateTempPassword() {
   return randomBytes(6).toString("hex") // 12 char hex string
 }
 
-export async function updateSelf(data: { name: string; email: string }) {
+/**
+ * Name and email of the signed-in user. A new email needs the current
+ * password: whoever controls the email controls password reset, so a signed-in
+ * browser alone must not be able to move it (same rule as changeOwnPassword).
+ */
+export async function updateSelf(data: { name: string; email: string; currentPassword?: string }) {
   const session = await auth()
   if (!session) redirect("/login")
 
   const parsed = z.object({
     name: z.string().min(1),
     email: emailAddress,
+    currentPassword: z.string().optional(),
   }).safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+
+  const account = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { email: true, passwordHash: true },
+  })
+  if (!account) redirect("/login")
+  if (parsed.data.email !== account.email) {
+    const current = parsed.data.currentPassword ?? ""
+    if (!current || !(await bcrypt.compare(current, account.passwordHash))) {
+      return { error: { currentPassword: ["Your current password is not correct."] } }
+    }
+  }
 
   const conflict = await prisma.user.findFirst({
     where: { email: parsed.data.email, NOT: { id: session.user.id } },

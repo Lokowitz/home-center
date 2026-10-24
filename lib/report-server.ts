@@ -100,6 +100,8 @@ const PROPERTY_TYPE_LABELS: Record<string, string> = {
 }
 
 export async function loadReport(assetType: AssetType, assetId: string): Promise<ReportData | null> {
+  // A person's report is a medical summary: with Health off there is none to show.
+  if (assetType === "PERSON" && !(await loadFeatures()).health) return null
   const [services, warranties, schedules] = await Promise.all([
     prisma.serviceRecord.findMany({
       where: { assetId, assetType },

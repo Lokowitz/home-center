@@ -32,6 +32,12 @@ const schema = z.object({
 
 export type MailSettingsInput = z.infer<typeof schema>
 
+/** True when the server is being pointed somewhere other than where the password was saved for. */
+function hostChanged(savedHost: string | null, nextHost: string | null) {
+  const norm = (h: string | null) => (h ?? "").trim().toLowerCase()
+  return norm(savedHost) !== norm(nextHost)
+}
+
 function optionalInt(raw: string | undefined, min: number, max: number) {
   if (!raw) return null
   const n = Number(raw)
@@ -66,11 +72,16 @@ export async function updateMailSettings(data: MailSettingsInput) {
     publicUrl,
   }
 
+  // A stored password never follows the settings to a different server.
+  // Compared as resolved, so a blank field and SMTP_HOST count as the same server.
+  const savedHost = (await loadMailConfig()).host
   const passwordEnc = v.clearPassword
     ? null
     : v.password
       ? encrypt(v.password)
-      : undefined // undefined = don't touch the stored value
+      : hostChanged(savedHost, base.host || process.env.SMTP_HOST || null)
+        ? null
+        : undefined // undefined = don't touch the stored value
 
   await prisma.mailSettings.upsert({
     where: { id: SETTINGS_ID },
@@ -100,14 +111,17 @@ async function draftConfig(input?: MailSettingsInput) {
 
   const port = optionalInt(v.port, 1, 65535)
   const resolvedPort = port === undefined || port === null ? saved.port : port
+  const host = v.host || saved.host
 
   return {
     ...saved,
-    host: v.host || saved.host,
+    host,
     port: resolvedPort,
     username: v.username || saved.username,
-    // An empty password field means "keep the stored one", same as on save.
-    password: v.password || saved.password,
+    // An empty password field means "keep the stored one", same as on save, but
+    // only for the server it was saved for: otherwise "Test" would hand the
+    // stored password to whatever host was typed in.
+    password: v.password || (hostChanged(saved.host, host) ? null : saved.password),
     secure: v.secure === "auto" ? resolvedPort === 465 : v.secure === "true",
     from: v.fromAddress || saved.from,
   }

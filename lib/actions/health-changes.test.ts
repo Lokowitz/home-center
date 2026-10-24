@@ -14,6 +14,7 @@ vi.mock("@/auth", () => ({ auth: async () => ({ user: { id: "u1" } }) }))
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }))
 vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirect") } }))
 vi.mock("@/lib/upload-fs", () => ({ removeUploadDir }))
+vi.mock("@/lib/features-server", () => ({ requireHealth: async () => undefined }))
 
 import { STALE_ENTRY } from "@/lib/observation-cards"
 import { applyObservationEdit, deleteObservationIfUnchanged } from "./health"

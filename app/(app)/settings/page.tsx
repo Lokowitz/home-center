@@ -51,7 +51,10 @@ export default async function SettingsPage({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
     }),
-    is("users") ? prisma.user.findMany({ orderBy: { createdAt: "asc" } }) : Promise.resolve([]),
+    // Only what the table shows: the rows are sent to the browser, so no password hashes.
+    is("users")
+      ? prisma.user.findMany({ select: { id: true, name: true, email: true, role: true, mustResetPassword: true }, orderBy: { createdAt: "asc" } })
+      : Promise.resolve([]),
     is("notifications") && isAdmin
       ? prisma.user.findMany({
           select: { id: true, name: true, email: true, role: true, receivesNotifications: true },

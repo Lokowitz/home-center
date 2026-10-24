@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // No "X-Powered-By: Next.js" — it only helps someone pick an exploit.
   poweredByHeader: false,
+  // next/image isn't used, so the /_next/image optimizer (public, outside the
+  // proxy) is switched off rather than left as attack surface.
+  images: { unoptimized: true },
   // The capture inbox is shown as "Intake" now; old links and bookmarks still work.
   async redirects() {
     return [{ source: "/inbox", destination: "/intake", permanent: true }];

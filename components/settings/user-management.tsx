@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { signOut } from "next-auth/react"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -14,7 +14,9 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Badge } from "@/components/ui/badge"
 import { createUser, updateUserRole, resetUserPassword, deleteUser, updateSelf, changeOwnPassword } from "@/lib/actions/users"
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-change"
-import type { User } from "@/app/generated/prisma/client"
+import type { User as PrismaUser } from "@/app/generated/prisma/client"
+
+type User = Pick<PrismaUser, "id" | "name" | "email" | "role" | "mustResetPassword">
 
 const roleLabel: Record<string, string> = { ADMIN: "Admin", USER: "User" }
 
@@ -206,19 +208,23 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: (result?:
 const editSelfSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().min(1, "Email is required"),
+  currentPassword: z.string(),
 })
 
 function EditSelfDialog({ user, onClose }: { user: User; onClose: () => void }) {
   const form = useForm({
     resolver: zodResolver(editSelfSchema),
-    defaultValues: { name: user.name, email: user.email },
+    defaultValues: { name: user.name, email: user.email, currentPassword: "" },
   })
+  const emailChanged = useWatch({ control: form.control, name: "email" }) !== user.email
 
   async function onSubmit(values: z.infer<typeof editSelfSchema>) {
     const result = await updateSelf(values)
     if (result?.error) {
       const emailError = Array.isArray(result.error.email) ? result.error.email[0] : null
       if (emailError) form.setError("email", { message: emailError })
+      const passwordError = "currentPassword" in result.error && Array.isArray(result.error.currentPassword) ? result.error.currentPassword[0] : null
+      if (passwordError) form.setError("currentPassword", { message: passwordError })
       toast.error("Failed to update profile.")
       return
     }
@@ -238,6 +244,11 @@ function EditSelfDialog({ user, onClose }: { user: User; onClose: () => void }) 
             <FormField control={form.control} name="email" render={({ field }) => (
               <FormItem><FormLabel>Email *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+            {emailChanged && (
+              <FormField control={form.control} name="currentPassword" render={({ field }) => (
+                <FormItem><FormLabel>Current password *</FormLabel><FormControl><Input type="password" autoComplete="current-password" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            )}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>

@@ -13,6 +13,10 @@ export const MAX_OCR_PAGES = 30
 export const EXTRACT_TIMEOUT_MS = 120_000
 export const OCR_TIMEOUT_MS = 600_000
 export const MAX_ATTEMPTS = 3
+/** Heap cap for the extraction worker; past it the worker dies, not the server. */
+export const EXTRACT_HEAP_MB = 1024
+/** Added to the extract timeouts for the worker to start and compile the extractors. */
+export const EXTRACT_WORKER_GRACE_MS = 15_000
 
 /** Separates pages in AttachmentText.text. */
 export const PAGE_BREAK = "\f"

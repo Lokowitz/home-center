@@ -9,6 +9,8 @@ import {
 
 const NOW = new Date("2026-10-21T12:00:00Z")
 const hash = (t: string) => createHash("sha256").update(t).digest("hex")
+// The link is sent in the background; lets it finish before checking.
+const settle = () => new Promise((r) => setTimeout(r, 0))
 
 function requestDeps(over: Partial<RequestDeps> = {}): RequestDeps {
   return {
@@ -29,6 +31,7 @@ describe("requestPasswordReset", () => {
   it("emails a link and stores only the token's hash, valid for 15 minutes", async () => {
     const d = requestDeps()
     expect(await requestPasswordReset("a@b.co", "1.1.1.1", d)).toBe("sent")
+    await settle()
     expect(d.send).toHaveBeenCalledWith(
       expect.objectContaining({ to: "a@b.co", text: expect.stringContaining("https://home.example/reset-password?token=tok_abc") })
     )
@@ -60,7 +63,18 @@ describe("requestPasswordReset", () => {
     const d = requestDeps({ send: vi.fn(async () => { throw new Error("smtp down") }) })
     vi.spyOn(console, "error").mockImplementation(() => {})
     expect(await requestPasswordReset("a@b.co", "1.1.1.1", d)).toBe("sent")
+    await settle()
     expect(d.storeToken).not.toHaveBeenCalled()
+  })
+
+  it("answers without waiting for the mail server, so a real account isn't slower", async () => {
+    let release!: () => void
+    const d = requestDeps({ send: vi.fn(() => new Promise<void>((r) => (release = r))) })
+    expect(await requestPasswordReset("a@b.co", "1.1.1.1", d)).toBe("sent")
+    expect(d.storeToken).not.toHaveBeenCalled()
+    release()
+    await settle()
+    expect(d.storeToken).toHaveBeenCalled()
   })
 
   it("rejects a malformed address", async () => {
@@ -72,6 +86,7 @@ describe("requestPasswordReset", () => {
     const d = requestDeps()
     for (let i = 0; i < RESET_REQUEST_LIMITS.perEmail; i++) expect(await requestPasswordReset("a@b.co", `10.0.0.${i}`, d)).toBe("sent")
     expect(await requestPasswordReset("a@b.co", "10.0.0.99", d)).toBe("throttled")
+    await settle()
     expect(d.send).toHaveBeenCalledTimes(RESET_REQUEST_LIMITS.perEmail)
   })
 })
