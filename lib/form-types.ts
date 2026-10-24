@@ -22,4 +22,10 @@ export type FieldConfig = {
   suggestions?: string[]
   /// Spans both columns of the dialog grid.
   wide?: boolean
+  /// A lib/field-help id: adds the "?" popover beside the label.
+  help?: string
+  /// Shown only while this returns true (values are the form's current values). A hidden field keeps its value.
+  showWhen?: (values: FormValues) => boolean
+  /// A warning shown under the field while it returns text.
+  notice?: (values: FormValues) => string | null
 }

@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Inbox, MessageSquare } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FieldHelp } from "@/components/ui/field-help"
 import { cn } from "@/lib/utils"
 import { PLACEMENTS, savePlacement, type PlacementKey, type PlacementValue } from "@/lib/placement"
 
 const ICONS = { assistant: MessageSquare, intake: Inbox } satisfies Record<PlacementKey, React.ElementType>
+const HELP = { assistant: { help: "placement.assistant" }, intake: { help: "placement.intake" } } satisfies Record<PlacementKey, { help: string }>
 
 /** A small sketch of a page (top bar, side menu, content) with the button where this option puts it. */
 function Sketch({ prefKey, value, chosen }: { prefKey: PlacementKey; value: string; chosen: boolean }) {
@@ -71,7 +73,7 @@ export function PlacementSettings<K extends PlacementKey>({
   return (
     <Card className="py-5">
       <CardHeader className="px-5">
-        <CardTitle>{title}</CardTitle>
+        <CardTitle className="flex items-center gap-1.5">{title}<FieldHelp id={HELP[prefKey].help} /></CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="px-5">

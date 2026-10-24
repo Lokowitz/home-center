@@ -94,7 +94,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel help="property.name">Name *</FormLabel>
                   <FormControl><Input placeholder="Main House" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -102,7 +102,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="type" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Type *</FormLabel>
+                  <FormLabel help="property.type">Type *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue>{(v: string) => TYPE_LABELS[v] ?? v}</SelectValue></SelectTrigger></FormControl>
                     <SelectContent>
@@ -119,7 +119,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="yearBuilt" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Year Built</FormLabel>
+                  <FormLabel help="property.year-built">Year Built</FormLabel>
                   <FormControl><Input type="number" placeholder="1995" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -127,7 +127,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="address" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Address *</FormLabel>
+                  <FormLabel help="property.address">Address *</FormLabel>
                   <FormControl><Input placeholder="123 Main St, City, State" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -135,7 +135,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="purchaseDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Date</FormLabel>
+                  <FormLabel help="property.purchase-date">Purchase Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -143,7 +143,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Price</FormLabel>
+                  <FormLabel help="property.purchase-price">Purchase Price</FormLabel>
                   <FormControl><Input type="number" placeholder="350000" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -151,7 +151,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="sqFt" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{fmt.areaLabel}</FormLabel>
+                  <FormLabel help="property.area">{fmt.areaLabel}</FormLabel>
                   <FormControl><Input type="number" placeholder="2000" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -159,7 +159,7 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
 
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="property.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

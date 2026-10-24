@@ -7,6 +7,7 @@ import { generateX25519Identity, identityToRecipient } from "age-encryption"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { FieldHelp } from "@/components/ui/field-help"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -45,7 +46,7 @@ export function BackupProtection({ data, onSaved }: { data: BackupOverview; onSa
   return (
     <Card className="py-5">
       <CardHeader className="px-5">
-        <CardTitle>Protection</CardTitle>
+        <CardTitle className="flex items-center gap-1.5">Protection<FieldHelp id="backup.protection" /></CardTitle>
         <CardDescription>Applies to new backups. Each backup in the list shows how it was protected.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3 px-5 sm:grid-cols-3">
@@ -129,10 +130,10 @@ function KeyDialog({ onClose, onSaved, replacing }: { onClose: () => void; onSav
           <div className="space-y-3 text-sm">
             <p>Fingerprint <span className="font-mono">{kit.fingerprint}</span></p>
             <Button variant="outline" onClick={download}><Download className="h-4 w-4" aria-hidden="true" />Download recovery key</Button>
-            <label className="flex items-start gap-2">
+            <Label help="backup.key-saved" className="items-start font-normal leading-normal">
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={saved} disabled={!downloaded} onChange={(e) => setSaved(e.target.checked)} />
               <span>I saved the key somewhere other than this server. I understand backups made with it can&apos;t be opened without it.</span>
-            </label>
+            </Label>
           </div>
         )}
         <DialogFooter>
@@ -173,12 +174,12 @@ function PasswordDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
-            <Label htmlFor="bk-pw">Password</Label>
+            <Label htmlFor="bk-pw" help="backup.password">Password</Label>
             <Input id="bk-pw" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
             {problem && <p className="text-xs text-destructive">{problem}</p>}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="bk-pw2">Same password again</Label>
+            <Label htmlFor="bk-pw2" help="backup.password-again">Same password again</Label>
             <Input id="bk-pw2" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
             {mismatch && <p className="text-xs text-destructive">{mismatch}</p>}
           </div>

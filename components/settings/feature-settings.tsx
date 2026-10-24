@@ -5,6 +5,7 @@ import { useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import { updateFeatureSettings } from "@/lib/actions/feature-settings"
 
 type Values = { healthEnabled: boolean; roomsEnabled: boolean; equipmentTabEnabled: boolean }
@@ -48,7 +49,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="px-5 space-y-2">
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <Label help="features.health" className="leading-normal">
           <input
             type="checkbox"
             className="h-4 w-4 accent-primary"
@@ -57,7 +58,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
             onChange={(e) => save({ ...values, healthEnabled: e.target.checked })}
           />
           Show the Health section
-        </label>
+        </Label>
         <p className="ml-6 text-xs text-muted-foreground">
           Turned off, it disappears from the menu, the dashboard, lists, search, notifications and the assistant. Nothing
           is deleted — turn it back on and it all returns.
@@ -74,7 +75,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         <CardDescription>Rooms inside properties: paint, flooring, photos.</CardDescription>
       </CardHeader>
       <CardContent className="px-5 space-y-2">
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <Label help="features.rooms" className="leading-normal">
           <input
             type="checkbox"
             className="h-4 w-4 accent-primary"
@@ -83,7 +84,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
             onChange={(e) => save({ ...values, roomsEnabled: e.target.checked })}
           />
           Show Rooms
-        </label>
+        </Label>
         <p className="ml-6 text-xs text-muted-foreground">
           Turned off, rooms disappear from properties, equipment and records. Nothing is deleted — turn it back on and it
           all returns.
@@ -100,7 +101,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         <CardDescription>A property&apos;s equipment, and each room&apos;s, listed and edited in place.</CardDescription>
       </CardHeader>
       <CardContent className="px-5 space-y-2">
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <Label help="features.equipment-tab" className="leading-normal">
           <input
             type="checkbox"
             className="h-4 w-4 accent-primary"
@@ -109,7 +110,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
             onChange={(e) => save({ ...values, equipmentTabEnabled: e.target.checked })}
           />
           Show the Equipment tab on properties and rooms
-        </label>
+        </Label>
         <p className="ml-6 text-xs text-muted-foreground">
           Turned off, the Equipment tab disappears from properties and from the room window. Equipment itself is
           untouched and still reachable from the Equipment page.

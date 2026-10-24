@@ -8,6 +8,7 @@ import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useDropTarget } from "@/components/drop/drop-provider"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { completeMaintenanceSchedule } from "@/lib/actions/maintenance"
@@ -71,38 +72,38 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, manual, on
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label htmlFor="complete-date" className="text-sm font-medium">Completion Date</label>
+              <Label htmlFor="complete-date" help="complete.date">Completion Date</Label>
               <Input id="complete-date" type="date" {...register("completedDate")} />
             </div>
             {schedule.assetType === "VEHICLE" && (
               <div className="space-y-1.5">
-                <label htmlFor="complete-mileage" className="text-sm font-medium">{fmt.meterNoun(meterUnit)} at Completion</label>
+                <Label htmlFor="complete-mileage" help="complete.mileage">{fmt.meterNoun(meterUnit)} at Completion</Label>
                 <Input id="complete-mileage" type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...register("completedMileage")} />
               </div>
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-sm font-medium">
+          <Label help="complete.log">
             <input type="checkbox" className="h-4 w-4 accent-primary" {...register("logService")} />
             {isPerson ? "Add to visits" : "Add to service history"}
-          </label>
+          </Label>
 
           {logService && (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label htmlFor="complete-vendor" className="text-sm font-medium">{isPerson ? "Facility" : "Vendor / Shop"}</label>
+                <Label htmlFor="complete-vendor" help="complete.vendor">{isPerson ? "Facility" : "Vendor / Shop"}</Label>
                 <Input id="complete-vendor" placeholder={isPerson ? "City Medical Center" : "Jiffy Lube"} {...register("vendor")} />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="complete-cost" className="text-sm font-medium">{`Cost (${fmt.currencySymbol})`}</label>
+                <Label htmlFor="complete-cost" help="complete.cost">{`Cost (${fmt.currencySymbol})`}</Label>
                 <Input id="complete-cost" type="number" step="0.01" min="0" placeholder={schedule.estimatedCost != null ? `Est. ${fmt.money(schedule.estimatedCost)}` : "89.99"} {...register("cost")} />
               </div>
               <div className="col-span-2 space-y-1.5">
-                <label htmlFor="complete-notes" className="text-sm font-medium">Notes</label>
+                <Label htmlFor="complete-notes" help="complete.notes">Notes</Label>
                 <Textarea id="complete-notes" rows={2} {...register("notes")} />
               </div>
               <div className="col-span-2 space-y-1.5">
-                <label htmlFor="complete-files" className="text-sm font-medium">Receipt or photos</label>
+                <Label htmlFor="complete-files" help="complete.files">Receipt or photos</Label>
                 <Input
                   id="complete-files"
                   type="file"

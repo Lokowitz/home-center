@@ -14,7 +14,7 @@ export function RoomSelect({ value, onChange, options }: { value: string; onChan
   if (options.length === 0) return null
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>Room</Label>
+      <Label htmlFor={id} help="room.select">Room</Label>
       <Select value={value || NO_ROOM} onValueChange={(v) => onChange(!v || v === NO_ROOM ? "" : v)}>
         <SelectTrigger id={id} className="w-full">
           <SelectValue>{(v: string) => options.find((r) => r.id === v)?.name ?? "None"}</SelectValue>

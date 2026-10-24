@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { FieldHelp } from "@/components/ui/field-help"
 import {
   clearExtractedText, deleteEmbeddingModel, downloadEmbeddingModel, getModelStatus, rebuildDocumentIndex, reextractDocuments,
   retryFailedDocuments, switchEmbeddingModel, updateDocumentSettings, type DocumentActionResult,
@@ -107,42 +108,51 @@ export function DocumentSettings({
         </CardDescription>
       </CardHeader>
       <CardContent className="px-5 space-y-4">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={on}
-            disabled={pending}
-            onChange={(e) => save({ ...values, indexingEnabled: e.target.checked })}
-          />
-          Index uploaded documents
-        </label>
-
-        <div className="space-y-1">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-primary"
-              checked={values.ocrEnabled}
-              disabled={pending || !on}
-              onChange={(e) => save({ ...values, ocrEnabled: e.target.checked })}
-            />
-            Read text from photos and scanned PDFs (OCR)
-          </label>
-          <p className="ml-6 text-xs text-muted-foreground">Uses noticeable CPU while indexing new uploads.</p>
-        </div>
-
-        <div className="space-y-3 border-t pt-4">
+        <div className="flex items-center gap-1.5">
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
               type="checkbox"
               className="h-4 w-4 accent-primary"
-              checked={values.semanticEnabled}
-              disabled={pending || !on}
-              onChange={(e) => save({ ...values, semanticEnabled: e.target.checked })}
+              checked={on}
+              disabled={pending}
+              onChange={(e) => save({ ...values, indexingEnabled: e.target.checked })}
             />
-            Find documents by meaning, not just exact words
+            Index uploaded documents
           </label>
+          <FieldHelp id="documents.indexing" />
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={values.ocrEnabled}
+                disabled={pending || !on}
+                onChange={(e) => save({ ...values, ocrEnabled: e.target.checked })}
+              />
+              Read text from photos and scanned PDFs (OCR)
+            </label>
+            <FieldHelp id="documents.ocr" />
+          </div>
+          <p className="ml-6 text-xs text-muted-foreground">Uses noticeable CPU while indexing new uploads.</p>
+        </div>
+
+        <div className="space-y-3 border-t pt-4">
+          <div className="flex items-center gap-1.5">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={values.semanticEnabled}
+                disabled={pending || !on}
+                onChange={(e) => save({ ...values, semanticEnabled: e.target.checked })}
+              />
+              Find documents by meaning, not just exact words
+            </label>
+            <FieldHelp id="documents.semantic" />
+          </div>
           <p className="ml-6 text-xs text-muted-foreground">
             Runs a small AI model on this server. Nothing leaves it. The model loads when needed and unloads when idle.
           </p>

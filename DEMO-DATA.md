@@ -47,6 +47,7 @@ npx tsx prisma/seed-demo.ts
 |---|---|
 | `--yes` / `-y` | Skip the confirmation prompt. Required for non-interactive shells. |
 | `--no-images` | Skip photo lookup entirely and use generated placeholders. Fast. |
+| `--keep` | Wipe nothing and ask nothing: add the demo data beside what is already there, written by your first admin login. Run it twice and you get two copies. |
 | `--refresh-photos` | Ignore the photo cache and re-download everything. |
 
 Environment overrides:
@@ -85,7 +86,7 @@ onto the dashboard — no password-change interstitial in your screenshots.
 | **16 warranties** | 3 expired, 3 expiring within 60 days, the rest comfortably active, 1 deliberately unknown |
 | **24 reminders** | 3 overdue, 5 due within 30 days, the rest further out |
 | **12 attachments** | Generated PDF invoices and warranty certificates, so records show paperclip counts |
-| **Insurance** | A home policy on Maple Street House renewing in 21 days and an auto policy on the Work Truck, each with coverage lines and two premiums |
+| **Insurance** | A home policy on Maple Street House renewing in 21 days, an auto policy on the Work Truck (premiums every 6 months), an umbrella policy renewing in 18 days that covers nothing yet (monthly premium), and a term life policy covering both people (monthly premium that went up). Each has coverage lines. |
 | **People** | Two people (the demo user and a child), three providers, a managed condition with a medication due for refill, a severe penicillin allergy, two insurance policies (one expiring within 60 days), five visits with PDF receipts, and two health reminders |
 
 The mix is deliberate: the dashboard's "Upcoming Maintenance" and "Expiring

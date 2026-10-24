@@ -40,19 +40,19 @@ function initialFor(o: ObservationRow | null): FormValues {
 function fieldsFor(typeOptions: string[], conditions: ConditionOption[]): FieldConfig[] {
   return [
     {
-      name: "type", label: "What happened", kind: "text", required: true, wide: true,
+      name: "type", label: "What happened", kind: "text", required: true, wide: true, help: "observation.what-happened",
       placeholder: "Meltdown, bad night, headache…", suggestions: typeOptions,
     },
-    { name: "date", label: "Date", kind: "date", required: true },
-    { name: "time", label: "Time (optional)", kind: "time" },
-    { name: "severity", label: "How bad (optional)", kind: "select", options: SEVERITIES },
-    { name: "durationMinutes", label: "How long, in minutes (optional)", kind: "number", placeholder: "20" },
+    { name: "date", label: "Date", kind: "date", required: true, help: "observation.date" },
+    { name: "time", label: "Time (optional)", kind: "time", help: "observation.time" },
+    { name: "severity", label: "How bad (optional)", kind: "select", options: SEVERITIES, help: "observation.severity" },
+    { name: "durationMinutes", label: "How long, in minutes (optional)", kind: "number", placeholder: "20", help: "observation.duration" },
     {
-      name: "conditionId", label: "Related condition (optional)", kind: "select", wide: true,
+      name: "conditionId", label: "Related condition (optional)", kind: "select", wide: true, help: "observation.condition",
       options: conditions.map((c) => ({ value: c.id, label: c.name })),
     },
-    { name: "tags", label: "Tags (optional)", kind: "text", wide: true, placeholder: "Comma-separated: school, tired, transition" },
-    { name: "notes", label: "Notes", kind: "textarea", wide: true, placeholder: "What led up to it, what helped…" },
+    { name: "tags", label: "Tags (optional)", kind: "text", wide: true, placeholder: "Comma-separated: school, tired, transition", help: "observation.tags" },
+    { name: "notes", label: "Notes", kind: "textarea", wide: true, placeholder: "What led up to it, what helped…", help: "observation.notes" },
   ]
 }
 

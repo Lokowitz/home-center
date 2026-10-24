@@ -64,10 +64,10 @@ export function PolicyCard({ policy: p, health, onEdit }: Props) {
       ]
 
   const premiumFields: FieldConfig[] = [
-    { name: "effectiveDate", label: "Starts", kind: "date", required: true },
-    { name: "amount", label: `Amount (${fmt.currencySymbol})`, kind: "number", required: true },
-    { name: "period", label: "Billed", kind: "select", required: true, options: PREMIUM_PERIODS },
-    { name: "notes", label: "Notes", kind: "text", wide: true },
+    { name: "effectiveDate", label: "Starts", kind: "date", required: true, help: "premium.starts" },
+    { name: "amount", label: `Amount (${fmt.currencySymbol})`, kind: "number", required: true, help: "premium.amount" },
+    { name: "period", label: "Billed", kind: "select", required: true, options: PREMIUM_PERIODS, help: "premium.billed" },
+    { name: "notes", label: "Notes", kind: "text", wide: true, help: "premium.notes" },
   ]
 
   async function handleDelete() {

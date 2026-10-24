@@ -13,7 +13,7 @@ import { loadLlmConfig, loadLlmStatus } from "@/lib/llm/config"
 import { cookies } from "next/headers"
 import { PLACEMENTS, readPlacement } from "@/lib/placement"
 import { PlacementSettings } from "@/components/settings/placement-settings"
-import { isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
+import { assistantShown, isLlmReady, parseExtraBody } from "@/lib/llm/settings-schema"
 import { DocumentSettings } from "@/components/settings/document-settings"
 import { CaptureSettings } from "@/components/settings/capture-settings"
 import { loadCaptureParser } from "@/lib/capture-server"
@@ -78,7 +78,7 @@ export default async function SettingsPage({
           assistant: readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value),
           intake: readPlacement("intake", jar.get(PLACEMENTS.intake.cookie)?.value),
           // Same rule as the layout.
-          assistantShown: s.available,
+          assistantShown: assistantShown(s),
         }))
       : Promise.resolve(null),
     is("data") ? loadBackupOverview() : Promise.resolve(null),

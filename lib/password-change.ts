@@ -1,4 +1,4 @@
-export const MIN_PASSWORD_LENGTH = 4
+export const MIN_PASSWORD_LENGTH = 6
 
 export type PasswordChangeError = "wrong-current" | "short" | "mismatch"
 

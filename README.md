@@ -254,6 +254,8 @@ The container sets up its database and admin account automatically on first boot
 
 **5. Log in** at `http://<your-server-ip>:3000/login` with the admin email/password from step 3.
 
+> **Keep it off the open internet.** HomeCenter holds your household's records, and optionally your family's health records, behind a single login. It serves plain HTTP on port 3000 and has no built-in HTTPS. Don't forward that port from your router or publish it to the web. For access away from home, use a VPN to your home network (WireGuard, Tailscale or your router's own). If you must publish it, put it behind a reverse proxy that adds HTTPS, set `AUTH_URL` to the public address, and use a long admin password.
+
 ## Optional extras
 
 HomeCenter works fully without these. Add them when you want them.
@@ -412,6 +414,10 @@ Each backup is one file holding the database and every uploaded file. Protection
 Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password and AI key. Protected backups carry them.
 
 **Restoring** is done in the app (Settings → Data), or from the command line when the app won't start: stop HomeCenter, then `npm run restore -- <file>` (`--dry-run` to only look). The command line swaps the data in right away. The next start upgrades the database if the backup is older and finishes the restore (everyone is signed out, carried secrets are put back); in Docker that start is the container restarting. `npm start` outside Docker does not run `prisma migrate deploy`, so run `npx prisma migrate deploy` before starting if the backup came from an older version. A restore made in the app waits for a restart; `npm run restore -- --cancel` (or **Cancel staged restore** in Settings → Data) takes it back. In Docker, `docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- /data/backups/<file> --yes` runs it in a fresh container.
+
+### Can I reach it from outside my home?
+
+Not safely by opening a port. HomeCenter has no built-in HTTPS and its login is the only protection, so don't expose port 3000 to the internet. Use a VPN into your home network instead, or put the app behind a reverse proxy that adds HTTPS and set `AUTH_URL` to the public address.
 
 ### Will it run on my NAS?
 

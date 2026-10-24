@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isLlmReady, isOffNetworkUrl, LLM_PRESETS, originChanged, parseExtraBody, parseLlmSettings, type LlmSettingsInput } from "./settings-schema"
+import { assistantShown, documentSwitchError, isLlmReady, isOffNetworkUrl, LLM_PRESETS, originChanged, parseExtraBody, parseLlmSettings, type LlmSettingsInput } from "./settings-schema"
 
 const base: LlmSettingsInput = {
   enabled: true,
@@ -174,5 +174,29 @@ describe("isOffNetworkUrl", () => {
   it("is false when the URL is blank or can't be read", () => {
     expect(isOffNetworkUrl("")).toBe(false)
     expect(isOffNetworkUrl("not a url")).toBe(false)
+  })
+})
+
+describe("assistantShown", () => {
+  it("shows the assistant only when it's ready and not hidden", () => {
+    expect(assistantShown({ available: true, hidden: false })).toBe(true)
+    // On and working, but kept out of the nav menu and the top-right button.
+    expect(assistantShown({ available: true, hidden: true })).toBe(false)
+    expect(assistantShown({ available: false, hidden: false })).toBe(false)
+    expect(assistantShown({ available: false, hidden: true })).toBe(false)
+  })
+})
+
+describe("documentSwitchError", () => {
+  it("refuses to turn on document reading while the assistant is off", () => {
+    expect(documentSwitchError({ enabled: false }, { documentsEnabled: true })).toBe("Turn on the assistant first.")
+    expect(documentSwitchError({ enabled: false }, { healthDocumentsEnabled: true })).toBe("Turn on the assistant first.")
+  })
+
+  it("allows them with the assistant on, when turning them off, or when turning both on together", () => {
+    expect(documentSwitchError({ enabled: true }, { documentsEnabled: true })).toBeNull()
+    expect(documentSwitchError({ enabled: false }, { documentsEnabled: false, healthDocumentsEnabled: false })).toBeNull()
+    expect(documentSwitchError({ enabled: true }, { enabled: true, documentsEnabled: true })).toBeNull()
+    expect(documentSwitchError({ enabled: false }, { hidden: true })).toBeNull()
   })
 })

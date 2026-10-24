@@ -187,7 +187,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {equipmentOptions && equipmentOptions.length > 0 && (
               <FormItem>
-                <FormLabel>For</FormLabel>
+                <FormLabel help="warranty.target">For</FormLabel>
                 <Select
                   value={targetKey(form.watch("assetType"), form.watch("assetId"))}
                   onValueChange={(value) => {
@@ -217,7 +217,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="productName" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Product / Coverage *</FormLabel>
+                  <FormLabel help="warranty.product">Product / Coverage *</FormLabel>
                   <FormControl><Input placeholder="Roof — GAF Timberline" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -225,7 +225,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="vendor" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Vendor / Manufacturer</FormLabel>
+                  <FormLabel help="warranty.vendor">Vendor / Manufacturer</FormLabel>
                   <FormControl><Input placeholder="GAF" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -233,7 +233,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="purchaseDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Date</FormLabel>
+                  <FormLabel help="warranty.purchase-date">Purchase Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -241,7 +241,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="expirationDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Expiration Date</FormLabel>
+                  <FormLabel help="warranty.expiration">Expiration Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -249,7 +249,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="vendorPhone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Vendor Phone</FormLabel>
+                  <FormLabel help="warranty.phone">Vendor Phone</FormLabel>
                   <FormControl><Input type="tel" placeholder="555-555-5555" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -257,7 +257,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="vendorEmail" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Vendor Email</FormLabel>
+                  <FormLabel help="warranty.email">Vendor Email</FormLabel>
                   <FormControl><Input type="email" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -265,7 +265,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
 
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="warranty.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

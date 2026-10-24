@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Check, CircleDashed, CircleOff, Minus, ScanText, Sparkles } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { FieldHelp } from "@/components/ui/field-help"
 import { setCaptureParser } from "@/lib/actions/inbox"
 import { settingsHref } from "@/lib/settings-sections"
 import {
@@ -91,6 +92,7 @@ export function CaptureSettings({ initial, llmReady }: { initial: CaptureParser;
       <CardHeader className="px-5">
         <CardTitle className="flex items-center gap-2">
           Receipt reading
+          <FieldHelp id="capture.parser" />
           {current && <Badge variant={shown === "OFF" ? "outline" : "secondary"}>{current.label}</Badge>}
         </CardTitle>
         <CardDescription>

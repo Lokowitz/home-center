@@ -17,12 +17,12 @@ import type { Attachment, Immunization } from "@/app/generated/prisma/client"
 export type ImmunizationRow = Immunization & { attachments: Attachment[] }
 
 const FIELDS: FieldConfig[] = [
-  { name: "vaccine", label: "Vaccine", kind: "text", required: true, placeholder: "Tdap", wide: true },
-  { name: "dateGiven", label: "Date given", kind: "date", required: true },
-  { name: "nextDueDate", label: "Next due", kind: "date" },
-  { name: "dose", label: "Dose", kind: "text", placeholder: "Booster" },
-  { name: "givenBy", label: "Given by", kind: "text", placeholder: "CVS Pharmacy" },
-  { name: "notes", label: "Notes", kind: "textarea", wide: true },
+  { name: "vaccine", label: "Vaccine", kind: "text", required: true, placeholder: "Tdap", wide: true, help: "immunization.vaccine" },
+  { name: "dateGiven", label: "Date given", kind: "date", required: true, help: "immunization.date-given" },
+  { name: "nextDueDate", label: "Next due", kind: "date", help: "immunization.next-due" },
+  { name: "dose", label: "Dose", kind: "text", placeholder: "Booster", help: "immunization.dose" },
+  { name: "givenBy", label: "Given by", kind: "text", placeholder: "CVS Pharmacy", help: "immunization.given-by" },
+  { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "immunization.notes" },
 ]
 
 function initialFor(i: ImmunizationRow | null): FormValues {

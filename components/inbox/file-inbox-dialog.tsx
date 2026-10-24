@@ -100,7 +100,7 @@ export function FileInboxDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="assetKey" render={({ field, fieldState }) => (
               <FormItem>
-                <FormLabel>For *</FormLabel>
+                <FormLabel help="inbox.asset">For *</FormLabel>
                 <AssetSelect
                   assets={assets}
                   value={field.value}
@@ -119,7 +119,7 @@ export function FileInboxDialog({
             {assetReminders.length > 0 && (
               <FormField control={form.control} name="scheduleId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Completes reminder</FormLabel>
+                  <FormLabel help="service.completes-reminder">Completes reminder</FormLabel>
                   <Select
                     value={field.value || NO_LINK}
                     onValueChange={(v) => {
@@ -162,7 +162,7 @@ export function FileInboxDialog({
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Title *</FormLabel>
+                  <FormLabel help="service.title">Title *</FormLabel>
                   <FormControl><Input placeholder={isPerson ? "Annual physical" : "Oil Change"} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -170,7 +170,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date *</FormLabel>
+                  <FormLabel help="service.date">Date *</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -178,7 +178,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="cost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{`Cost (${fmt.currencySymbol})`}</FormLabel>
+                  <FormLabel help="service.cost">{`Cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" inputMode="decimal" placeholder="89.99" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -186,7 +186,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="vendor" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{isPerson ? "Facility" : "Vendor / Shop"}</FormLabel>
+                  {isPerson ? <FormLabel help="service.facility">Facility</FormLabel> : <FormLabel help="service.vendor">Vendor / Shop</FormLabel>}
                   <FormControl><Input placeholder={isPerson ? "City Medical Center" : "Jiffy Lube"} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -194,7 +194,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="category" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel help="service.category">Category</FormLabel>
                   <Select value={field.value} onValueChange={(v) => field.onChange(v ?? NO_CATEGORY)}>
                     <FormControl>
                       <SelectTrigger className="w-full">
@@ -217,7 +217,7 @@ export function FileInboxDialog({
               {asset?.assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{fmt.meterNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
+                    <FormLabel help="service.mileage">{fmt.meterNoun(chosen?.meterUnit ?? "MILES")} at Service</FormLabel>
                     <FormControl><Input type="number" inputMode="numeric" placeholder={chosen?.meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -226,7 +226,7 @@ export function FileInboxDialog({
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem className="sm:col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="service.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={2} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

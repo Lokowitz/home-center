@@ -138,7 +138,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel help="equipment.name">Name *</FormLabel>
                   <FormControl><Input placeholder="Kitchen Refrigerator" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -146,7 +146,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="category" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category *</FormLabel>
+                  <FormLabel help="equipment.category">Category *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: EquipmentCategory) => categoryLabel(v)}</SelectValue></SelectTrigger></FormControl>
                     <SelectContent>
@@ -161,7 +161,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="propertyId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Property</FormLabel>
+                  <FormLabel help="equipment.property">Property</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: string) => properties.find((p) => p.id === v)?.name ?? "Not assigned"}</SelectValue></SelectTrigger></FormControl>
                     <SelectContent>
@@ -177,7 +177,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="manufacturer" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Manufacturer</FormLabel>
+                  <FormLabel help="equipment.manufacturer">Manufacturer</FormLabel>
                   <FormControl><Input placeholder="LG" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -185,7 +185,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="modelNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model Number</FormLabel>
+                  <FormLabel help="equipment.model-number">Model Number</FormLabel>
                   <FormControl><Input placeholder="LRFVS3006S" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -193,7 +193,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="serialNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Serial Number</FormLabel>
+                  <FormLabel help="equipment.serial-number">Serial Number</FormLabel>
                   <FormControl><Input {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -201,7 +201,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="location" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Location</FormLabel>
+                  <FormLabel help="equipment.location">Location</FormLabel>
                   <FormControl><Input placeholder="Kitchen" list={selectedRooms.length ? roomListId : undefined} autoComplete="off" {...field} /></FormControl>
                   {selectedRooms.length > 0 && (
                     <datalist id={roomListId}>
@@ -214,7 +214,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="purchaseDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Date</FormLabel>
+                  <FormLabel help="equipment.purchase-date">Purchase Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -222,7 +222,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="installDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Install Date</FormLabel>
+                  <FormLabel help="equipment.install-date">Install Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -230,7 +230,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Price</FormLabel>
+                  <FormLabel help="equipment.purchase-price">Purchase Price</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="2499" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -238,7 +238,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="replacementCost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Replacement Cost</FormLabel>
+                  <FormLabel help="equipment.replacement-cost">Replacement Cost</FormLabel>
                   <FormControl><Input type="number" step="0.01" min="0" placeholder="2800" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -246,7 +246,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="expectedLifeYears" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Expected Life (years)</FormLabel>
+                  <FormLabel help="equipment.expected-life">Expected Life (years)</FormLabel>
                   <FormControl><Input type="number" step="1" min="1" max="100" placeholder="15" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -254,7 +254,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="valueClass" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Counts As</FormLabel>
+                  <FormLabel help="equipment.counts-as">Counts As</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger className="w-full">
@@ -276,7 +276,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
 
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="equipment.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

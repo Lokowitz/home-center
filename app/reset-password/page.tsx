@@ -53,16 +53,16 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
                 <input type="hidden" name="token" value={token} />
               ) : (
                 <div className="space-y-1.5">
-                  <Label htmlFor="token">Reset code</Label>
+                  <Label htmlFor="token" help="auth.reset-code">Reset code</Label>
                   <Input id="token" name="token" autoComplete="off" required />
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label htmlFor="newPassword">New password</Label>
+                <Label htmlFor="newPassword" help="auth.new-password">New password</Label>
                 <Input id="newPassword" name="newPassword" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="confirm">Confirm password</Label>
+                <Label htmlFor="confirm" help="auth.confirm-password">Confirm password</Label>
                 <Input id="confirm" name="confirm" type="password" autoComplete="new-password" required minLength={MIN_PASSWORD_LENGTH} />
               </div>
               <Button type="submit" className="w-full">Set password</Button>

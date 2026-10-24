@@ -14,6 +14,7 @@ import { GlobalSearch } from "@/components/global-search"
 import { resolveNotificationHrefs } from "@/lib/notification-links"
 import { loadNotificationReminders } from "@/lib/notification-reminders"
 import { loadLlmStatus } from "@/lib/llm/config"
+import { assistantShown } from "@/lib/llm/settings-schema"
 import { inboxCount } from "@/lib/inbox-server"
 import { loadCaptureParser } from "@/lib/capture-server"
 import { ChatProvider } from "@/components/chat/chat-provider"
@@ -46,9 +47,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const isAdmin = session.user.role === "ADMIN"
   const jar = await cookies()
   const sidebarCollapsed = readSidebarCollapsed(jar.get(SIDEBAR_COOKIE)?.value)
-  // Every entry point (nav, header, floating button) disappears while the assistant is off.
+  // Every entry point (nav, header, floating button) disappears while the assistant is off or hidden.
   // Admins find the setup in Settings.
-  const showAssistant = llm.available
+  const showAssistant = assistantShown(llm)
   // Where this device put the assistant's button and Intake (Settings → Appearance).
   const floatingAssistant = showAssistant && readPlacement("assistant", jar.get(PLACEMENTS.assistant.cookie)?.value) === "floating"
   // Intake has no entry point while receipt reading is Off (Settings → Documents & search).

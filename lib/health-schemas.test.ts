@@ -45,6 +45,14 @@ describe("date-order rules", () => {
     expect(r.success).toBe(false)
     if (!r.success) expect(r.error.flatten().fieldErrors.resolvedDate).toBeDefined()
   })
+  it("a resolved date only counts while the condition is resolved", () => {
+    const base = { name: "X", diagnosedDate: "2026-01-01", resolvedDate: "2026-03-01" }
+    expect(conditionSchema.parse({ ...base, status: "RESOLVED" }).resolvedDate).toEqual(new Date("2026-03-01"))
+    expect(conditionSchema.parse({ ...base, status: "ACTIVE" }).resolvedDate).toBeNull()
+    expect(conditionSchema.parse({ ...base, status: "MANAGED" }).resolvedDate).toBeNull()
+    // A stale date from before the status changed must not trip the diagnosis check.
+    expect(conditionSchema.safeParse({ ...base, status: "ACTIVE", resolvedDate: "2025-01-01" }).success).toBe(true)
+  })
   it("policy cannot end before it starts", () => {
     const r = insuranceSchema.safeParse({ carrier: "Aetna", kind: "MEDICAL", startDate: "2026-05-01", endDate: "2026-01-01" })
     expect(r.success).toBe(false)

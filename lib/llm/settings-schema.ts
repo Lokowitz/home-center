@@ -136,6 +136,23 @@ export function parseLlmSettings(input: LlmSettingsInput, opts: { requireComplet
   }
 }
 
+/**
+ * Whether the assistant has an entry point (nav item, header button, floating chat). It can be on and
+ * working but hidden: features that use the AI model keep working without a visible chat.
+ */
+export function assistantShown(status: { available: boolean; hidden: boolean }): boolean {
+  return status.available && !status.hidden
+}
+
+/** Document reading belongs to the assistant: it can't be switched on while the assistant is off. */
+export function documentSwitchError(
+  next: { enabled: boolean },
+  patch: { enabled?: boolean; hidden?: boolean; documentsEnabled?: boolean; healthDocumentsEnabled?: boolean },
+): string | null {
+  const turningOn = patch.documentsEnabled === true || patch.healthDocumentsEnabled === true
+  return turningOn && !next.enabled ? "Turn on the assistant first." : null
+}
+
 export function isLlmReady(c: { enabled: boolean; baseUrl: string | null; model: string | null; keyUnreadable: boolean }): boolean {
   return c.enabled && !!c.baseUrl && !!c.model && !c.keyUnreadable
 }

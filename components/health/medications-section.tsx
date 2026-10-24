@@ -154,17 +154,17 @@ export function MedicationsSection({ personId, medications, providers, condition
   const past = sortChronologically(medications.filter((m) => !isMedicationActive(m, now)), "desc")
 
   const fields: FieldConfig[] = [
-    { name: "name", label: "Medication", kind: "text", required: true, placeholder: "Metformin", wide: true },
-    { name: "dosage", label: "Dosage", kind: "text", placeholder: "500 mg" },
-    { name: "frequency", label: "Frequency", kind: "text", placeholder: "Twice daily" },
-    { name: "prescriberId", label: "Prescriber", kind: "select", options: providers.map((p) => ({ value: p.id, label: p.name })) },
-    { name: "conditionId", label: "For condition", kind: "select", options: conditions.map((c) => ({ value: c.id, label: c.name })) },
-    { name: "startDate", label: "Started", kind: "date" },
-    { name: "endDate", label: "Stopped", kind: "date" },
-    { name: "refillIntervalDays", label: "Refill every (days)", kind: "number", placeholder: "30" },
-    { name: "nextRefillDate", label: "Next refill", kind: "date" },
-    { name: "pharmacy", label: "Pharmacy", kind: "text", placeholder: "Walgreens on Main", wide: true },
-    { name: "notes", label: "Notes", kind: "textarea", wide: true },
+    { name: "name", label: "Medication", kind: "text", required: true, placeholder: "Metformin", wide: true, help: "medication.name" },
+    { name: "dosage", label: "Dosage", kind: "text", placeholder: "500 mg", help: "medication.dosage" },
+    { name: "frequency", label: "Frequency", kind: "text", placeholder: "Twice daily", help: "medication.frequency" },
+    { name: "prescriberId", label: "Prescriber", kind: "select", options: providers.map((p) => ({ value: p.id, label: p.name })), help: "medication.prescriber" },
+    { name: "conditionId", label: "For condition", kind: "select", options: conditions.map((c) => ({ value: c.id, label: c.name })), help: "medication.condition" },
+    { name: "startDate", label: "Started", kind: "date", help: "medication.started" },
+    { name: "endDate", label: "Stopped", kind: "date", help: "medication.stopped" },
+    { name: "refillIntervalDays", label: "Refill every (days)", kind: "number", placeholder: "30", help: "medication.refill-every" },
+    { name: "nextRefillDate", label: "Next refill", kind: "date", help: "medication.next-refill" },
+    { name: "pharmacy", label: "Pharmacy", kind: "text", placeholder: "Walgreens on Main", wide: true, help: "medication.pharmacy" },
+    { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "medication.notes" },
   ]
 
   async function handleDelete(m: MedicationRow) {

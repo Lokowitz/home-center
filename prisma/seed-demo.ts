@@ -1,6 +1,7 @@
 /**
  * Demo data seeder — wipes the database and rebuilds it with a realistic,
- * lived-in dataset for screenshots.
+ * lived-in dataset for screenshots. With --keep it wipes nothing and adds the
+ * demo data beside what's already there.
  *
  * Every date is written relative to the moment you run it, so re-running months
  * from now refreshes the whole timeline: overdue stays overdue, "due soon"
@@ -9,6 +10,7 @@
  *   npx tsx prisma/seed-demo.ts             # prompts before wiping
  *   npx tsx prisma/seed-demo.ts --yes       # no prompt (CI / scripted use)
  *   npx tsx prisma/seed-demo.ts --no-images # skip photo downloads
+ *   npx tsx prisma/seed-demo.ts --keep      # add the demo data, delete nothing, keep your login
  *
  * See DEMO-DATA.md.
  */
@@ -35,6 +37,8 @@ const ADMIN_NAME = process.env.DEMO_NAME ?? "Alex Rivera"
 const args = new Set(process.argv.slice(2))
 const SKIP_PROMPT = args.has("--yes") || args.has("-y")
 const SKIP_IMAGES = args.has("--no-images")
+/** Add the demo data beside what exists: no confirmation, no wipe, existing login kept. */
+const KEEP = args.has("--keep")
 const REFRESH_PHOTOS = args.has("--refresh-photos")
 
 // Downloaded photos are cached outside the uploads folder so re-seeding is fast
@@ -599,7 +603,11 @@ type VisitSeed = {
   cost: number
 }
 
-/** A home policy and an auto policy with coverage lines and two premiums each; they show with Health off too. */
+/**
+ * Home, auto, life and umbrella policies, so every non-health kind shows: coverage lines, premium history
+ * (yearly, every 6 months, monthly), renewals inside and outside the 30-day window, one policy covering
+ * nothing yet, and one covering people (visible only with Health on). They show with Health off too.
+ */
 async function seedInsurance(properties: { id: string }[], vehicles: { id: string }[]) {
   await prisma.insurancePolicy.create({
     data: {
@@ -641,6 +649,31 @@ async function seedInsurance(properties: { id: string }[], vehicles: { id: strin
         create: [
           { effectiveDate: at(-222), amount: 672, period: "SEMIANNUAL" },
           { effectiveDate: at(-40), amount: 708, period: "SEMIANNUAL" },
+        ],
+      },
+    },
+  })
+  // Renewing in 18 days (a second renewal notice), linked to nothing, monthly premium unchanged.
+  await prisma.insurancePolicy.create({
+    data: {
+      carrier: "Chubb", planName: "Personal umbrella", kind: "UMBRELLA", policyNumber: "UMB-90311",
+      startDate: at(-347), endDate: at(18),
+      coverages: { create: [{ label: "Liability", limit: 1000000, sortOrder: 0 }] },
+      premiums: { create: [{ effectiveDate: at(-347), amount: 33.33, period: "MONTHLY" }] },
+    },
+  })
+  // Covers the people, so it shows their names only with Health on. Ends well outside the 30-day window.
+  const people = await prisma.person.findMany({ select: { id: true } })
+  await prisma.insurancePolicy.create({
+    data: {
+      carrier: "Lifeco", planName: "20-year term", kind: "LIFE", policyNumber: "TL-77210",
+      startDate: at(-900), endDate: at(5000),
+      members: { connect: people.map((x) => ({ id: x.id })) },
+      coverages: { create: [{ label: "Death benefit", limit: 500000, sortOrder: 0 }] },
+      premiums: {
+        create: [
+          { effectiveDate: at(-900), amount: 41, period: "MONTHLY" },
+          { effectiveDate: at(-170), amount: 45, period: "MONTHLY" },
         ],
       },
     },
@@ -695,15 +728,25 @@ async function seedPeople(userId: string) {
 // ─── Seed ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  await confirmWipe()
+  let user: { id: string }
+  if (KEEP) {
+    console.log("\n  --keep given: nothing is deleted. Adding demo data beside what's already here.\n")
+    // Records need an author: use an existing admin, else any user, else create the demo login.
+    const existing = (await prisma.user.findFirst({ where: { role: "ADMIN" }, orderBy: { createdAt: "asc" } })) ?? (await prisma.user.findFirst())
+    user = existing ?? (await prisma.user.create({
+      data: { name: ADMIN_NAME, email: ADMIN_EMAIL, passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 12), role: "ADMIN", mustResetPassword: false },
+    }))
+  } else {
+    await confirmWipe()
 
-  console.log("  Wiping…")
-  await wipe()
+    console.log("  Wiping…")
+    await wipe()
 
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12)
-  const user = await prisma.user.create({
-    data: { name: ADMIN_NAME, email: ADMIN_EMAIL, passwordHash, role: "ADMIN", mustResetPassword: false },
-  })
+    const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12)
+    user = await prisma.user.create({
+      data: { name: ADMIN_NAME, email: ADMIN_EMAIL, passwordHash, role: "ADMIN", mustResetPassword: false },
+    })
+  }
 
   console.log("  Creating assets…")
   const properties: { id: string }[] = []
@@ -858,11 +901,11 @@ async function main() {
     SECURITY: "home security", OTHER: "hardware",
   }
 
-  console.log("  Creating insurance…")
-  await seedInsurance(properties, vehicles)
-
   console.log("  Creating people…")
   await seedPeople(user.id)
+
+  console.log("  Creating insurance…")
+  await seedInsurance(properties, vehicles)
 
   const jobs: PhotoJob[] = [
     ...properties.map((p, i) => ({ kind: "properties" as const, id: p.id, query: PROPERTIES[i].photo, fallbackQuery: "house exterior", variant: i })),
@@ -895,7 +938,7 @@ async function main() {
     ${overdue} maintenance overdue, ${dueSoon} due within 30 days
     ${expired} warranties expired, ${expiring} expiring within 60 days
 
-  Sign in:  ${ADMIN_EMAIL}  /  ${ADMIN_PASSWORD}
+  ${KEEP ? "Sign in with your existing login (nothing was deleted)." : `Sign in:  ${ADMIN_EMAIL}  /  ${ADMIN_PASSWORD}`}
 `)
 }
 

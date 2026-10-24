@@ -54,7 +54,7 @@ export function KeepDocumentDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <Label htmlFor={`keep-${itemId}`}>For</Label>
+          <Label htmlFor={`keep-${itemId}`} help="inbox.keep-asset">For</Label>
           <AssetSelect id={`keep-${itemId}`} assets={assets} value={key} onChange={setKey} />
         </div>
         <DialogFooter>

@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { FieldHelp } from "@/components/ui/field-help"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -57,7 +58,7 @@ export function ModelTest({
         <CardContent className="px-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="mt-model">Model</Label>
+              <Label htmlFor="mt-model" help="modeltest.model">Model</Label>
               <Input
                 id="mt-model"
                 value={t.model}
@@ -67,7 +68,7 @@ export function ModelTest({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="mt-temp">Temperature</Label>
+              <Label htmlFor="mt-temp" help="modeltest.temperature">Temperature</Label>
               <Input
                 id="mt-temp"
                 type="number"
@@ -81,7 +82,7 @@ export function ModelTest({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="mt-rounds">Lookup rounds</Label>
+              <Label htmlFor="mt-rounds" help="modeltest.rounds">Lookup rounds</Label>
               <Input
                 id="mt-rounds"
                 type="number"
@@ -95,7 +96,7 @@ export function ModelTest({
               <p className="text-xs text-muted-foreground">Used by the “Whole conversation” tests.</p>
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <Label htmlFor="mt-extra">Extra request JSON</Label>
+              <Label htmlFor="mt-extra" help="modeltest.extra-body">Extra request JSON</Label>
               <Textarea
                 id="mt-extra"
                 rows={3}
@@ -135,7 +136,10 @@ export function ModelTest({
 
       <Card className="py-5">
         <CardHeader className="px-5">
-          <CardTitle>Which tests</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Which tests
+            <FieldHelp id="modeltest.stages" />
+          </CardTitle>
           <CardDescription>
             Everything runs by default. Untick a stage or pick topics to run just those. Repeat a run to check how consistent the answers are.
           </CardDescription>
@@ -168,7 +172,10 @@ export function ModelTest({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium" id="mt-topics-label">Topics</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium" id="mt-topics-label">Topics</p>
+              <FieldHelp id="modeltest.topics" />
+            </div>
             <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="mt-topics-label">
               <TopicChip
                 label="All topics"
@@ -192,7 +199,7 @@ export function ModelTest({
           </div>
 
           <div className="flex items-center gap-3">
-            <Label htmlFor="mt-repeat" className="text-sm">
+            <Label htmlFor="mt-repeat" className="text-sm" help="modeltest.repeat">
               Repeat
             </Label>
             <Select value={String(t.repeat)} onValueChange={(v) => v && t.setRepeat(Number(v))} disabled={t.running}>

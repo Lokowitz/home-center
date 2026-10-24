@@ -49,7 +49,7 @@ export function RecordsAddButton({ assets }: { assets: InboxAssetOption[] }) {
             <DialogDescription>Which asset is it for?</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor={id}>For</Label>
+            <Label htmlFor={id} help="service.asset">For</Label>
             <AssetSelect id={id} assets={assets} value={key} onChange={setKey} />
           </div>
           <DialogFooter>

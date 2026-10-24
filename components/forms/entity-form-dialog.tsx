@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { deleteAttachment } from "@/lib/actions/attachments"
-import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
+import { Paperclip, TriangleAlert, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { ActionResult, FieldConfig, FormValues } from "@/lib/form-types"
 import type { Attachment, AttachmentRecordType } from "@/app/generated/prisma/client"
 
@@ -65,6 +65,7 @@ export function EntityFormDialog({ open, onClose, title, submitLabel, successMes
   const router = useRouter()
 
   const existingAttachments = initialAttachments.filter((a) => !removedIds.has(a.id))
+  const visibleFields = fields.filter((f) => !f.showWhen || f.showWhen(values))
 
   // Reset whenever the dialog opens, so it shows the record being edited (or a
   // blank form) rather than whatever was typed last time.
@@ -126,7 +127,7 @@ export function EntityFormDialog({ open, onClose, title, submitLabel, successMes
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const missing = fields.filter((f) => f.required && !values[f.name]?.trim())
+    const missing = visibleFields.filter((f) => f.required && !values[f.name]?.trim())
     if (missing.length > 0) {
       setErrors(Object.fromEntries(missing.map((f) => [f.name, `${f.label} is required`])))
       return
@@ -190,14 +191,20 @@ export function EntityFormDialog({ open, onClose, title, submitLabel, successMes
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {fields.map((f) => (
+            {visibleFields.map((f) => (
               <div key={f.name} className={cn("space-y-1.5", f.wide && "sm:col-span-2")}>
-                <Label htmlFor={`field-${f.name}`}>
+                <Label htmlFor={`field-${f.name}`} help={f.help}>
                   {f.label}
                   {f.required && " *"}
                 </Label>
                 <FieldInput field={f} value={values[f.name] ?? ""} onChange={(v) => set(f.name, v)} />
                 {errors[f.name] && <p className="text-xs text-destructive">{errors[f.name]}</p>}
+                {f.notice?.(values) && (
+                  <p className="flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+                    <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {f.notice(values)}
+                  </p>
+                )}
               </div>
             ))}
           </div>

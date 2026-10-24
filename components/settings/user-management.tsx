@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Badge } from "@/components/ui/badge"
+import { FieldHelp } from "@/components/ui/field-help"
 import { createUser, updateUserRole, resetUserPassword, deleteUser, updateSelf, changeOwnPassword } from "@/lib/actions/users"
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-change"
 import type { User as PrismaUser } from "@/app/generated/prisma/client"
@@ -59,7 +60,9 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
             <tr>
               <th className="text-left font-medium px-4 py-2.5">Name</th>
               <th className="text-left font-medium px-4 py-2.5 hidden sm:table-cell">Email</th>
-              <th className="text-left font-medium px-4 py-2.5">Role</th>
+              <th className="text-left font-medium px-4 py-2.5">
+                <span className="inline-flex items-center gap-1.5">Role <FieldHelp id="users.role" /></span>
+              </th>
               <th className="text-right font-medium px-4 py-2.5">Actions</th>
             </tr>
           </thead>
@@ -174,14 +177,14 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: (result?:
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.name">Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.email">Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="role" render={({ field }) => (
               <FormItem>
-                <FormLabel>Role *</FormLabel>
+                <FormLabel help="users.role">Role *</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl><SelectTrigger><SelectValue>{(v: keyof typeof roleLabel) => roleLabel[v]}</SelectValue></SelectTrigger></FormControl>
                   <SelectContent>
@@ -239,14 +242,14 @@ function EditSelfDialog({ user, onClose }: { user: User; onClose: () => void }) 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem><FormLabel>Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.name">Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem><FormLabel>Email *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.own-email">Email *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             {emailChanged && (
               <FormField control={form.control} name="currentPassword" render={({ field }) => (
-                <FormItem><FormLabel>Current password *</FormLabel><FormControl><Input type="password" autoComplete="current-password" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel help="users.current-password">Current password *</FormLabel><FormControl><Input type="password" autoComplete="current-password" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             )}
             <DialogFooter>
@@ -293,13 +296,13 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="current" render={({ field }) => (
-              <FormItem><FormLabel>Current password</FormLabel><FormControl><Input type="password" autoComplete="current-password" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.current-password">Current password</FormLabel><FormControl><Input type="password" autoComplete="current-password" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="next" render={({ field }) => (
-              <FormItem><FormLabel>New password</FormLabel><FormControl><Input type="password" autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.new-password">New password</FormLabel><FormControl><Input type="password" autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="confirm" render={({ field }) => (
-              <FormItem><FormLabel>Confirm new password</FormLabel><FormControl><Input type="password" autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel help="users.confirm-password">Confirm new password</FormLabel><FormControl><Input type="password" autoComplete="new-password" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <p className="text-xs text-muted-foreground">
               Changing it signs you out on every device, including this one.

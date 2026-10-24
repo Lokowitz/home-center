@@ -1,0 +1,62 @@
+"use client"
+
+import { CircleHelp } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { FIELD_HELP } from "@/lib/field-help"
+import { cn } from "@/lib/utils"
+
+/**
+ * The small "?" beside a field label. Opens a popover with what the field is, how HomeCenter
+ * uses it and, where the choices behave differently, what each one does. Text comes from
+ * lib/field-help; an unknown id renders nothing (a test keeps ids and entries in step).
+ */
+export function FieldHelp({ id, className }: { id: string; className?: string }) {
+  const entry = FIELD_HELP[id]
+  if (!entry) return null
+  return (
+    <Popover>
+      <PopoverTrigger
+        type="button"
+        aria-label={`About ${entry.title}`}
+        // Inside a <label> a click would also toggle its checkbox or focus its input.
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors",
+          "hover:text-primary focus-visible:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 data-popup-open:text-primary",
+          className,
+        )}
+      >
+        <CircleHelp className="h-3.5 w-3.5" aria-hidden="true" />
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={6}
+        className="w-80 max-w-[calc(100vw-2rem)] max-h-[min(70vh,28rem)] gap-0 overflow-y-auto border-t-2 border-t-primary p-0"
+      >
+        <div className="space-y-3 p-3.5">
+          <div className="font-heading text-sm font-semibold leading-snug">{entry.title}</div>
+          <p className="text-sm leading-relaxed text-popover-foreground">{entry.what}</p>
+          {entry.use && (
+            <div className="space-y-1">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">In HomeCenter</div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{entry.use}</p>
+            </div>
+          )}
+          {entry.values && entry.values.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">Choices</div>
+              <dl className="space-y-1.5">
+                {entry.values.map((v) => (
+                  <div key={v.label} className="rounded-md bg-muted/60 px-2.5 py-1.5">
+                    <dt className="text-sm font-medium">{v.label}</dt>
+                    <dd className="text-sm leading-snug text-muted-foreground">{v.effect}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}

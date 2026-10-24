@@ -40,7 +40,7 @@ export function BackupSchedule({ data, onSaved }: { data: BackupOverview; onSave
       <CardContent className="px-5">
         <form onSubmit={save} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="bk-schedule">How often</Label>
+            <Label htmlFor="bk-schedule" help="backup.schedule">How often</Label>
             <select id="bk-schedule" className={select} value={schedule} onChange={(e) => setSchedule(e.target.value as typeof schedule)}>
               <option value="OFF">Off</option>
               <option value="DAILY">Every day</option>
@@ -50,19 +50,19 @@ export function BackupSchedule({ data, onSaved }: { data: BackupOverview; onSave
           <div className="flex gap-3">
             {schedule === "WEEKLY" && (
               <div className="space-y-1.5">
-                <Label htmlFor="bk-day">Day</Label>
+                <Label htmlFor="bk-day" help="backup.day">Day</Label>
                 <select id="bk-day" className={select} value={weekday} onChange={(e) => setWeekday(e.target.value)}>
                   {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
                 </select>
               </div>
             )}
             <div className="space-y-1.5">
-              <Label htmlFor="bk-time">Time</Label>
+              <Label htmlFor="bk-time" help="backup.time">Time</Label>
               <Input id="bk-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={schedule === "OFF"} />
             </div>
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="bk-folder">Folder</Label>
+            <Label htmlFor="bk-folder" help="backup.folder">Folder</Label>
             <Input id="bk-folder" placeholder={`${s.folderIsDefault ? s.folder : "/data/backups"} (default)`} value={folder} onChange={(e) => setFolder(e.target.value)} />
             <p className="text-xs text-muted-foreground">
               A path inside the container. For a real backup, mount a different disk or NAS share (for example <code>/backups</code>) in docker-compose.
@@ -70,7 +70,7 @@ export function BackupSchedule({ data, onSaved }: { data: BackupOverview; onSave
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="bk-keep">Keep the newest</Label>
+            <Label htmlFor="bk-keep" help="backup.keep">Keep the newest</Label>
             <Input id="bk-keep" type="number" min={1} max={365} value={keep} onChange={(e) => setKeep(e.target.value)} />
           </div>
           <div className="flex items-end sm:col-span-2">

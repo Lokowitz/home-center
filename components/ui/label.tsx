@@ -2,10 +2,12 @@
 
 import * as React from "react"
 
+import { FieldHelp } from "@/components/ui/field-help"
 import { cn } from "@/lib/utils"
 
-function Label({ className, ...props }: React.ComponentProps<"label">) {
-  return (
+/** `help` is a lib/field-help id: it adds the "?" popover just after the label, outside it. */
+function Label({ className, help, ...props }: React.ComponentProps<"label"> & { help?: string }) {
+  const label = (
     <label
       data-slot="label"
       className={cn(
@@ -14,6 +16,13 @@ function Label({ className, ...props }: React.ComponentProps<"label">) {
       )}
       {...props}
     />
+  )
+  if (!help) return label
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {label}
+      <FieldHelp id={help} />
+    </span>
   )
 }
 

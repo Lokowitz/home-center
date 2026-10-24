@@ -16,10 +16,10 @@ import type { Allergy, Attachment } from "@/app/generated/prisma/client"
 export type AllergyRow = Allergy & { attachments: Attachment[] }
 
 const FIELDS: FieldConfig[] = [
-  { name: "substance", label: "Substance", kind: "text", required: true, placeholder: "Penicillin" },
-  { name: "severity", label: "Severity", kind: "select", required: true, options: ALLERGY_SEVERITIES },
-  { name: "reaction", label: "Reaction", kind: "text", placeholder: "Hives, swelling", wide: true },
-  { name: "notes", label: "Notes", kind: "textarea", wide: true },
+  { name: "substance", label: "Substance", kind: "text", required: true, placeholder: "Penicillin", help: "allergy.substance" },
+  { name: "severity", label: "Severity", kind: "select", required: true, options: ALLERGY_SEVERITIES, help: "allergy.severity" },
+  { name: "reaction", label: "Reaction", kind: "text", placeholder: "Hives, swelling", wide: true, help: "allergy.reaction" },
+  { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "allergy.notes" },
 ]
 
 const SEVERITY_VARIANT = { MILD: "outline", MODERATE: "secondary", SEVERE: "destructive" } as const

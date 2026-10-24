@@ -101,7 +101,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Nickname *</FormLabel>
+                  <FormLabel help="vehicle.name">Nickname *</FormLabel>
                   <FormControl><Input placeholder="Family SUV" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -109,7 +109,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="year" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Year *</FormLabel>
+                  <FormLabel help="vehicle.year">Year *</FormLabel>
                   <FormControl><Input type="number" placeholder="2022" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -117,7 +117,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="make" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Make *</FormLabel>
+                  <FormLabel help="vehicle.make">Make *</FormLabel>
                   <FormControl><Input placeholder="Toyota" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -125,7 +125,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="model" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model *</FormLabel>
+                  <FormLabel help="vehicle.model">Model *</FormLabel>
                   <FormControl><Input placeholder="RAV4" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -133,7 +133,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="color" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Color</FormLabel>
+                  <FormLabel help="vehicle.color">Color</FormLabel>
                   <FormControl><Input placeholder="Silver" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -141,7 +141,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="purchaseDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Purchase Date</FormLabel>
+                  <FormLabel help="vehicle.purchase-date">Purchase Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -149,7 +149,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="purchasePrice" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{`Purchase Price (${fmt.currencySymbol})`}</FormLabel>
+                  <FormLabel help="vehicle.purchase-price">{`Purchase Price (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="28500" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -157,7 +157,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="currentMileage" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Current {fmt.meterNoun(form.watch("meterUnit"))}</FormLabel>
+                  <FormLabel help="vehicle.current-mileage">Current {fmt.meterNoun(form.watch("meterUnit"))}</FormLabel>
                   <FormControl><Input type="number" placeholder={form.watch("meterUnit") === "HOURS" ? "1250" : "45000"} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -165,7 +165,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="meterUnit" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tracked In</FormLabel>
+                  <FormLabel help="vehicle.tracked-in">Tracked In</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: string) => meterUnitLabels[v] ?? v}</SelectValue></SelectTrigger></FormControl>
                     <SelectContent>
@@ -179,7 +179,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="vin" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>VIN</FormLabel>
+                  <FormLabel help="vehicle.vin">VIN</FormLabel>
                   <FormControl><Input placeholder="1HGCM82633A123456" className="font-mono text-sm" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -187,7 +187,7 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
 
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="vehicle.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

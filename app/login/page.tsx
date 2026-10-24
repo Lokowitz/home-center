@@ -69,7 +69,7 @@ export default async function LoginPage({
           <CardContent>
             <form action={login} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" help="auth.email">Email</Label>
                 <Input
                   id="email"
                   name="email"
@@ -80,7 +80,7 @@ export default async function LoginPage({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" help="auth.password">Password</Label>
                 <Input
                   id="password"
                   name="password"

@@ -75,6 +75,8 @@ export const conditionSchema = z
     resolvedDate: optionalDate,
     notes: optionalText,
   })
+  // A resolved date belongs to a resolved condition: when the status moves away from Resolved it goes.
+  .transform((v) => ({ ...v, resolvedDate: v.status === "RESOLVED" ? v.resolvedDate : null }))
   .superRefine(notBefore("resolvedDate", "diagnosedDate", "Resolved date can't be before diagnosis"))
 
 export const medicationSchema = z

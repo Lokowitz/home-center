@@ -100,7 +100,7 @@ export function ExportPanel({ data }: { data: BackupOverview }) {
       </CardHeader>
       <CardContent className="grid gap-4 px-5 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="ex-scope">What</Label>
+          <Label htmlFor="ex-scope" help="export.scope">What</Label>
           <select id="ex-scope" className={select} value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="all">Everything</option>
             {GROUPS.map((g) => {
@@ -114,24 +114,28 @@ export function ExportPanel({ data }: { data: BackupOverview }) {
           </select>
         </div>
         {scope === "all" && data.healthEnabled && (
-          <label className="flex items-center gap-2 self-end text-sm">
-            <input type="checkbox" className="h-4 w-4 accent-primary" checked={includeHealth} onChange={(e) => setIncludeHealth(e.target.checked)} />
-            Include health records
-          </label>
+          <div className="self-end">
+            <Label help="export.include-health" className="font-normal leading-normal">
+              <input type="checkbox" className="h-4 w-4 accent-primary" checked={includeHealth} onChange={(e) => setIncludeHealth(e.target.checked)} />
+              Include health records
+            </Label>
+          </div>
         )}
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input type="checkbox" className="h-4 w-4 accent-primary" checked={protect} onChange={(e) => setProtect(e.target.checked)} />
-          Protect with a password (send the password separately from the file)
-        </label>
+        <div className="sm:col-span-2">
+          <Label help="export.protect" className="font-normal leading-normal">
+            <input type="checkbox" className="h-4 w-4 accent-primary" checked={protect} onChange={(e) => setProtect(e.target.checked)} />
+            Protect with a password (send the password separately from the file)
+          </Label>
+        </div>
         {protect && (
           <>
             <div className="space-y-1.5">
-              <Label htmlFor="ex-pw">Password</Label>
+              <Label htmlFor="ex-pw" help="export.password">Password</Label>
               <Input id="ex-pw" type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
               {pwProblem && <p className="text-xs text-destructive">{pwProblem}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ex-pw2">Same password again</Label>
+              <Label htmlFor="ex-pw2" help="export.password-again">Same password again</Label>
               <Input id="ex-pw2" type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
               {again && pw !== again && <p className="text-xs text-destructive">The passwords don&apos;t match.</p>}
             </div>

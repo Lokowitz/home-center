@@ -52,7 +52,7 @@ export default async function ForgotPasswordPage({ searchParams }: { searchParam
           <CardContent className="space-y-4">
             <form action={request} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" help="auth.reset-email">Email</Label>
                 <Input id="email" name="email" type="email" autoComplete="email" required />
               </div>
               <Button type="submit" className="w-full">Email me a reset link</Button>

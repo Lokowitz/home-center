@@ -254,7 +254,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {equipmentOptions && equipmentOptions.length > 0 && (
               <FormItem>
-                <FormLabel>For</FormLabel>
+                <FormLabel help="service.target">For</FormLabel>
                 <Select
                   value={targetKey(form.watch("assetType"), form.watch("assetId"))}
                   onValueChange={(value) => {
@@ -290,7 +290,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
             {!record && targetReminders.length > 0 && (
               <FormField control={form.control} name="scheduleId" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Completes reminder</FormLabel>
+                  <FormLabel help="service.completes-reminder">Completes reminder</FormLabel>
                   <Select
                     value={field.value || NO_LINK}
                     onValueChange={(v) => {
@@ -318,7 +318,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Date *</FormLabel>
+                  <FormLabel help="service.date">Date *</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -326,7 +326,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Title *</FormLabel>
+                  <FormLabel help="service.title">Title *</FormLabel>
                   <FormControl><Input placeholder={isPerson ? "Annual physical" : "Oil Change"} {...field} /></FormControl>
                   <FormMessage />
                   {suggested && (
@@ -349,7 +349,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="vendor" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{isPerson ? "Facility" : "Vendor / Shop"}</FormLabel>
+                  {isPerson ? <FormLabel help="service.facility">Facility</FormLabel> : <FormLabel help="service.vendor">Vendor / Shop</FormLabel>}
                   <FormControl><Input placeholder={isPerson ? "City Medical Center" : "Jiffy Lube"} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -357,7 +357,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="cost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{`Cost (${fmt.currencySymbol})`}</FormLabel>
+                  <FormLabel help="service.cost">{`Cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" placeholder="89.99" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -365,7 +365,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="category" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
+                  <FormLabel help="service.category">Category</FormLabel>
                   <Select value={field.value} onValueChange={(v) => field.onChange(v ?? NO_CATEGORY)}>
                     <FormControl>
                       <SelectTrigger className="w-full">
@@ -388,7 +388,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               {providerOptions && (
                 <FormField control={form.control} name="providerId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Provider</FormLabel>
+                    <FormLabel help="service.provider">Provider</FormLabel>
                     <Select value={field.value || NO_LINK} onValueChange={(v) => field.onChange(!v || v === NO_LINK ? "" : v)}>
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -407,7 +407,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               {conditionOptions && conditionOptions.length > 0 && (
                 <FormField control={form.control} name="conditionId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>For condition</FormLabel>
+                    <FormLabel help="service.condition">For condition</FormLabel>
                     <Select value={field.value || NO_LINK} onValueChange={(v) => field.onChange(!v || v === NO_LINK ? "" : v)}>
                       <FormControl>
                         <SelectTrigger className="w-full">
@@ -426,7 +426,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="mileageAtService" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{fmt.meterNoun(meterUnit)} at Service</FormLabel>
+                    <FormLabel help="service.mileage">{fmt.meterNoun(meterUnit)} at Service</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "1250" : "45230"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -435,7 +435,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="service.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={3} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

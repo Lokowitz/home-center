@@ -11,13 +11,13 @@ import type { Provider } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
 
 const FIELDS: FieldConfig[] = [
-  { name: "name", label: "Name", kind: "text", required: true, placeholder: "Dr. Maria Chen", wide: true },
-  { name: "specialty", label: "Specialty", kind: "text", placeholder: "Family medicine" },
-  { name: "practice", label: "Practice", kind: "text", placeholder: "Riverside Family Health" },
-  { name: "phone", label: "Phone", kind: "tel", placeholder: "555-555-5555" },
-  { name: "email", label: "Email", kind: "email" },
-  { name: "address", label: "Address", kind: "text", wide: true },
-  { name: "notes", label: "Notes", kind: "textarea", wide: true },
+  { name: "name", label: "Name", kind: "text", required: true, placeholder: "Dr. Maria Chen", wide: true, help: "provider.name" },
+  { name: "specialty", label: "Specialty", kind: "text", placeholder: "Family medicine", help: "provider.specialty" },
+  { name: "practice", label: "Practice", kind: "text", placeholder: "Riverside Family Health", help: "provider.practice" },
+  { name: "phone", label: "Phone", kind: "tel", placeholder: "555-555-5555", help: "provider.phone" },
+  { name: "email", label: "Email", kind: "email", help: "provider.email" },
+  { name: "address", label: "Address", kind: "text", wide: true, help: "provider.address" },
+  { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "provider.notes" },
 ]
 
 function initialFor(p: Provider | null): FormValues {

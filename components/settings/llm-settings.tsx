@@ -9,6 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { FieldHelp } from "@/components/ui/field-help"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form"
 import { Check, TriangleAlert } from "lucide-react"
 import { settingsHref } from "@/lib/settings-sections"
@@ -71,7 +72,7 @@ export function LlmSettings({
     const apply = (v: Partial<LlmSwitches>) => {
       for (const k of keys) if (v[k] !== undefined) form.setValue(k, v[k]!, { shouldDirty: false })
     }
-    apply({ ...patch, ...(patch.enabled ? { hidden: false } : {}) })
+    apply(patch)
     setSwitchStatus("idle")
     startSwitch(async () => {
       const result = await updateLlmSwitches(patch)
@@ -142,22 +143,25 @@ export function LlmSettings({
               <div className="space-y-3">
                 <SwitchRow
                   label="Turn on the assistant"
+                  help="llm.enabled"
                   checked={enabled}
                   disabled={switchPending}
                   onChange={(v) => toggle({ enabled: v })}
                 />
                 <SwitchRow
                   label="Hide the assistant from the nav menu and the top-right button"
+                  help="llm.hidden"
                   nested
                   checked={hidden}
-                  disabled={switchPending || enabled}
-                  disabledReason={enabled ? "only while the assistant is off" : undefined}
+                  disabled={switchPending}
                   onChange={(v) => toggle({ hidden: v })}
                 />
                 <SwitchRow
                   label="Let the assistant read uploaded documents"
-                  checked={documentsEnabled}
-                  disabled={switchPending || !indexingEnabled}
+                  help="llm.documents"
+                  checked={documentsEnabled && enabled}
+                  disabled={switchPending || !enabled || !indexingEnabled}
+                  disabledReason={!enabled ? "turn on the assistant first" : undefined}
                   onChange={(v) => toggle({ documentsEnabled: v })}
                   hint={
                     indexingEnabled
@@ -167,11 +171,14 @@ export function LlmSettings({
                 />
                 <SwitchRow
                   label="Include health record documents"
+                  help="llm.health-documents"
                   nested
-                  checked={healthDocumentsEnabled && healthEnabled}
-                  disabled={switchPending || !healthEnabled || !indexingEnabled || !documentsEnabled}
+                  checked={healthDocumentsEnabled && healthEnabled && enabled}
+                  disabled={switchPending || !enabled || !healthEnabled || !indexingEnabled || !documentsEnabled}
                   disabledReason={
-                    !healthEnabled ? (
+                    !enabled ? (
+                      "turn on the assistant first"
+                    ) : !healthEnabled ? (
                       <>
                         Health is turned off under{" "}
                         <Link href={settingsHref("features")} className="underline underline-offset-2 hover:text-foreground">
@@ -199,7 +206,7 @@ export function LlmSettings({
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="baseUrl" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Base URL</FormLabel>
+                  <FormLabel help="llm.base-url">Base URL</FormLabel>
                   <FormControl><Input placeholder="https://api.openai.com/v1" {...field} /></FormControl>
                   <FormDescription className="text-xs">
                     Fill from:{" "}
@@ -233,7 +240,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="model" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Model</FormLabel>
+                  <FormLabel help="llm.model">Model</FormLabel>
                   <FormControl><Input placeholder="gpt-4o-mini" {...field} /></FormControl>
                   <FormDescription className="text-xs">Must support tool (function) calling.</FormDescription>
                   <FormMessage />
@@ -242,7 +249,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="apiKey" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>API key</FormLabel>
+                  <FormLabel help="llm.api-key">API key</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
@@ -266,7 +273,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="temperature" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Temperature</FormLabel>
+                  <FormLabel help="llm.temperature">Temperature</FormLabel>
                   <FormControl><Input type="number" step="0.1" min={0} max={2} placeholder="Provider default" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -274,7 +281,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="maxTokens" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Max tokens</FormLabel>
+                  <FormLabel help="llm.max-tokens">Max tokens</FormLabel>
                   <FormControl><Input type="number" min={1} max={32000} placeholder="Provider default" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -282,7 +289,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="timeoutSeconds" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Time limit per question (seconds)</FormLabel>
+                  <FormLabel help="llm.timeout">Time limit per question (seconds)</FormLabel>
                   <FormControl><Input type="number" min={30} max={900} placeholder={String(DEFAULT_TIMEOUT_SECONDS)} {...field} /></FormControl>
                   <FormDescription className="text-xs">
                     Raise it for slow local models. Once a reply starts, it also stops if the server then sends nothing for 60 seconds.
@@ -293,7 +300,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="maxToolRounds" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Lookup rounds per question</FormLabel>
+                  <FormLabel help="llm.tool-rounds">Lookup rounds per question</FormLabel>
                   <FormControl>
                     <Input type="number" min={TOOL_ROUNDS_RANGE.min} max={TOOL_ROUNDS_RANGE.max} placeholder={String(DEFAULT_TOOL_ROUNDS)} {...field} />
                   </FormControl>
@@ -307,7 +314,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="systemPrompt" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Extra instructions</FormLabel>
+                  <FormLabel help="llm.system-prompt">Extra instructions</FormLabel>
                   <FormControl><Textarea rows={3} maxLength={4000} placeholder="e.g. Keep answers short." {...field} /></FormControl>
                   <FormDescription className="text-xs">Added to the assistant&apos;s built-in instructions.</FormDescription>
                   <FormMessage />
@@ -316,7 +323,7 @@ export function LlmSettings({
 
               <FormField control={form.control} name="extraBody" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Extra request JSON</FormLabel>
+                  <FormLabel help="llm.extra-body">Extra request JSON</FormLabel>
                   <FormControl>
                     <Textarea rows={3} maxLength={2000} className="font-mono text-xs" placeholder='{"chat_template_kwargs": {"enable_thinking": true}}' {...field} />
                   </FormControl>
@@ -351,9 +358,11 @@ export function LlmSettings({
 }
 
 function SwitchRow({
-  label, checked, disabled, disabledReason, onChange, hint, nested,
+  label, help, checked, disabled, disabledReason, onChange, hint, nested,
 }: {
   label: string
+  /** lib/field-help id for the "?" beside the label. */
+  help: string
   checked: boolean
   disabled?: boolean
   onChange: (checked: boolean) => void
@@ -365,16 +374,19 @@ function SwitchRow({
 }) {
   return (
     <div className="space-y-1">
-      <label className={`flex items-center gap-2 text-sm ${nested ? "ml-6 font-normal" : "font-medium"} ${disabled ? "opacity-60" : ""}`}>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={checked}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        <span>{label}</span>
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label className={`flex items-center gap-2 text-sm ${nested ? "ml-6 font-normal" : "font-medium"} ${disabled ? "opacity-60" : ""}`}>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={checked}
+            disabled={disabled}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+          <span>{label}</span>
+        </label>
+        <FieldHelp id={help} />
+      </div>
       {disabledReason && (
         <p className={`${nested ? "ml-12" : "ml-6"} text-xs font-medium text-muted-foreground`}>({disabledReason})</p>
       )}

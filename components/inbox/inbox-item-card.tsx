@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowRight, FileText, Loader2, MoreHorizontal, RotateCw,
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { FieldHelp } from "@/components/ui/field-help"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { FileInboxDialog } from "@/components/inbox/file-inbox-dialog"
 import { KeepDocumentDialog } from "@/components/inbox/keep-document-dialog"
@@ -314,7 +315,7 @@ export function InboxItemCard({
         {/* Where it goes */}
         <fieldset className="min-w-0 border-t bg-muted/50 p-4 md:border-t-0 md:border-l">
           <legend className="float-left mb-3 w-full text-[0.7rem] font-semibold tracking-wider text-muted-foreground uppercase">
-            Where it goes
+            Where it goes <FieldHelp id="inbox.destination" className="ml-1 align-middle" />
           </legend>
           <div className="clear-left space-y-1">
             {DESTINATIONS.map((d) => (

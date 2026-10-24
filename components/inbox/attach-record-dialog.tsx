@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { FieldHelp } from "@/components/ui/field-help"
 import { AssetSelect, type InboxAssetOption } from "@/components/inbox/asset-select"
 import { attachToRecord, listAttachCandidates } from "@/lib/actions/inbox"
 import { bestAttachMatch, type AttachCandidate } from "@/lib/inbox"
@@ -95,12 +96,12 @@ export function AttachRecordDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor={`attach-${itemId}`}>For</Label>
+            <Label htmlFor={`attach-${itemId}`} help="inbox.attach-asset">For</Label>
             <AssetSelect id={`attach-${itemId}`} assets={assets} value={choices.assetKey} onChange={changeAsset} />
           </div>
           {choices.assetKey && (
             <fieldset className="space-y-2">
-              <legend className="mb-2 text-sm font-medium">Record</legend>
+              <legend className="mb-2 flex items-center gap-1.5 text-sm font-medium">Record<FieldHelp id="inbox.attach-record" /></legend>
               {loading ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading records…</p>
               ) : choices.error ? (

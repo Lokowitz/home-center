@@ -80,7 +80,7 @@ export default async function ChangePasswordPage({
             <form action={changePassword} className="space-y-4">
               {askCurrent && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="currentPassword">Current password</Label>
+                  <Label htmlFor="currentPassword" help="auth.current-password">Current password</Label>
                   <Input
                     id="currentPassword"
                     name="currentPassword"
@@ -91,7 +91,7 @@ export default async function ChangePasswordPage({
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label htmlFor="newPassword">New password</Label>
+                <Label htmlFor="newPassword" help="auth.new-password">New password</Label>
                 <Input
                   id="newPassword"
                   name="newPassword"
@@ -102,7 +102,7 @@ export default async function ChangePasswordPage({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="confirm">Confirm password</Label>
+                <Label htmlFor="confirm" help="auth.confirm-password">Confirm password</Label>
                 <Input
                   id="confirm"
                   name="confirm"

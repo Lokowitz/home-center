@@ -301,7 +301,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {equipmentOptions && equipmentOptions.length > 0 && (
               <FormItem>
-                <FormLabel>For</FormLabel>
+                <FormLabel help="reminder.for">For</FormLabel>
                 <Select
                   value={targetKey(form.watch("assetType"), form.watch("assetId"))}
                   onValueChange={(value) => {
@@ -339,14 +339,14 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="title" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Title *</FormLabel>
+                  <FormLabel help="reminder.title">Title *</FormLabel>
                   <FormControl><Input placeholder="Oil Change" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <div className="col-span-2 space-y-2">
-                <FormLabel>Repeats</FormLabel>
+                <FormLabel help="reminder.repeat">Repeats</FormLabel>
                 <div role="group" aria-label="Repeats" className="flex flex-wrap gap-2">
                   {REPEAT_OPTIONS.map((o) => (
                     <Button
@@ -367,7 +367,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                 <>
                   <FormField control={form.control} name="intervalDays" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Repeat Every (days)</FormLabel>
+                      <FormLabel help="reminder.interval-days">Repeat Every (days)</FormLabel>
                       <FormControl><Input type="number" placeholder="90" {...field} /></FormControl>
                       <FormDescription className="text-xs">
                         {INTERVAL_PRESETS.map((p, i) => (
@@ -386,7 +386,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                   {assetType === "VEHICLE" && (
                     <FormField control={form.control} name="intervalMiles" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Repeat Every ({fmt.meterShort(meterUnit)})</FormLabel>
+                        <FormLabel help="reminder.interval-miles">Repeat Every ({fmt.meterShort(meterUnit)})</FormLabel>
                         <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "50" : "5000"} {...field} /></FormControl>
                         <FormDescription className="text-xs">{meterUnit === "HOURS" ? "e.g. 50 for an oil change" : "e.g. 5000 for oil change"}</FormDescription>
                         <FormMessage />
@@ -399,7 +399,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {repeat === "months" && (
                 <>
                   <div className="col-span-2 space-y-2">
-                    <FormLabel>Months</FormLabel>
+                    <FormLabel help="reminder.months">Months</FormLabel>
                     <div role="group" aria-label="Months" className="grid grid-cols-6 gap-1.5">
                       {MONTHS.map((name, i) => {
                         const on = selectedMonths.includes(i + 1)
@@ -427,7 +427,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                   </div>
                   <FormField control={form.control} name="dueDay" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Day of month</FormLabel>
+                      <FormLabel help="reminder.due-day">Day of month</FormLabel>
                       <FormControl><Input type="number" min={1} max={28} placeholder="1" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -437,7 +437,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
               <FormField control={form.control} name="estimatedCost" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{`Estimated cost (${fmt.currencySymbol})`}</FormLabel>
+                  <FormLabel help="reminder.estimated-cost">{`Estimated cost (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="0.01" min="0" placeholder="150" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -445,7 +445,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
               <FormField control={form.control} name="nextDueDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Next Due Date</FormLabel>
+                  <FormLabel help="reminder.next-due-date">Next Due Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -454,7 +454,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="nextDueMileage" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Next Due {fmt.meterNoun(meterUnit)}</FormLabel>
+                    <FormLabel help="reminder.next-due-mileage">Next Due {fmt.meterNoun(meterUnit)}</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "1300" : "50000"} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -463,7 +463,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
               <FormField control={form.control} name="reminderDaysBefore" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Remind (days before)</FormLabel>
+                  <FormLabel help="reminder.remind-days">Remind (days before)</FormLabel>
                   <FormControl><Input type="number" placeholder="14" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -472,7 +472,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
               {assetType === "VEHICLE" && (
                 <FormField control={form.control} name="reminderMilesBefore" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Remind ({fmt.meterShort(meterUnit)} before)</FormLabel>
+                    <FormLabel help="reminder.remind-miles">Remind ({fmt.meterShort(meterUnit)} before)</FormLabel>
                     <FormControl><Input type="number" placeholder={meterUnit === "HOURS" ? "10" : "500"} {...field} /></FormControl>
                     <FormDescription className="text-xs">How close to the due {meterUnit === "HOURS" ? "hour count" : fmt.distanceNoun.toLowerCase()} to start warning</FormDescription>
                     <FormMessage />
@@ -482,7 +482,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
               {choices.length > 0 && (
                 <div className="col-span-2 space-y-2">
-                  <FormLabel>Manual</FormLabel>
+                  <FormLabel help="reminder.manual">Manual</FormLabel>
                   <div className="flex flex-wrap items-center gap-2">
                     <Select
                       value={pickedChoice ? pickedChoice.id : NO_MANUAL}
@@ -523,7 +523,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="reminder.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={2} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

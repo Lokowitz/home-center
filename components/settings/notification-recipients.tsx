@@ -4,6 +4,7 @@ import { useState, useTransition } from "react"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { FieldHelp } from "@/components/ui/field-help"
 import { setReceivesNotifications } from "@/lib/actions/users"
 
 export type Recipient = { id: string; name: string; email: string; role: string; receivesNotifications: boolean }
@@ -33,6 +34,7 @@ export function NotificationRecipients({ users, currentUserId }: { users: Recipi
       <CardHeader className="px-5">
         <CardTitle className="flex items-center gap-2">
           Who gets notifications
+          <FieldHelp id="recipients.receives" />
           <Badge variant="outline">{count} of {users.length}</Badge>
         </CardTitle>
         <CardDescription>

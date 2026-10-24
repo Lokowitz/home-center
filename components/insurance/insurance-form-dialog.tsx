@@ -65,10 +65,10 @@ function toValues(policy: PolicyRow | null): FormValues {
   }
 }
 
-function CheckList({ label, options, value, onChange }: { label: string; options: Named[]; value: string[]; onChange: (next: string[]) => void }) {
+function CheckList({ label, help, options, value, onChange }: { label: string; help: string; options: Named[]; value: string[]; onChange: (next: string[]) => void }) {
   return (
     <div className="col-span-2 space-y-1.5">
-      <FormLabel>{label}</FormLabel>
+      <FormLabel help={help}>{label}</FormLabel>
       <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
         {options.map((o) => (
           <label key={o.id} className="flex items-center gap-2 text-sm">
@@ -160,21 +160,21 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="carrier" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Carrier *</FormLabel>
+                  <FormLabel help="policy.carrier">Carrier *</FormLabel>
                   <FormControl><Input placeholder="State Farm" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="planName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Plan</FormLabel>
+                  <FormLabel help="policy.plan">Plan</FormLabel>
                   <FormControl><Input placeholder="Homeowners HO-3" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
               <div className="space-y-2">
-                <FormLabel>Type</FormLabel>
+                <FormLabel help="policy.type">Type</FormLabel>
                 <Select value={kind} onValueChange={(v) => v && form.setValue("kind", v, { shouldDirty: true })}>
                   <SelectTrigger className="w-full" aria-label="Type">
                     <SelectValue>{(v: string) => insuranceKindLabel(v)}</SelectValue>
@@ -188,7 +188,7 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
               </div>
               <FormField control={form.control} name="policyNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Policy number</FormLabel>
+                  <FormLabel help="policy.number">Policy number</FormLabel>
                   <FormControl><Input {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -196,14 +196,14 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
 
               <FormField control={form.control} name="phone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{healthKind ? "Member services phone" : "Phone"}</FormLabel>
+                  {healthKind ? <FormLabel help="policy.member-phone">Member services phone</FormLabel> : <FormLabel help="policy.phone">Phone</FormLabel>}
                   <FormControl><Input type="tel" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="deductible" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{`Deductible (${fmt.currencySymbol})`}</FormLabel>
+                  <FormLabel help="policy.deductible">{`Deductible (${fmt.currencySymbol})`}</FormLabel>
                   <FormControl><Input type="number" step="any" min="0" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -211,14 +211,14 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
 
               <FormField control={form.control} name="startDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{healthKind ? "Coverage starts" : "Term starts"}</FormLabel>
+                  {healthKind ? <FormLabel help="policy.coverage-start">Coverage starts</FormLabel> : <FormLabel help="policy.term-start">Term starts</FormLabel>}
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="endDate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{healthKind ? "Coverage ends" : "Renewal date"}</FormLabel>
+                  {healthKind ? <FormLabel help="policy.coverage-end">Coverage ends</FormLabel> : <FormLabel help="policy.renewal">Renewal date</FormLabel>}
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -228,21 +228,21 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
                 <>
                   <FormField control={form.control} name="memberId" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Member ID</FormLabel>
+                      <FormLabel help="policy.member-id">Member ID</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="groupNumber" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Group number</FormLabel>
+                      <FormLabel help="policy.group">Group number</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="outOfPocketMax" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{`Out-of-pocket max (${fmt.currencySymbol})`}</FormLabel>
+                      <FormLabel help="policy.oop-max">{`Out-of-pocket max (${fmt.currencySymbol})`}</FormLabel>
                       <FormControl><Input type="number" step="any" min="0" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
@@ -251,18 +251,18 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
               )}
 
               {allowed.members && people.length > 0 && (
-                <CheckList label="Covers people" options={people} value={memberIds} onChange={(next) => form.setValue("memberIds", next, { shouldDirty: true })} />
+                <CheckList label="Covers people" help="policy.covers-people" options={people} value={memberIds} onChange={(next) => form.setValue("memberIds", next, { shouldDirty: true })} />
               )}
               {allowed.assets && properties.length > 0 && (
-                <CheckList label="Covers properties" options={properties} value={propertyIds} onChange={(next) => form.setValue("propertyIds", next, { shouldDirty: true })} />
+                <CheckList label="Covers properties" help="policy.covers-properties" options={properties} value={propertyIds} onChange={(next) => form.setValue("propertyIds", next, { shouldDirty: true })} />
               )}
               {allowed.assets && vehicles.length > 0 && (
-                <CheckList label="Covers vehicles" options={vehicles} value={vehicleIds} onChange={(next) => form.setValue("vehicleIds", next, { shouldDirty: true })} />
+                <CheckList label="Covers vehicles" help="policy.covers-vehicles" options={vehicles} value={vehicleIds} onChange={(next) => form.setValue("vehicleIds", next, { shouldDirty: true })} />
               )}
 
               <div className="col-span-2 space-y-2">
                 <div className="flex items-center justify-between">
-                  <FormLabel>Coverage</FormLabel>
+                  <FormLabel help="policy.coverage">Coverage</FormLabel>
                   <Button type="button" variant="outline" size="sm" onClick={addCoverage}>
                     <Plus className="mr-1 h-3.5 w-3.5" />
                     Add coverage
@@ -300,7 +300,7 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
 
               <FormField control={form.control} name="notes" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel help="policy.notes">Notes</FormLabel>
                   <FormControl><Textarea rows={2} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

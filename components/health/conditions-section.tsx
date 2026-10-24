@@ -53,12 +53,16 @@ export function ConditionsSection({ personId, conditions, providers, observation
   const [open, setOpen] = useState(false)
 
   const fields: FieldConfig[] = [
-    { name: "name", label: "Condition", kind: "text", required: true, placeholder: "Type 2 diabetes", wide: true },
-    { name: "status", label: "Status", kind: "select", required: true, options: CONDITION_STATUSES },
-    { name: "providerId", label: "Treating provider", kind: "select", options: providers.map((p) => ({ value: p.id, label: p.name })) },
-    { name: "diagnosedDate", label: "Diagnosed", kind: "date" },
-    { name: "resolvedDate", label: "Resolved", kind: "date" },
-    { name: "notes", label: "Notes", kind: "textarea", wide: true },
+    { name: "name", label: "Condition", kind: "text", required: true, placeholder: "Type 2 diabetes", wide: true, help: "condition.name" },
+    {
+      name: "status", label: "Status", kind: "select", required: true, options: CONDITION_STATUSES, help: "condition.status",
+      // Only a Resolved condition has a resolved date; switching away from Resolved drops it on save.
+      notice: (v) => (v.status !== "RESOLVED" && v.resolvedDate ? "The resolved date will be cleared when you save." : null),
+    },
+    { name: "providerId", label: "Treating provider", kind: "select", options: providers.map((p) => ({ value: p.id, label: p.name })), help: "condition.provider" },
+    { name: "diagnosedDate", label: "Diagnosed", kind: "date", help: "condition.diagnosed" },
+    { name: "resolvedDate", label: "Resolved", kind: "date", help: "condition.resolved", showWhen: (v) => v.status === "RESOLVED" },
+    { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "condition.notes" },
   ]
 
   async function handleDelete(c: ConditionRow) {

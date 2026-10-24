@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
+import { Label } from "@/components/ui/label"
 import { useFormat } from "@/components/regional-provider"
 import { useDropTarget } from "@/components/drop/drop-provider"
 import { createRoom, updateRoom, deleteRoom } from "@/lib/actions/rooms"
@@ -211,35 +212,35 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
         <div className="grid grid-cols-2 gap-4">
           <FormField control={form.control} name="name" render={({ field }) => (
             <FormItem>
-              <FormLabel>Name *</FormLabel>
+              <FormLabel help="room.name">Name *</FormLabel>
               <FormControl><Input placeholder="Kitchen" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField control={form.control} name="level" render={({ field }) => (
             <FormItem>
-              <FormLabel>Level</FormLabel>
+              <FormLabel help="room.level">Level</FormLabel>
               <FormControl><Input placeholder="Main floor" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField control={form.control} name="area" render={({ field }) => (
             <FormItem>
-              <FormLabel>{fmt.areaLabel}</FormLabel>
+              <FormLabel help="room.area">{fmt.areaLabel}</FormLabel>
               <FormControl><Input type="number" step="any" min="0" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField control={form.control} name="dimensions" render={({ field }) => (
             <FormItem>
-              <FormLabel>Dimensions</FormLabel>
+              <FormLabel help="room.dimensions">Dimensions</FormLabel>
               <FormControl><Input placeholder={`14 × 16 ${fmt.areaShort === "m²" ? "m" : "ft"}`} {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField control={form.control} name="flooringType" render={({ field }) => (
             <FormItem>
-              <FormLabel>Flooring</FormLabel>
+              <FormLabel help="room.flooring">Flooring</FormLabel>
               <FormControl><Input list="room-flooring-suggestions" autoComplete="off" placeholder="Hardwood" {...field} /></FormControl>
               <datalist id="room-flooring-suggestions">
                 {FLOORING_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
@@ -249,14 +250,14 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
           )} />
           <FormField control={form.control} name="flooringProduct" render={({ field }) => (
             <FormItem>
-              <FormLabel>Flooring product</FormLabel>
+              <FormLabel help="room.flooring-product">Flooring product</FormLabel>
               <FormControl><Input placeholder="Brand, product, color" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
           <FormField control={form.control} name="flooringInstalled" render={({ field }) => (
             <FormItem>
-              <FormLabel>Flooring installed</FormLabel>
+              <FormLabel help="room.flooring-installed">Flooring installed</FormLabel>
               <FormControl><Input type="date" {...field} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -265,7 +266,7 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Paint</span>
+            <Label help="room.paint">Paint</Label>
             <Button type="button" variant="outline" size="sm" onClick={addPaint}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Add paint
             </Button>
@@ -303,7 +304,7 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
 
         <FormField control={form.control} name="notes" render={({ field }) => (
           <FormItem>
-            <FormLabel>Notes</FormLabel>
+            <FormLabel help="room.notes">Notes</FormLabel>
             <FormControl><Textarea rows={3} {...field} /></FormControl>
             <FormMessage />
           </FormItem>

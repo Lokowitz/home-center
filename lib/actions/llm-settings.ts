@@ -7,7 +7,7 @@ import { z } from "zod"
 import { redirect } from "next/navigation"
 import { encrypt } from "@/lib/secret-box"
 import { loadLlmConfig, LLM_SETTINGS_ID } from "@/lib/llm/config"
-import { originChanged, parseLlmSettings, type LlmSettingsInput, parseExtraBody } from "@/lib/llm/settings-schema"
+import { documentSwitchError, originChanged, parseLlmSettings, type LlmSettingsInput, parseExtraBody } from "@/lib/llm/settings-schema"
 import { createChatClient } from "@/lib/llm/client"
 import { LlmError } from "@/lib/llm/errors"
 import type { OpenAiTool } from "@/lib/llm/types"
@@ -73,12 +73,11 @@ export async function updateLlmSwitches(patch: Partial<LlmSwitches>): Promise<{ 
     healthDocumentsEnabled: saved?.healthDocumentsEnabled ?? false,
     ...parsed.data,
   }
+  const documentError = documentSwitchError(next, parsed.data)
+  if (documentError) return { error: documentError }
   if (next.enabled && !(saved?.baseUrl && saved?.model)) {
     return { error: "Save a base URL and model under Advanced settings first." }
   }
-  // Hidden only applies while off.
-  if (next.enabled) next.hidden = false
-
   await prisma.llmSettings.upsert({
     where: { id: LLM_SETTINGS_ID },
     create: { id: LLM_SETTINGS_ID, ...next },

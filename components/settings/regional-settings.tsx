@@ -49,7 +49,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
       </CardHeader>
       <CardContent className="px-5 space-y-4">
         <div className="space-y-1.5">
-          <Label>Currency</Label>
+          <Label help="regional.currency">Currency</Label>
           <Select value={value.currency} onValueChange={(v) => v && set("currency", v)}>
             <SelectTrigger className="w-full sm:w-64" disabled={pending}>
               <SelectValue suppressHydrationWarning>{(v: string) => currencyLabel(v)}</SelectValue>
@@ -63,7 +63,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Distance</Label>
+          <Label help="regional.distance">Distance</Label>
           <Select value={value.distanceUnit} onValueChange={(v) => v && set("distanceUnit", v)}>
             <SelectTrigger className="w-full sm:w-64" disabled={pending}>
               <SelectValue>{(v: Regional["distanceUnit"]) => DISTANCE_LABELS[v]}</SelectValue>
@@ -76,7 +76,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Area</Label>
+          <Label help="regional.area">Area</Label>
           <Select value={value.areaUnit} onValueChange={(v) => v && set("areaUnit", v)}>
             <SelectTrigger className="w-full sm:w-64" disabled={pending}>
               <SelectValue>{(v: Regional["areaUnit"]) => AREA_LABELS[v]}</SelectValue>
@@ -90,7 +90,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Date format</Label>
+          <Label help="regional.date-format">Date format</Label>
           <Select value={value.dateFormat} onValueChange={(v) => v && set("dateFormat", v)}>
             <SelectTrigger className="w-full sm:w-64" disabled={pending}>
               <SelectValue>{(v: Regional["dateFormat"]) => dateLabel(v)}</SelectValue>
@@ -103,7 +103,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
           </Select>
         </div>
 
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <Label help="regional.hour12" className="leading-normal">
           <input
             type="checkbox"
             className="h-4 w-4 accent-primary"
@@ -112,7 +112,7 @@ export function RegionalSettingsForm({ initial }: { initial: Regional }) {
             onChange={(e) => set("hour12", !e.target.checked)}
           />
           24-hour clock
-        </label>
+        </Label>
 
         <p className="text-sm text-muted-foreground" suppressHydrationWarning>
           Preview: {preview.money(1234.56)} · {(12345).toLocaleString()} {preview.distanceShort} · {preview.area(1200)} · {preview.dateTime(now)}

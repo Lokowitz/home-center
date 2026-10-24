@@ -114,7 +114,7 @@ export function MailSettings({
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="host" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Server</FormLabel>
+                  <FormLabel help="mail.host">Server</FormLabel>
                   <FormControl><Input placeholder="smtp.gmail.com" {...field} /></FormControl>
                   <SourceNote source={sources.host} />
                   <FormMessage />
@@ -123,7 +123,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="port" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Port</FormLabel>
+                  <FormLabel help="mail.port">Port</FormLabel>
                   <FormControl><Input type="number" placeholder="587" {...field} /></FormControl>
                   <SourceNote source={sources.port} />
                   <FormMessage />
@@ -132,7 +132,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="username" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel help="mail.username">Username</FormLabel>
                   <FormControl><Input placeholder="you@gmail.com" {...field} /></FormControl>
                   <FormDescription className="text-xs">Leave blank for an unauthenticated relay.</FormDescription>
                   <FormMessage />
@@ -141,7 +141,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="password" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Password</FormLabel>
+                  <FormLabel help="mail.password">Password</FormLabel>
                   <FormControl>
                     <Input
                       type="password"
@@ -169,7 +169,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="secure" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Encryption</FormLabel>
+                  <FormLabel help="mail.secure">Encryption</FormLabel>
                   <Select value={field.value} onValueChange={(v) => field.onChange(v ?? field.value)}>
                     <FormControl>
                       <SelectTrigger className="w-full">
@@ -188,7 +188,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="digestHour" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Digest hour</FormLabel>
+                  <FormLabel help="mail.digest-hour">Digest hour</FormLabel>
                   <FormControl><Input type="number" min={0} max={23} placeholder="8" {...field} /></FormControl>
                   <FormDescription className="text-xs">When daily and weekly emails go out.</FormDescription>
                   <FormMessage />
@@ -197,7 +197,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="fromAddress" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>From address</FormLabel>
+                  <FormLabel help="mail.from">From address</FormLabel>
                   <FormControl><Input placeholder="HomeCenter <no-reply@homecenter.local>" {...field} /></FormControl>
                   <FormDescription className="text-xs">
                     Many providers require this to match the account you signed in with.
@@ -209,7 +209,7 @@ export function MailSettings({
 
               <FormField control={form.control} name="publicUrl" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Public address</FormLabel>
+                  <FormLabel help="mail.public-url">Public address</FormLabel>
                   <FormControl><Input placeholder="https://home.example.com" {...field} /></FormControl>
                   <FormDescription className="text-xs">
                     Where links in emails point, such as password reset. Use the address people type in their browser.
