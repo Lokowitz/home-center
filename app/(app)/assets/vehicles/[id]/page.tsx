@@ -13,6 +13,8 @@ import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { VehicleEditButton } from "@/components/vehicles/vehicle-edit-button"
 import { getFormat } from "@/lib/regional-server"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
+import { AssetInsurance } from "@/components/insurance/asset-insurance"
+import { loadAssetPolicies } from "@/lib/insurance-server"
 
 export default async function VehicleDetailPage({
   params,
@@ -27,12 +29,13 @@ export default async function VehicleDetailPage({
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, documents, manualOptions] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, documents, manualOptions, policies] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "VEHICLE", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadManualOptions([{ assetType: "VEHICLE", assetId: id }]),
+    loadAssetPolicies("VEHICLE", id),
   ])
 
   return (
@@ -52,6 +55,7 @@ export default async function VehicleDetailPage({
           {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(vehicle.purchaseDate)} />}
         </div>
 
+        <AssetInsurance policies={policies} />
         <AssetCostPanel
           assetType="VEHICLE"
           assetId={id}

@@ -39,7 +39,7 @@ export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS,
   return [
     health
       ? "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, people and their health records (including observations the family logs, like meltdowns or bad nights), care providers, insurance, service records and costs, warranties, and maintenance schedules."
-      : "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, service records and costs, warranties, and maintenance schedules. Its health section (people, providers, insurance, health records) is turned off: if asked about those, say it's turned off in Settings.",
+      : "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, service records and costs, warranties, and maintenance schedules. Its health section (people, providers, health insurance, health records) is turned off: if asked about those, say it's turned off in Settings.",
     today ? `Today is ${today} (the user's local day).` : `Today is ${toDay(now)} (UTC).`,
     "",
     "Rules:",

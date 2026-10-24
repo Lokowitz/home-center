@@ -98,4 +98,51 @@ describe("snapshot", () => {
     expect(await row()).toMatchObject({ referenceAttachmentId: null })
     c.close()
   })
+
+  it("keeps health policies through the insurance migration and links policies to properties and vehicles", async () => {
+    const dir = await tempDir()
+    const db = path.join(dir, "old.db")
+    await createMigratedDb(db, { upTo: "20261024175732_maintenance_manual_reference" })
+    const { openDb } = await import("./snapshot")
+    const c = openDb(db)
+    const t = "2026-01-01T00:00:00.000Z"
+    await c.executeMultiple(`
+      INSERT INTO "User" (id, name, email, passwordHash, role) VALUES ('u1', 'Admin', 'admin@example.test', 'hash', 'ADMIN');
+      INSERT INTO "Person" (id, name, updatedAt) VALUES ('h1', 'Pat', '${t}');
+      INSERT INTO "Property" (id, name, address, updatedAt) VALUES ('p1', 'Main House', '1 Elm St', '${t}');
+      INSERT INTO "Vehicle" (id, name, make, model, year, updatedAt) VALUES ('v1', 'Daily Driver', 'Honda', 'Fit', 2015, '${t}');
+      INSERT INTO "InsurancePolicy" (id, carrier, kind, updatedAt) VALUES ('i1', 'Delta Dental', 'DENTAL', '${t}');
+      INSERT INTO "_InsurancePolicyToPerson" (A, B) VALUES ('i1', 'h1');
+      INSERT INTO "Attachment" (id, recordType, filename, originalName, mimeType, sizeBytes, uploadedById, insurancePolicyId) VALUES ('ai1', 'INSURANCE', 'f-ai1.pdf', 'card.pdf', 'application/pdf', 5, 'u1', 'i1');
+    `)
+    const migrations = path.resolve(__dirname, "../../prisma/migrations")
+    const folder = (await readdir(migrations)).find((n) => n.endsWith("_insurance_property_auto_life"))
+    expect(folder).toBeDefined()
+    await c.executeMultiple(await readFile(path.join(migrations, folder!, "migration.sql"), "utf8"))
+
+    const count = async (sql: string) => Number((await c.execute(sql)).rows[0].n)
+    expect((await c.execute(`SELECT kind FROM "InsurancePolicy" WHERE id = 'i1'`)).rows[0].kind).toBe("DENTAL")
+    expect(await count(`SELECT COUNT(*) AS n FROM "_InsurancePolicyToPerson" WHERE A = 'i1'`)).toBe(1)
+    expect(await count(`SELECT COUNT(*) AS n FROM "Attachment" WHERE id = 'ai1'`)).toBe(1)
+
+    await c.executeMultiple(`
+      INSERT INTO "InsurancePolicy" (id, carrier, kind, updatedAt) VALUES ('i2', 'Acme', 'HOME', '${t}');
+      INSERT INTO "_InsurancePolicyToProperty" (A, B) VALUES ('i2', 'p1');
+      INSERT INTO "_InsurancePolicyToVehicle" (A, B) VALUES ('i2', 'v1');
+      INSERT INTO "InsurancePremium" (id, policyId, effectiveDate, amount) VALUES ('pr1', 'i2', '${t}', 1680);
+      INSERT INTO "InsuranceCoverage" (id, policyId, label, "limit") VALUES ('c1', 'i2', 'Personal property', 225000);
+    `)
+    expect((await c.execute(`SELECT period FROM "InsurancePremium" WHERE id = 'pr1'`)).rows[0].period).toBe("ANNUAL")
+
+    await c.execute(`PRAGMA foreign_keys = ON`)
+    await c.execute(`DELETE FROM "Property" WHERE id = 'p1'`)
+    expect(await count(`SELECT COUNT(*) AS n FROM "_InsurancePolicyToProperty"`)).toBe(0)
+    expect(await count(`SELECT COUNT(*) AS n FROM "InsurancePolicy" WHERE id = 'i2'`)).toBe(1)
+    expect(await count(`SELECT COUNT(*) AS n FROM "_InsurancePolicyToVehicle" WHERE A = 'i2'`)).toBe(1)
+    await c.execute(`DELETE FROM "InsurancePolicy" WHERE id = 'i2'`)
+    expect(await count(`SELECT COUNT(*) AS n FROM "InsurancePremium" WHERE policyId = 'i2'`)).toBe(0)
+    expect(await count(`SELECT COUNT(*) AS n FROM "InsuranceCoverage" WHERE policyId = 'i2'`)).toBe(0)
+    expect(await count(`SELECT COUNT(*) AS n FROM "_InsurancePolicyToVehicle" WHERE A = 'i2'`)).toBe(0)
+    c.close()
+  })
 })

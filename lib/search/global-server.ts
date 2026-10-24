@@ -21,6 +21,7 @@ import { loadFeatures } from "@/lib/features-server"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
 import type { Features } from "@/lib/features"
+import { HEALTH_INSURANCE_KINDS, renewalWindowDays } from "@/lib/insurance"
 import type { Hit } from "@/lib/documents/index-db"
 import {
   bestPerKey, byTier, idsNamed, matchKind, MAX_RECORD_DISTANCE, mergeSemantic, nearest, rankSections, RECORD_WINDOW, searchTerms,
@@ -167,7 +168,7 @@ const PAINT_FIELDS = ["brand", "colorName", "colorCode"] as const
 const termsWhereAlso = <W>(terms: string[], fields: readonly string[], also: (term: string) => Record<string, unknown>[]): W =>
   ({ AND: terms.map((t) => ({ OR: [...fields.map((f) => ({ [f]: { contains: t } })), ...also(t)] })) }) as W
 
-function keywordWheres(terms: string[], owners: Owners): Wheres {
+function keywordWheres(terms: string[], owners: Owners, health: boolean): Wheres {
   const onAsset = { ownerIds: (t: string) => idsNamed(owners.allNames, t), ownerClause: (ids: string[]) => ({ assetId: { in: ids } }) }
   const onPerson = { ownerIds: (t: string) => idsNamed(owners.names.PERSON, t), ownerClause: (ids: string[]) => ({ personId: { in: ids } }) }
   return {
@@ -182,7 +183,21 @@ function keywordWheres(terms: string[], owners: Owners): Wheres {
     insurance: termsWhere(
       terms,
       FIELDS.insurance,
-      { ownerIds: onPerson.ownerIds, ownerClause: (ids) => ({ members: { some: { id: { in: ids } } } }) }
+      {
+        // A policy is found by the property or vehicle it covers, and by its people only with Health on.
+        ownerIds: (t: string) => [
+          ...idsNamed(owners.names.PROPERTY, t),
+          ...idsNamed(owners.names.VEHICLE, t),
+          ...(health ? idsNamed(owners.names.PERSON, t) : []),
+        ],
+        ownerClause: (ids: string[]) => ({
+          OR: [
+            { properties: { some: { id: { in: ids } } } },
+            { vehicles: { some: { id: { in: ids } } } },
+            { members: { some: { id: { in: ids } } } },
+          ],
+        }),
+      }
     ),
     provider: termsWhere(terms, FIELDS.provider),
     condition: termsWhere(terms, FIELDS.condition, onPerson),
@@ -222,10 +237,10 @@ function matchKinds(terms: string[]) {
 const NOTHING = { id: { in: [] as string[] } }
 
 /** Health's record kinds, as the search index names them. */
-const HEALTH_KINDS = new Set<EntityKind>(["PERSON", "PROVIDER", "INSURANCE", "CONDITION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "OBSERVATION"])
+const HEALTH_KINDS = new Set<EntityKind>(["PERSON", "PROVIDER", "CONDITION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "OBSERVATION"])
 
 /**
- * With Health off: no people, providers, insurance or health records, and nothing a person owns.
+ * With Health off: no people, providers, health insurance or health records, and nothing a person owns.
  * With Rooms off: no rooms.
  */
 function withFeatures(all: Wheres, features: Features): Wheres {
@@ -234,8 +249,9 @@ function withFeatures(all: Wheres, features: Features): Wheres {
   const notPerson = { assetType: { not: "PERSON" as const } }
   return {
     ...w,
-    person: NOTHING, insurance: NOTHING, provider: NOTHING, condition: NOTHING, medication: NOTHING,
+    person: NOTHING, provider: NOTHING, condition: NOTHING, medication: NOTHING,
     allergy: NOTHING, immunization: NOTHING, observation: NOTHING,
+    insurance: { AND: [w.insurance, { kind: { notIn: [...HEALTH_INSURANCE_KINDS] } }] },
     service: { AND: [w.service, notPerson] },
     maintenance: { AND: [w.maintenance, notPerson] },
     warranty: { AND: [w.warranty, notPerson] },
@@ -282,7 +298,7 @@ async function semanticRecords(vector: number[], shown: Set<string>, owners: Own
     ids.set(kind, [...(ids.get(kind) ?? []), key.slice(at + 1)])
   }
   const where = withFeatures(idWheres(ids), features)
-  const [assets, records] = await Promise.all([searchAssets(where, now, []), searchRecords(where, owners, now, [])])
+  const [assets, records] = await Promise.all([searchAssets(where, now, []), searchRecords(where, owners, now, [], features.health)])
   const byRank = (section: Section) => (item: Section["items"][number]) => rank.get(entityKeyOf(section, item) ?? "") ?? Infinity
   return [...assets, ...records]
     .filter((sec) => sec.items.length > 0)
@@ -412,7 +428,7 @@ async function searchAssets(where: Wheres, now: Date, terms: string[]): Promise<
 }
 
 /** `terms` empty for the meaning pass; otherwise rows are ranked and marked exact or partial. */
-async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[]): Promise<Section[]> {
+async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: string[], showPeople: boolean): Promise<Section[]> {
   const fmt = await getFormat()
   const money = moneyWith(fmt)
   const day = dayWith(fmt)
@@ -450,7 +466,11 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
     }),
     prisma.insurancePolicy.findMany({
       where: where.insurance,
-      include: { members: { select: { name: true }, orderBy: { name: "asc" } } },
+      include: {
+        members: { select: { name: true }, orderBy: { name: "asc" } },
+        properties: { select: { name: true }, orderBy: { name: "asc" } },
+        vehicles: { select: { name: true }, orderBy: { name: "asc" } },
+      },
       orderBy: { carrier: "asc" },
       take,
     }),
@@ -565,22 +585,26 @@ async function searchRecords(where: Wheres, owners: Owners, now: Date, terms: st
     }
   })
 
-  const ins = page(kinds.rank(policies, (r) => textsOf(r, FIELDS.insurance, ...r.members.map((x) => x.name))))
+  // People are health data: with Health off their names neither rank nor show.
+  const peopleOf = (r: (typeof policies)[number]) => (showPeople ? r.members.map((x) => x.name) : [])
+  const coversOf = (r: (typeof policies)[number]) => [...r.properties, ...r.vehicles].map((x) => x.name)
+  const ins = page(kinds.rank(policies, (r) => textsOf(r, FIELDS.insurance, ...peopleOf(r), ...coversOf(r))))
   const insuranceCards: RecordResult[] = ins.items.map((r) => {
     const expired = r.endDate != null && r.endDate.getTime() < now.getTime() - 86_400_000
     const status: Status | null = expired ? { label: "Ended", tone: "outline" }
-      : insuranceExpiring(r, now) ? { label: "Ending soon", tone: "secondary" } : null
+      : insuranceExpiring(r, now, renewalWindowDays(r.kind)) ? { label: "Ending soon", tone: "secondary" } : null
     return {
       kind: "insurance", id: r.id, href: `/insurance?open=${r.id}`,
       title: r.carrier, subtitle: r.planName, date: r.endDate ? `Ends ${day(r.endDate)}` : null, amount: null, status,
       facts: facts([
         ["Kind", labelFor(INSURANCE_KINDS, r.kind)],
+        ["Covers", coversOf(r).join(", ") || null],
         ["Policy #", r.policyNumber],
         ["Group #", r.groupNumber],
         ["Deductible", money(r.deductible)],
         ["Phone", r.phone],
       ]),
-      owner: null, people: r.members.map((x) => x.name).join(", ") || null,
+      owner: null, people: peopleOf(r).join(", ") || null,
     }
   })
 
@@ -705,10 +729,10 @@ export async function globalSearch(query: string, opts: { semantic: boolean }): 
     }
   }
 
-  const where = terms.length ? withFeatures(keywordWheres(terms, owners), features) : null
+  const where = terms.length ? withFeatures(keywordWheres(terms, owners, features.health), features) : null
   const [assetSections, recordSections, keyword] = await Promise.all([
     where ? searchAssets(where, now, terms) : Promise.resolve([]),
-    where ? searchRecords(where, owners, now, terms) : Promise.resolve([]),
+    where ? searchRecords(where, owners, now, terms, features.health) : Promise.resolve([]),
     keywordDocs(),
   ])
   const kwDocs = await toDocuments(keyword.hits, parsed?.terms ?? terms, "keyword", owners)

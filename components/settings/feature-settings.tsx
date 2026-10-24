@@ -44,7 +44,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
           {on ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}
         </CardTitle>
         <CardDescription>
-          People, providers and insurance, with everyone&apos;s visits, reminders, warranties and health records.
+          People, providers and health insurance, with everyone&apos;s visits, reminders, warranties and health records.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-5 space-y-2">

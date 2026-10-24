@@ -282,9 +282,63 @@ describe("readable", () => {
     expect(csv).toBe("\uFEFFa,b,c,d,e,f,g,h,i,j\r\n" + [`"line1\nline2"`, "'=SUM(A1)", "'+1", "'-2x", "'@cmd", "'\tx", `"'\rx"`, "-5", "ok=fine", `"'=""q"",z"`].join(",") + "\r\n")
   })
 
+  async function snapWithPolicies() {
+    const db = await snap()
+    const t = "2026-01-01T00:00:00.000Z"
+    const c = createClient({ url: fileUrl(db) })
+    try {
+      await c.executeMultiple(`
+        INSERT INTO "InsurancePolicy" (id, carrier, kind, updatedAt) VALUES ('i1', 'Acme Mutual', 'HOME', '${t}'), ('i2', 'Blue Cross', 'MEDICAL', '${t}'), ('i3', 'Lifeco', 'LIFE', '${t}');
+        INSERT INTO "_InsurancePolicyToProperty" (A, B) VALUES ('i1', 'p1');
+        INSERT INTO "_InsurancePolicyToVehicle" (A, B) VALUES ('i1', 'v1');
+        INSERT INTO "_InsurancePolicyToPerson" (A, B) VALUES ('i3', 'h1'), ('i2', 'h1');
+        INSERT INTO "InsurancePremium" (id, policyId, effectiveDate, amount, period) VALUES
+          ('pr1', 'i1', '2023-11-01T00:00:00.000Z', 1500, 'ANNUAL'), ('pr2', 'i1', '2024-11-01T00:00:00.000Z', 140, 'MONTHLY');
+        INSERT INTO "InsuranceCoverage" (id, policyId, label, "limit", sortOrder) VALUES ('c1', 'i1', 'Personal property', 225000, 0);
+        INSERT INTO "Attachment" (id, recordType, filename, originalName, mimeType, sizeBytes, uploadedById, insurancePolicyId) VALUES
+          ('ai1', 'INSURANCE', 'dec.pdf', 'dec.pdf', 'application/pdf', 1, 'u1', 'i1');
+      `)
+    } finally {
+      c.close()
+    }
+    await releaseDbHandles()
+    return db
+  }
+
+  it("insurance: non-health policies export without health, with premiums, coverages and what they cover", async () => {
+    const db = await snapWithPolicies()
+    const { data, files } = await loadReadable(db, { kind: "all", includeHealth: false }, rawPlacement)
+    expect(data.insurance.map((p) => p.carrier)).toEqual(["Acme Mutual", "Lifeco"])
+    expect(data.health).toBeNull()
+    const acme = data.insurance[0]
+    expect(acme).toMatchObject({ propertyIds: ["p1"], vehicleIds: ["v1"], personIds: [], annualPremium: 1680 })
+    expect(acme.premiums.map((p) => p.annual)).toEqual([1680, 1500])
+    expect(acme.coverages).toEqual([{ id: expect.any(String), policyId: "i1", label: "Personal property", limit: 225000, deductible: null }])
+    expect(acme.files[0].name).toBe("dec.pdf")
+    expect(data.insurance[1].personIds).toEqual([])
+    expect(files.map((f) => f.rel)).toContain("insurance/i1/dec.pdf")
+    const csv = csvTables(data)
+    expect(Object.keys(csv)).toEqual(expect.arrayContaining(["insurance.csv", "insurance-premiums.csv", "insurance-coverages.csv"]))
+    expect(csv["insurance.csv"].startsWith("\uFEFFpeople,covers,carrier,plan,kind,")).toBe(true)
+    expect(csv["insurance.csv"]).toContain("Main House; Daily Driver")
+  })
+
+  it("insurance: health kinds stay under health", async () => {
+    const db = await snapWithPolicies()
+    const { data } = await loadReadable(db, { kind: "all", includeHealth: true }, rawPlacement)
+    expect(data.health!.insurance.map((p) => p.carrier)).toEqual(["Blue Cross"])
+    expect(data.insurance.find((p) => p.carrier === "Lifeco")!.personIds).toEqual(["h1"])
+  })
+
+  it("insurance: one vehicle's export carries the policies that cover it", async () => {
+    const db = await snapWithPolicies()
+    const { data } = await loadReadable(db, { kind: "asset", assetType: "VEHICLE", assetId: "v1" }, rawPlacement)
+    expect(data.insurance.map((p) => p.carrier)).toEqual(["Acme Mutual"])
+  })
+
   it("builds the csv set", async () => {
     const { data } = await loadReadable(await snap(), { kind: "all", includeHealth: true }, rawPlacement)
     expect(Object.keys(csvTables(data)).sort()).toEqual(
-      ["allergies.csv", "assets.csv", "conditions.csv", "documents.csv", "immunizations.csv", "insurance.csv", "medications.csv", "observations.csv", "providers.csv", "reminders.csv", "room-paints.csv", "rooms.csv", "service-records.csv", "warranties.csv"])
+      ["allergies.csv", "assets.csv", "conditions.csv", "documents.csv", "immunizations.csv", "insurance-coverages.csv", "insurance-premiums.csv", "insurance.csv", "medications.csv", "observations.csv", "providers.csv", "reminders.csv", "room-paints.csv", "rooms.csv", "service-records.csv", "warranties.csv"])
   })
 })

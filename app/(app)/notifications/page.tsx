@@ -10,7 +10,7 @@ import { ReminderActions } from "@/components/maintenance/reminder-actions"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Bell, Eye, EyeOff, Wrench, ShieldCheck, Pill, Syringe, ShieldPlus } from "lucide-react"
+import { Bell, Eye, EyeOff, Wrench, ShieldCheck, Pill, Syringe, ShieldPlus, Umbrella } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const typeIcon: Record<string, React.ElementType> = {
@@ -19,6 +19,7 @@ const typeIcon: Record<string, React.ElementType> = {
   MEDICATION_REFILL: Pill,
   IMMUNIZATION_DUE: Syringe,
   INSURANCE_EXPIRING: ShieldPlus,
+  POLICY_RENEWAL: Umbrella,
   CUSTOM: Bell,
 }
 

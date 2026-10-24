@@ -55,8 +55,8 @@ When was the furnace last serviced? Is the fridge still under warranty? What did
 
 | | |
 |---|---|
-| **Home** | Properties, vehicles and equipment, with service records, warranties and reminders |
-| **Health** *(optional)* | People, providers and insurance, with visits, medications and immunizations |
+| **Home** | Properties, vehicles and equipment, with service records, warranties and reminders, plus home, auto and life insurance |
+| **Health** *(optional)* | People, providers and health insurance, with visits, medications and immunizations |
 | **Money** | Costs by asset, category and vendor, and a 12-month spending chart |
 | **Finding things** | Global search across records and documents, plus an optional AI assistant |
 | **Reminders** | In-app bell and per-person email digests |

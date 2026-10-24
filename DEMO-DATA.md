@@ -85,6 +85,7 @@ onto the dashboard — no password-change interstitial in your screenshots.
 | **16 warranties** | 3 expired, 3 expiring within 60 days, the rest comfortably active, 1 deliberately unknown |
 | **24 reminders** | 3 overdue, 5 due within 30 days, the rest further out |
 | **12 attachments** | Generated PDF invoices and warranty certificates, so records show paperclip counts |
+| **Insurance** | A home policy on Maple Street House renewing in 21 days and an auto policy on the Work Truck, each with coverage lines and two premiums |
 | **People** | Two people (the demo user and a child), three providers, a managed condition with a medication due for refill, a severe penicillin allergy, two insurance policies (one expiring within 60 days), five visits with PDF receipts, and two health reminders |
 
 The mix is deliberate: the dashboard's "Upcoming Maintenance" and "Expiring

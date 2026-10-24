@@ -1,7 +1,8 @@
 import { z } from "zod"
 import {
-  AllergySeverity, ConditionStatus, InsuranceKind, Relationship,
+  AllergySeverity, ConditionStatus, InsuranceKind, PremiumPeriod, Relationship,
 } from "@/app/generated/prisma/enums"
+import { coverageRows } from "@/lib/insurance"
 
 // Form values arrive as strings exactly as the inputs hold them. Each schema
 // trims, turns blanks into null, parses dates and numbers, and enforces the
@@ -140,6 +141,8 @@ export const observationSchema = z.object({
   notes: optionalText,
 })
 
+const commaIds = z.string().optional().transform((v) => (v ? v.split(",").filter(Boolean) : []))
+
 export const insuranceSchema = z
   .object({
     carrier: requiredText("Carrier is required"),
@@ -154,6 +157,33 @@ export const insuranceSchema = z
     deductible: optionalMoney,
     outOfPocketMax: optionalMoney,
     notes: optionalText,
-    memberIds: z.string().optional().transform((v) => (v ? v.split(",").filter(Boolean) : [])),
+    memberIds: commaIds,
+    propertyIds: commaIds,
+    vehicleIds: commaIds,
+    coverages: z
+      .array(z.object({ label: optionalText, limit: optionalMoney, deductible: optionalMoney }))
+      .optional()
+      .default([]),
   })
   .superRefine(notBefore("endDate", "startDate", "End date can't be before the start date"))
+  .superRefine((v, ctx) => {
+    if (v.coverages.some((c) => !c.label && (c.limit != null || c.deductible != null))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["coverages"], message: "Each coverage line needs a name." })
+    }
+  })
+  .transform((v) => ({ ...v, coverages: coverageRows(v.coverages) }))
+
+/// What the policy form sends: ids as comma strings, coverage amounts as strings.
+export type PolicyInput = z.input<typeof insuranceSchema>
+
+export const premiumSchema = z.object({
+  effectiveDate: requiredDate("Date is required"),
+  amount: z
+    .string()
+    .trim()
+    .min(1, "Amount is required")
+    .refine((v) => Number.isFinite(Number(v)) && Number(v) >= 0, "Enter 0 or more")
+    .transform(Number),
+  period: z.nativeEnum(PremiumPeriod).default("ANNUAL"),
+  notes: optionalText,
+})

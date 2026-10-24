@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   LayoutDashboard, Building2, Car, Refrigerator, Wrench, ShieldCheck,
-  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, ShieldPlus, Sparkles,
+  Calendar, Bell, Settings, Menu, PiggyBank, HeartPulse, Stethoscope, Umbrella, Sparkles,
   PanelLeftClose, PanelLeftOpen, Inbox,
 } from "lucide-react"
 
@@ -24,9 +24,9 @@ const navItems: NavItem[] = [
   { href: "/assets/properties", label: "Properties", icon: Building2, section: "Home" },
   { href: "/assets/vehicles", label: "Vehicles", icon: Car },
   { href: "/assets/equipment", label: "Equipment", icon: Refrigerator },
+  { href: "/insurance", label: "Insurance", icon: Umbrella },
   { href: "/assets/people", label: "People", icon: HeartPulse, section: "Health" },
   { href: "/providers", label: "Providers", icon: Stethoscope },
-  { href: "/insurance", label: "Insurance", icon: ShieldPlus },
   { href: "/records", label: "Records", icon: Wrench, section: "Activity" },
   { href: "/costs", label: "Costs", icon: PiggyBank },
   { href: "/warranties", label: "Warranties", icon: ShieldCheck },

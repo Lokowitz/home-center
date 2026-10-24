@@ -14,6 +14,15 @@ describe("isHealthDocument", () => {
     expect(isHealthDocument({ recordType: "SERVICE", asset: { type: "VEHICLE", id: "v1" } })).toBe(false)
     expect(isHealthDocument({ recordType: "INSURANCE", asset: null })).toBe(false)
   })
+
+  it("treats a medical, dental or vision policy's card as health, and a home or life policy's file as not", () => {
+    for (const insuranceKind of ["MEDICAL", "DENTAL", "VISION", "OTHER"]) {
+      expect(isHealthDocument({ recordType: "INSURANCE", asset: null, insuranceKind })).toBe(true)
+    }
+    for (const insuranceKind of ["HOME", "AUTO", "LIFE", "UMBRELLA", "RENTERS", "PROPERTY_OTHER"]) {
+      expect(isHealthDocument({ recordType: "INSURANCE", asset: null, insuranceKind })).toBe(false)
+    }
+  })
 })
 
 describe("listedDocument", () => {

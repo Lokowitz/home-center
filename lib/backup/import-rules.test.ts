@@ -9,7 +9,7 @@ const engine = readdirSync(path.join(root, "lib/backup"))
   .filter((f) => f.endsWith(".ts") && !f.endsWith("-server.ts") && !f.endsWith(".test.ts") && f !== "test-support.ts")
   .map((f) => `lib/backup/${f}`)
 const scripts = readdirSync(path.join(root, "scripts")).filter((f) => /^(backup|restore)/.test(f)).map((f) => `scripts/${f}`)
-const helpers = ["lib/attachment-location.ts", "lib/secret-box.ts", "lib/maintenance-schedule.ts", "lib/equipment-value.ts", "lib/manual-reference.ts"]
+const helpers = ["lib/attachment-location.ts", "lib/secret-box.ts", "lib/maintenance-schedule.ts", "lib/equipment-value.ts", "lib/manual-reference.ts", "lib/insurance.ts"]
 
 describe("engine import rule", () => {
   it.each([...engine, ...scripts, ...helpers])("%s imports no @/ at runtime", (file) => {

@@ -21,10 +21,11 @@ describe("isHealthPath", () => {
     expect(isHealthPath("/assets/people")).toBe(true)
     expect(isHealthPath("/assets/people/abc?tab=health")).toBe(true)
     expect(isHealthPath("/providers")).toBe(true)
-    expect(isHealthPath("/insurance?open=1")).toBe(true)
   })
   it("leaves the rest alone", () => {
     expect(isHealthPath("/assets/properties")).toBe(false)
     expect(isHealthPath("/insurance-claims")).toBe(false)
+    expect(isHealthPath("/insurance")).toBe(false)
+    expect(isHealthPath("/insurance?open=1")).toBe(false)
   })
 })

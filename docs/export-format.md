@@ -56,7 +56,8 @@ A file reference (`FileRef`) is `{ name, path, size, mimeType }`. `path` is rela
 - `reminders.json`: `id`, `assetId`, `assetType`, `title`, `repeats` (for example "Every 90 days", "Apr, Oct" or "Once"), `estimatedCost`, `manual` (file name and page, for example "Owner manual.pdf, p. 42"), `everyDays`, `everyMiles`, `lastDone`, `nextDue`, `nextDueMileage`, `active`, `files`.
 - `documents.json`: `id`, `assetId`, `assetType`, `uploaded`, plus the `FileRef` fields.
 - `rooms.json`: `id`, `assetId` (the property), `assetType` (always `property`), `name`, `level`, `area` (the number as stored, in the household's area unit), `dimensions`, `flooringType`, `flooringProduct`, `flooringInstalled`, `notes`, `paints` (each `surface`, `brand`, `colorName`, `colorCode`, `finish`), `files`.
-- `health.json`: only when health records are included. Holds `providers`, `conditions`, `medications`, `allergies`, `immunizations`, `observations` and `insurance`. Each item has an `id`, the fields named in its CSV below, and `files`. Items for a person carry `personId`. Insurance carries `personIds`.
+- `insurance.json`: home, renters, auto, umbrella, life and other non-health policies, always exported, with or without health records. Each has `id`, `kind`, `carrier`, `plan`, `policyNumber`, `groupNumber`, `memberId`, `phone`, `start`, `end`, `deductible`, `outOfPocketMax`, `notes`, `personIds`, `propertyIds`, `vehicleIds`, `annualPremium` (the current premium as a yearly cost), `premiums` (`effective`, `amount`, `period`, `annual`, `notes`, newest first), `coverages` (`label`, `limit`, `deductible`) and `files`.
+- `health.json`: only when health records are included. Holds `providers`, `conditions`, `medications`, `allergies`, `immunizations`, `observations` and `insurance` (medical, dental and vision policies, with the same fields as `insurance.json`). Each item has an `id`, the fields named in its CSV below, and `files`. Items for a person carry `personId`. Insurance carries `personIds`.
 
 ## CSV files
 
@@ -72,15 +73,17 @@ The first row holds the column names. `asset` and `person` hold the name instead
 | rooms.csv | asset, name, level, area, dimensions, flooringType, flooringProduct, flooringInstalled, notes, id |
 | room-paints.csv | asset, room, surface, brand, colorName, colorCode, finish, roomId |
 | documents.csv | asset, name, uploaded, size, mimeType, path, id |
+| insurance.csv | people, covers, carrier, plan, kind, policyNumber, groupNumber, memberId, phone, start, end, deductible, annualPremium, notes, id |
+| insurance-premiums.csv | carrier, effective, amount, period, annual, notes, policyId, id |
+| insurance-coverages.csv | carrier, label, limit, deductible, policyId, id |
 | providers.csv | name, specialty, practice, phone, email, address, notes, id |
 | conditions.csv | person, name, status, diagnosed, resolved, notes, id |
 | medications.csv | person, name, dosage, frequency, pharmacy, start, end, nextRefill, notes, id |
 | allergies.csv | person, substance, reaction, severity, notes, id |
 | immunizations.csv | person, vaccine, given, dose, givenBy, nextDue, notes, id |
 | observations.csv | person, date, time, type, severity, minutes, tags, notes, id |
-| insurance.csv | people, carrier, plan, kind, policyNumber, groupNumber, memberId, phone, start, end, notes, id |
 
-The last seven files appear only when health records are included.
+The last six files above appear only when health records are included.
 
 ### Formulas in spreadsheets
 

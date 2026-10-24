@@ -45,7 +45,13 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
     }),
     prisma.maintenanceSchedule.findMany(),
     prisma.warranty.findMany(),
-    prisma.insurancePolicy.findMany({ include: { members: { select: { name: true }, orderBy: { name: "asc" } } } }),
+    prisma.insurancePolicy.findMany({
+      include: {
+        members: { select: { name: true }, orderBy: { name: "asc" } },
+        properties: { select: { name: true }, orderBy: { name: "asc" } },
+        vehicles: { select: { name: true }, orderBy: { name: "asc" } },
+      },
+    }),
     prisma.provider.findMany({ include: { primaryFor: { select: { name: true }, orderBy: { name: "asc" } } } }),
     prisma.healthCondition.findMany({ include: { person: { select: { name: true } }, provider: { select: { name: true } } } }),
     prisma.medication.findMany({
@@ -94,7 +100,7 @@ export async function buildEntityDocs(now: Date = new Date()): Promise<EntityDoc
       ...m, owner: ownerOf(m.assetType, m.assetId), isPerson: m.assetType === "PERSON", meterUnit: meterUnit(m.assetType, m.assetId),
     }, now, fmt)),
     ...warranties.map((w) => warrantyDoc({ ...w, owner: ownerOf(w.assetType, w.assetId) }, now)),
-    ...policies.map((p) => insuranceDoc({ ...p, members: p.members.map((m) => m.name) }, now, fmt)),
+    ...policies.map((p) => insuranceDoc({ ...p, members: p.members.map((m) => m.name), assets: [...p.properties, ...p.vehicles].map((x) => x.name) }, now, fmt)),
     ...providers.map((p) => providerDoc({ ...p, primaryFor: p.primaryFor.map((x) => x.name) })),
     ...conditions.map((c) => conditionDoc({ ...c, person: c.person.name, provider: c.provider?.name ?? null })),
     ...medications.map((m) => medicationDoc({

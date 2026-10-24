@@ -599,6 +599,54 @@ type VisitSeed = {
   cost: number
 }
 
+/** A home policy and an auto policy with coverage lines and two premiums each; they show with Health off too. */
+async function seedInsurance(properties: { id: string }[], vehicles: { id: string }[]) {
+  await prisma.insurancePolicy.create({
+    data: {
+      carrier: "State Farm", planName: "Homeowners HO-3", kind: "HOME", policyNumber: "HO-4471-208",
+      startDate: at(-344), endDate: at(21), deductible: 2500,
+      properties: { connect: [{ id: properties[0].id }] },
+      coverages: {
+        create: [
+          { label: "Dwelling", limit: 450000, sortOrder: 0 },
+          { label: "Other structures", limit: 45000, sortOrder: 1 },
+          { label: "Personal property", limit: 225000, sortOrder: 2 },
+          { label: "Loss of use", limit: 90000, sortOrder: 3 },
+          { label: "Liability", limit: 300000, sortOrder: 4 },
+          { label: "Medical payments", limit: 5000, sortOrder: 5 },
+        ],
+      },
+      premiums: {
+        create: [
+          { effectiveDate: at(-709), amount: 1560, period: "ANNUAL" },
+          { effectiveDate: at(-344), amount: 1740, period: "ANNUAL" },
+        ],
+      },
+    },
+  })
+  await prisma.insurancePolicy.create({
+    data: {
+      carrier: "Progressive", planName: "Auto", kind: "AUTO", startDate: at(-40), endDate: at(142),
+      vehicles: { connect: [{ id: vehicles[2].id }] },
+      coverages: {
+        create: [
+          { label: "Bodily injury", limit: 100000, sortOrder: 0 },
+          { label: "Property damage", limit: 50000, sortOrder: 1 },
+          { label: "Collision", deductible: 1000, sortOrder: 2 },
+          { label: "Comprehensive", deductible: 500, sortOrder: 3 },
+          { label: "Uninsured motorist", limit: 100000, sortOrder: 4 },
+        ],
+      },
+      premiums: {
+        create: [
+          { effectiveDate: at(-222), amount: 672, period: "SEMIANNUAL" },
+          { effectiveDate: at(-40), amount: 708, period: "SEMIANNUAL" },
+        ],
+      },
+    },
+  })
+}
+
 async function seedPeople(userId: string) {
   const drChen = await prisma.provider.create({ data: { name: "Dr. Maria Chen", specialty: "Family medicine", practice: "Riverside Family Health", phone: "555-201-4410" } })
   const drPatel = await prisma.provider.create({ data: { name: "Dr. Anil Patel", specialty: "Dentistry", practice: "Bright Smile Dental", phone: "555-201-8832" } })
@@ -810,6 +858,9 @@ async function main() {
     SECURITY: "home security", OTHER: "hardware",
   }
 
+  console.log("  Creating insurance…")
+  await seedInsurance(properties, vehicles)
+
   console.log("  Creating people…")
   await seedPeople(user.id)
 
@@ -837,7 +888,7 @@ async function main() {
     ${properties.length} properties, ${vehicles.length} vehicles, ${equipment.length} equipment
     ${SERVICE.length} service records, ${WARRANTIES.length} warranties, ${MAINTENANCE.length} reminders
     ${await prisma.attachment.count()} attachments
-    ${await prisma.person.count()} people, ${await prisma.provider.count()} providers, ${await prisma.insurancePolicy.count()} insurance policies
+    ${await prisma.person.count()} people, ${await prisma.provider.count()} providers, ${await prisma.insurancePolicy.count()} insurance policies (${await prisma.insurancePolicy.count({ where: { kind: { notIn: ["MEDICAL", "DENTAL", "VISION", "OTHER"] } } })} home or auto)
     photos: ${cached} cached, ${downloaded} fetched, ${generated} generated
 
   Timeline (relative to today):

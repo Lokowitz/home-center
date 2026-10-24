@@ -6,6 +6,14 @@ import { compileInclude, compileWhere, entityDef, relationNames, withLocationSel
 const FORBIDDEN = ["passwordHash", "passwordEnc", "apiKeyEnc", "imageFilename", "createdById", "createdBy", "uploadedBy", "attachments", "user", "userId"]
 
 describe("ontology", () => {
+  it("links premiums and coverage lines to their policy", () => {
+    expect(ENTITIES.insurancePremium.keys).toEqual(["policyId"])
+    expect(ENTITIES.insurancePremium.fields.period.values).toEqual(["MONTHLY", "SEMIANNUAL", "ANNUAL"])
+    expect(ENTITIES.insurancePremium.fields.amount.description).toMatch(/yearly/)
+    expect(ENTITIES.insurancePolicy.relations.vehicles).toEqual({ kind: "many", entity: "vehicle" })
+    expect(ENTITIES.insurancePolicy.href?.({ id: "i1" })).toBe("/insurance")
+  })
+
   it("lets the assistant open a reminder's manual page", () => {
     const def = ENTITIES.maintenanceSchedule
     expect(def.keys).toContain("referenceAttachmentId")

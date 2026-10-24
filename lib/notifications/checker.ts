@@ -7,6 +7,7 @@ import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { daysUntil, HEALTH_WINDOWS, immunizationDue, insuranceExpiring, isSupersededImmunization, refillDue } from "@/lib/health"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { HEALTH_INSURANCE_KINDS, POLICY_RENEWAL_DAYS, renewalNotice } from "@/lib/insurance"
 import { cycleKeyOf, decide, maintenanceCycleKey, type NotificationRepeat, type Stage } from "./repeat"
 
 const WARRANTY_WARN_DAYS = 60
@@ -43,7 +44,7 @@ const dedupKey = (userId: string, type: string, entityId: string) => `${userId}:
 const stageOf = (onOrPastDue: boolean): Stage => (onOrPastDue ? "DUE" : "REACHED")
 
 /**
- * Creates in-app notifications for due maintenance, expiring warranties, and health items (refills, vaccines, insurance).
+ * Creates in-app notifications for due maintenance, expiring warranties, and health items (refills, vaccines, health insurance), and policy renewals.
  *
  * Called by the scheduler in ./scheduler.ts, which is the only caller — it
  * serialises runs, so the dedup read below can't race another pass writing the
@@ -70,7 +71,7 @@ export async function checkAndNotify(): Promise<number> {
   const owned = ownedWhere(features)
   const health = <T,>(query: () => Promise<T[]>) => (features.health ? query() : Promise.resolve([] as T[]))
 
-  const [schedules, mileage, warranties, medications, immunizations, policies] = await Promise.all([
+  const [schedules, mileage, warranties, medications, immunizations, policies, renewals] = await Promise.all([
     prisma.maintenanceSchedule.findMany({ where: { AND: [dueCandidateFilter(MAINTENANCE_WINDOW_DAYS, now), owned] } }),
     loadVehicleMileage(),
     prisma.warranty.findMany({
@@ -96,8 +97,18 @@ export async function checkAndNotify(): Promise<number> {
     })),
     // endDate is stored as UTC midnight, so use startOfToday to include policies ending today.
     health(() => prisma.insurancePolicy.findMany({
-      where: { endDate: { gte: startOfToday, lte: new Date(now.getTime() + HEALTH_WINDOWS.insuranceDays * DAY) } },
+      where: {
+        kind: { in: [...HEALTH_INSURANCE_KINDS] },
+        endDate: { gte: startOfToday, lte: new Date(now.getTime() + HEALTH_WINDOWS.insuranceDays * DAY) },
+      },
     })),
+    // Home, auto, umbrella and life renewals aren't health data: raised whether or not Health is on.
+    prisma.insurancePolicy.findMany({
+      where: {
+        kind: { notIn: [...HEALTH_INSURANCE_KINDS] },
+        endDate: { gte: startOfToday, lte: new Date(now.getTime() + POLICY_RENEWAL_DAYS * DAY) },
+      },
+    }),
   ])
 
   // A later dose of the same vaccine supersedes an earlier one, so fetch every
@@ -204,6 +215,23 @@ export async function checkAndNotify(): Promise<number> {
         relatedEntityType: "InsurancePolicy",
         cycleKey: cycleKeyOf(p.endDate),
         stage: stageOf(days <= 0),
+      })
+    }
+  }
+
+  for (const p of renewals) {
+    const notice = renewalNotice(p, now)
+    if (!notice) continue
+    for (const user of users) {
+      wanted.push({
+        userId: user.id,
+        type: "POLICY_RENEWAL",
+        title: notice.title,
+        message: notice.message,
+        relatedEntityId: p.id,
+        relatedEntityType: "InsurancePolicy",
+        cycleKey: cycleKeyOf(p.endDate),
+        stage: notice.stage,
       })
     }
   }

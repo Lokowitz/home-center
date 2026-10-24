@@ -23,7 +23,7 @@ export type AttachmentOwnerRow = AttachmentLocation & {
   medication: ({ name: string } & OnPerson) | null
   allergy: ({ substance: string } & OnPerson) | null
   immunization: ({ vaccine: string } & OnPerson) | null
-  insurancePolicy: { carrier: string } | null
+  insurancePolicy: { carrier: string; kind: string } | null
   room: { name: string; propertyId: string } | null
   assetType: AssetType | null
 }
@@ -34,6 +34,8 @@ export type DocumentRef = {
   fileHref: string | null
   record: { type: string; title: string; href: string | null }
   asset: { type: AssetType; id: string } | null
+  /** Set on an insurance policy's files: health kinds count as health documents. */
+  insuranceKind?: string
 }
 
 type Owner = Pick<DocumentRef, "record" | "asset">
@@ -126,5 +128,6 @@ export function describeAttachment(a: AttachmentOwnerRow): DocumentRef {
     fileName: a.originalName,
     fileHref: dir ? `/api/files/${dir[0]}/${dir[1]}/${a.filename}` : null,
     ...owner(a),
+    ...(a.insurancePolicy ? { insuranceKind: a.insurancePolicy.kind } : {}),
   }
 }

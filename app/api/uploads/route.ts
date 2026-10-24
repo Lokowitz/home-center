@@ -11,6 +11,7 @@ import { enqueueDocument } from "@/lib/documents/indexer-server"
 import { loadFeatures } from "@/lib/features-server"
 import { loadDocumentSettings } from "@/lib/documents/settings"
 import { processInboxItem } from "@/lib/capture-server"
+import { isHealthInsuranceKind } from "@/lib/insurance"
 import type { AssetType } from "@/app/generated/prisma/client"
 
 const RECORD_TYPES = ["SERVICE", "WARRANTY", "MAINTENANCE", "CONDITION", "INSURANCE", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION", "DOCUMENT", "INBOX", "ROOM"] as const
@@ -79,6 +80,10 @@ export async function POST(request: NextRequest) {
   }
   if (recordType === "ROOM" && !(await loadFeatures()).rooms) {
     return NextResponse.json({ error: "Record not found" }, { status: 404 })
+  }
+  if (recordType === "INSURANCE" && !(await loadFeatures()).health) {
+    const policy = await prisma.insurancePolicy.findUnique({ where: { id: recordId }, select: { kind: true } })
+    if (policy && isHealthInsuranceKind(policy.kind)) return NextResponse.json({ error: "Record not found" }, { status: 404 })
   }
   const documentOn = recordType === "DOCUMENT" ? await documentAssetType(recordId) : null
   if (recordType === "DOCUMENT" ? !documentOn : !(await recordExists(recordType, recordId))) {

@@ -1,6 +1,7 @@
 import { DEFAULT_FORMAT, type Formatter } from "@/lib/regional"
 import { chunkPages } from "@/lib/documents/chunk"
 import { paintLabel } from "@/lib/rooms"
+import { insuranceKindLabel, isHealthInsuranceKind } from "@/lib/insurance"
 
 // The text each database record is embedded as, so global search can find
 // records by meaning. Rules:
@@ -274,13 +275,17 @@ export type InsuranceInput = {
   id: string; carrier: string; planName: string | null; kind: string
   startDate: Date | null; endDate: Date | null; deductible: number | null; outOfPocketMax: number | null
   notes: string | null; members: string[]
+  /** Names of the properties and vehicles it covers. */
+  assets: string[]
 }
 
 export function insuranceDoc(p: InsuranceInput, now: Date, fmt: Formatter = DEFAULT_FORMAT): EntityDoc {
   const ended = p.endDate != null && p.endDate.getTime() < now.getTime()
   const summary = sentences([
-    `${p.kind.charAt(0) + p.kind.slice(1).toLowerCase()} insurance policy from ${clean(p.carrier)}${p.planName ? `, plan ${clean(p.planName)}` : ""}`,
-    p.members.length > 0 && `Covers ${list(p.members)}`,
+    `${insuranceKindLabel(p.kind)} insurance policy from ${clean(p.carrier)}${p.planName ? `, plan ${clean(p.planName)}` : ""}`,
+    p.assets.length > 0 && `Covers ${list(p.assets)}`,
+    // People on a life policy are health data too: only health kinds put them in text semantic search matches on.
+    isHealthInsuranceKind(p.kind) && p.members.length > 0 && `Covers ${list(p.members)}`,
     p.deductible != null && `Deductible about ${fmt.moneyWhole(p.deductible)}`,
     p.outOfPocketMax != null && `Out-of-pocket maximum about ${fmt.moneyWhole(p.outOfPocketMax)}`,
     p.startDate && `Started ${fullDay(p.startDate)}`,

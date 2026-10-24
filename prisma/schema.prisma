@@ -109,7 +109,14 @@ enum InsuranceKind {
   MEDICAL
   DENTAL
   VISION
+  /// Health-gated (every policy before step 5 was made under Health). PROPERTY_OTHER shows as Other.
   OTHER
+  HOME
+  RENTERS
+  AUTO
+  UMBRELLA
+  LIFE
+  PROPERTY_OTHER
 }
 
 enum AttachmentRecordType {
@@ -158,6 +165,8 @@ enum NotificationType {
   MEDICATION_REFILL
   IMMUNIZATION_DUE
   INSURANCE_EXPIRING
+  /// Non-health policy renewals; raised whether or not Health is on.
+  POLICY_RENEWAL
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
@@ -222,6 +231,8 @@ model Property {
 
   equipment Equipment[]
   rooms     Room[]
+
+  insurancePolicies InsurancePolicy[]
 }
 
 /// A room inside a property: finishes, photos, and the equipment and records tagged to it.
@@ -286,6 +297,8 @@ model Vehicle {
   imageFilename  String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
+
+  insurancePolicies InsurancePolicy[]
 }
 
 model Equipment {
@@ -490,7 +503,42 @@ model InsurancePolicy {
   updatedAt      DateTime      @updatedAt
 
   members     Person[]
+  properties  Property[]
+  vehicles    Vehicle[]
+  premiums    InsurancePremium[]
+  coverages   InsuranceCoverage[]
   attachments Attachment[]
+}
+
+model InsurancePremium {
+  id            String          @id @default(cuid())
+  policyId      String
+  policy        InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  effectiveDate DateTime
+  amount        Float
+  period        PremiumPeriod   @default(ANNUAL)
+  notes         String?
+  createdAt     DateTime        @default(now())
+
+  @@index([policyId])
+}
+
+enum PremiumPeriod {
+  MONTHLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+model InsuranceCoverage {
+  id         String          @id @default(cuid())
+  policyId   String
+  policy     InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  label      String
+  limit      Float?
+  deductible Float?
+  sortOrder  Int             @default(0)
+
+  @@index([policyId])
 }
 
 // ─── Service Records ──────────────────────────────────────────────────────────
@@ -800,7 +848,7 @@ model DocumentSettings {
 /// touching its data, so switching it back on brings everything back.
 model FeatureSettings {
   id                  String   @id @default("singleton")
-  /// People, providers, insurance and everything owned by a person.
+  /// People, providers, health insurance and everything owned by a person.
   healthEnabled       Boolean  @default(true)
   /// Rooms inside properties: paint, flooring, photos, and what is tagged to them.
   roomsEnabled        Boolean  @default(true)

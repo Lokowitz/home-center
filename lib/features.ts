@@ -23,7 +23,7 @@ export const HEALTH_NOTIFICATION_TYPES: readonly NotificationType[] = [
 ]
 
 /** Pages that belong to Health. */
-export const HEALTH_PATHS = ["/assets/people", "/providers", "/insurance"] as const
+export const HEALTH_PATHS = ["/assets/people", "/providers"] as const
 
 export function isHealthPath(href: string): boolean {
   return HEALTH_PATHS.some((p) => href === p || href.startsWith(`${p}/`) || href.startsWith(`${p}?`))

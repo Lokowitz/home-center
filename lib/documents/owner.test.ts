@@ -99,9 +99,10 @@ describe("describeAttachment", () => {
   })
 
   it("links insurance files to the insurance page with no asset", () => {
-    const r = describeAttachment(row({ recordType: "INSURANCE", insurancePolicyId: "i1", insurancePolicy: { carrier: "Acme Mutual" } }))
+    const r = describeAttachment(row({ recordType: "INSURANCE", insurancePolicyId: "i1", insurancePolicy: { carrier: "Acme Mutual", kind: "HOME" } }))
     expect(r.record).toEqual({ type: "insurance policy", title: "Acme Mutual", href: "/insurance" })
     expect(r.asset).toBeNull()
+    expect(r.insuranceKind).toBe("HOME")
   })
 
   it("survives a missing parent record", () => {

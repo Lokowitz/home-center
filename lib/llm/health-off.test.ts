@@ -33,6 +33,19 @@ describe("assistant with Health off", () => {
     expect(() => compileInclude("serviceRecord", ["provider"], undefined, on)).not.toThrow()
   })
 
+  it("reaches non-health insurance with Health off", () => {
+    expect(entityDef("insurancePolicy", off).key).toBe("insurancePolicy")
+    expect(JSON.stringify(compileWhere("insurancePolicy", [], off).where)).toContain('"kind":{"notIn":["MEDICAL","DENTAL","VISION","OTHER"]}')
+    expect(JSON.stringify(compileWhere("insurancePolicy", [], on).where)).not.toContain("notIn")
+    expect(JSON.stringify(compileWhere("insurancePremium", [], off).where)).toContain('"policy":{"kind":{"notIn"')
+    expect(JSON.stringify(compileWhere("insuranceCoverage", [], off).where)).toContain('"policy":{"kind":{"notIn"')
+    expect(() => compileWhere("insurancePolicy", [{ field: "members.name", op: "eq", value: "Anna" }], off)).toThrow(ToolInputError)
+    expect(() => compileInclude("insurancePolicy", ["members"], undefined, off)).toThrow(ToolInputError)
+    expect(describeOntology(false)).toMatch(/^- insurancePolicy:/m)
+    expect(describeOntology(false)).toContain("properties→property[]")
+    expect(describeOntology(false)).not.toContain("members→person[]")
+  })
+
   it("keeps health out of the prompt and the tools", () => {
     expect(describeOntology(false)).not.toMatch(/^- person:/m)
     expect(describeOntology(true)).toMatch(/^- person:/m)

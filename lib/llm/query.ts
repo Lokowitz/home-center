@@ -77,6 +77,20 @@ function fieldDef(entity: EntityKey, name: string): FieldDef {
   return f
 }
 
+/**
+ * What Health off adds to every query of an entity: nothing a person owns, no health
+ * notifications, no health-kind policies (or their premiums and coverage lines).
+ */
+export function healthOffWhere(entity: EntityKey, ctx?: Pick<ToolContext, "health">): Row[] {
+  if (healthOn(ctx)) return []
+  const def = ENTITIES[entity]
+  return [
+    ...(def.polymorphic ? [{ assetType: { not: "PERSON" } }] : []),
+    ...(entity === "notification" ? [{ type: { notIn: [...HEALTH_NOTIFICATION_TYPES] } }] : []),
+    ...(def.healthOff ? [def.healthOff] : []),
+  ]
+}
+
 /** Whether a relation leads somewhere the assistant may go (not into a feature that's off). */
 const relationReachable = (r: RelationDef, ctx?: Pick<ToolContext, "health" | "rooms">) =>
   !("entity" in r) || ((healthOn(ctx) || !HEALTH_ENTITIES.has(r.entity)) && (roomsOn(ctx) || !ROOM_ENTITIES.has(r.entity)))
@@ -281,11 +295,7 @@ export function compileWhere(
 
   // Scope goes last and is ANDed, so nothing the model sends can widen it.
   if (def.scope) and.push(def.scope(ctx))
-  if (!healthOn(ctx)) {
-    // Health off: nothing a person owns, and no health notifications.
-    if (def.polymorphic) and.push({ assetType: { not: "PERSON" } })
-    if (entity === "notification") and.push({ type: { notIn: [...HEALTH_NOTIFICATION_TYPES] } })
-  }
+  and.push(...healthOffWhere(entity, ctx))
   return { where: and.length ? { AND: and } : {}, assetName, related }
 }
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   normalizeTags, observationSchema,
   allergySchema, conditionSchema, immunizationSchema, insuranceSchema,
-  medicationSchema, personSchema, providerSchema,
+  medicationSchema, personSchema, premiumSchema, providerSchema,
 } from "./health-schemas"
 
 describe("personSchema", () => {
@@ -111,5 +111,49 @@ describe("normalizeTags", () => {
     expect(normalizeTags(" school ,, tired,School ")).toBe("school, tired")
     expect(normalizeTags(" , ")).toBeNull()
     expect(normalizeTags(undefined)).toBeNull()
+  })
+})
+
+describe("insurance policy links and coverage lines", () => {
+  it("splits property and vehicle ids", () => {
+    const r = insuranceSchema.parse({ carrier: "A", kind: "AUTO", vehicleIds: "v1,v2" })
+    expect(r.vehicleIds).toEqual(["v1", "v2"])
+    expect(r.propertyIds).toEqual([])
+  })
+
+  it("reads coverage lines and drops blank ones", () => {
+    const r = insuranceSchema.parse({
+      carrier: "A", kind: "HOME",
+      coverages: [{ label: "Dwelling", limit: "450000", deductible: "2500" }, { label: "", limit: "", deductible: "" }],
+    })
+    expect(r.coverages).toEqual([{ label: "Dwelling", limit: 450000, deductible: 2500, sortOrder: 0 }])
+    expect(insuranceSchema.parse({ carrier: "A", kind: "HOME" }).coverages).toEqual([])
+  })
+
+  it("refuses a coverage line with an amount and no name", () => {
+    const r = insuranceSchema.safeParse({ carrier: "A", kind: "HOME", coverages: [{ label: " ", limit: "1000" }] })
+    expect(r.success).toBe(false)
+    if (!r.success) expect(r.error.flatten().fieldErrors.coverages).toContain("Each coverage line needs a name.")
+  })
+
+  it("refuses a negative coverage limit", () => {
+    expect(insuranceSchema.safeParse({ carrier: "A", kind: "HOME", coverages: [{ label: "Liability", limit: "-1" }] }).success).toBe(false)
+  })
+})
+
+describe("premiumSchema", () => {
+  it("reads a premium", () => {
+    expect(premiumSchema.parse({ effectiveDate: "2026-11-01", amount: "1680", period: "ANNUAL" })).toEqual({
+      effectiveDate: new Date("2026-11-01"), amount: 1680, period: "ANNUAL", notes: null,
+    })
+    expect(premiumSchema.parse({ effectiveDate: "2026-11-01", amount: "10" }).period).toBe("ANNUAL")
+  })
+
+  it("refuses a missing or negative amount and a missing date", () => {
+    const blank = premiumSchema.safeParse({ effectiveDate: "2026-11-01", amount: "" })
+    expect(blank.success).toBe(false)
+    if (!blank.success) expect(blank.error.flatten().fieldErrors.amount).toContain("Amount is required")
+    expect(premiumSchema.safeParse({ effectiveDate: "2026-11-01", amount: "-5" }).success).toBe(false)
+    expect(premiumSchema.safeParse({ amount: "5" }).success).toBe(false)
   })
 })

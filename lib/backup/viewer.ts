@@ -16,7 +16,7 @@ export async function writeReadableLayer(w: ArchiveWriter, data: ReadableData, r
   await w.addBytes(`${READABLE_PREFIX}data.js`, dataJs(data))
   const json: Record<string, unknown> = {
     "assets.json": data.assets, "service-records.json": data.serviceRecords, "warranties.json": data.warranties,
-    "reminders.json": data.reminders, "documents.json": data.documents, "rooms.json": data.rooms, ...(data.health ? { "health.json": data.health } : {}),
+    "reminders.json": data.reminders, "documents.json": data.documents, "rooms.json": data.rooms, "insurance.json": data.insurance, ...(data.health ? { "health.json": data.health } : {}),
   }
   for (const [n, v] of Object.entries(json)) await w.addBytes(`${READABLE_PREFIX}data/${n}`, JSON.stringify(v, null, 2))
   for (const [n, csv] of Object.entries(csvTables(data))) await w.addBytes(`${READABLE_PREFIX}csv/${n}`, csv)

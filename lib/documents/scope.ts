@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import type { AssetType, AttachmentRecordType, DocumentTextStatus, Prisma } from "@/app/generated/prisma/client"
 import { describeAttachment, type DocumentRef } from "./owner"
 import { HEALTH_RECORD_TYPES } from "./limits"
+import { HEALTH_INSURANCE_KINDS } from "@/lib/insurance"
 
 // Database side of the document tools: which files belong to an asset, and
 // what each file belongs to.
@@ -19,6 +20,8 @@ export function healthWhere(): Prisma.AttachmentWhereInput {
       { maintenanceSchedule: { is: { assetType: "PERSON" } } },
       { warranty: { is: { assetType: "PERSON" } } },
       { recordType: "DOCUMENT", assetType: "PERSON" },
+      // A medical, dental or vision card; home, auto and life policy files aren't health data.
+      { insurancePolicy: { is: { kind: { in: [...HEALTH_INSURANCE_KINDS] } } } },
     ],
   }
 }
@@ -50,7 +53,7 @@ export const OWNER_SELECT = {
   medication: { select: { name: true, personId: true } },
   allergy: { select: { substance: true, personId: true } },
   immunization: { select: { vaccine: true, personId: true } },
-  insurancePolicy: { select: { carrier: true } },
+  insurancePolicy: { select: { carrier: true, kind: true } },
   room: { select: { name: true, propertyId: true } },
 } satisfies Prisma.AttachmentSelect
 

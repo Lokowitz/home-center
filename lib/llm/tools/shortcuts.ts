@@ -14,7 +14,8 @@ import {
 } from "@/lib/health"
 import type { AssetType, ServiceCategory } from "@/app/generated/prisma/client"
 import { ENTITIES, HEALTH_ENTITIES, ROOM_ENTITIES, type EntityKey, type Row } from "../ontology"
-import { coerceValue, entityDef, healthOn, inDayRange, roomsOn, requireDay, selectFor, ToolInputError, withLocationSelect, type ToolContext } from "../query"
+import { coerceValue, entityDef, healthOffWhere, healthOn, inDayRange, roomsOn, requireDay, selectFor, ToolInputError, withLocationSelect, type ToolContext } from "../query"
+import { HEALTH_INSURANCE_KINDS } from "@/lib/insurance"
 import { compact, serializeRow, toDay } from "../serialize"
 import { aggregateRows, groupSpec, measureSpec } from "../aggregate"
 import { assetRef, attachAssets, delegate } from "../execute"
@@ -82,7 +83,7 @@ async function searchRecords(query: string, entities: string[] | undefined, ctx:
           ...words.map((w) => ({ OR: owned ? [...own(w), { person: { name: { contains: w } } }] : own(w) })),
           ...(owned && words.length ? [{ OR: words.flatMap(own) }] : []),
           ...(def.scope ? [def.scope(ctx)] : []),
-          ...(def.polymorphic && !healthOn(ctx) ? [{ assetType: { not: "PERSON" } }] : []),
+          ...healthOffWhere(key, ctx),
         ],
       }
       // Say whose record each row is: a bare personId leaves the model unable
@@ -421,7 +422,7 @@ export const healthAlertsTool = defineTool({
       prisma.medication.findMany({ where: { ...byPerson, nextRefillDate: { not: null } }, include: { person } }),
       prisma.immunization.findMany({ where: byPerson, include: { person } }),
       prisma.insurancePolicy.findMany({
-        where: { endDate: { not: null }, ...(personId ? { members: { some: { id: personId } } } : {}) },
+        where: { kind: { in: [...HEALTH_INSURANCE_KINDS] }, endDate: { not: null }, ...(personId ? { members: { some: { id: personId } } } : {}) },
         include: { members: person },
       }),
     ])

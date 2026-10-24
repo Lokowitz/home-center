@@ -12,6 +12,10 @@ import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
+import { AssetInsurance } from "@/components/insurance/asset-insurance"
+import { loadAssetPolicies } from "@/lib/insurance-server"
+import { belongingsComparison } from "@/lib/insurance"
+import { equipmentValueTotals } from "@/lib/equipment-value"
 import { getFormat } from "@/lib/regional-server"
 import { loadFeatures } from "@/lib/features-server"
 import { RoomList } from "@/components/rooms/room-list"
@@ -34,13 +38,14 @@ export default async function PropertyDetailPage({
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
 
-  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features] = await Promise.all([
+  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features, policies] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.equipment.findMany({ where: { propertyId: id }, include: { room: { select: { name: true } } }, orderBy: { name: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadFeatures(),
+    loadAssetPolicies("PROPERTY", id),
   ])
   const { rooms, roomServiceRecords, roomSchedules } = features.rooms ? await loadRooms(id) : { rooms: [], roomServiceRecords: [], roomSchedules: [] }
   // For the room selects and badges on the Service and Maintenance tabs; empty with Rooms off.
@@ -95,6 +100,7 @@ export default async function PropertyDetailPage({
           {property.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(property.purchaseDate)} />}
         </div>
 
+        <AssetInsurance policies={policies} belongings={belongingsComparison(equipmentValueTotals(equipment).CONTENTS, policies)} />
         <AssetCostPanel assetType="PROPERTY" assetId={id} purchasePrice={property.purchasePrice} ownedSince={property.purchaseDate} equipmentIds={equipmentIds} />
 
         {property.notes && (

@@ -3,6 +3,7 @@ import { ToolInputError } from "@/lib/llm/query"
 import { compact, toDay } from "@/lib/llm/serialize"
 import type { Hit } from "./index-db"
 import { HEALTH_RECORD_TYPES } from "./limits"
+import { isHealthInsuranceKind } from "@/lib/insurance"
 import type { DocumentRef } from "./owner"
 
 // Rules for the assistant's document tools that don't need the database.
@@ -24,11 +25,16 @@ export function visibleRecordTypes(includeHealth: boolean, includeRooms = true):
 /**
  * What "Include health record documents" covers: the health record types, and
  * anything else owned by a person — their visits (service records), reminders
- * (maintenance schedules) and warranties. Insurance policies aren't one
+ * (maintenance schedules) and warranties, and the files of medical, dental
+ * and vision policies. Home, auto and life policies aren't
  * person's record and stay visible.
  */
-export function isHealthDocument(ref: { recordType: string; asset: { type: string; id: string } | null }): boolean {
-  return ref.asset?.type === "PERSON" || (HEALTH_RECORD_TYPES as readonly string[]).includes(ref.recordType)
+export function isHealthDocument(ref: { recordType: string; asset: { type: string; id: string } | null; insuranceKind?: string }): boolean {
+  return (
+    ref.asset?.type === "PERSON" ||
+    (HEALTH_RECORD_TYPES as readonly string[]).includes(ref.recordType) ||
+    (ref.insuranceKind != null && isHealthInsuranceKind(ref.insuranceKind))
+  )
 }
 
 const ALIASES: Record<string, AttachmentRecordType> = {

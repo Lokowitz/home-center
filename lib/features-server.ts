@@ -3,6 +3,7 @@ import { cache } from "react"
 import { prisma } from "@/lib/prisma"
 import { DEFAULT_FEATURES, HEALTH_NOTIFICATION_TYPES, type Features } from "@/lib/features"
 import type { Prisma } from "@/app/generated/prisma/client"
+import { HEALTH_INSURANCE_KINDS } from "@/lib/insurance"
 
 export const FEATURE_SETTINGS_ID = "singleton"
 
@@ -22,11 +23,13 @@ export const loadFeatures = cache(async (): Promise<Features> => {
  */
 export async function visibleNotificationsWhere(features: Features): Promise<Prisma.NotificationWhereInput> {
   if (features.health) return {}
-  const [schedules, warranties] = await Promise.all([
+  const [schedules, warranties, policies] = await Promise.all([
     prisma.maintenanceSchedule.findMany({ where: { assetType: "PERSON" }, select: { id: true } }),
     prisma.warranty.findMany({ where: { assetType: "PERSON" }, select: { id: true } }),
+    // A renewal raised before the policy's kind changed to a health kind.
+    prisma.insurancePolicy.findMany({ where: { kind: { in: [...HEALTH_INSURANCE_KINDS] } }, select: { id: true } }),
   ])
-  const personOwned = [...schedules, ...warranties].map((r) => r.id)
+  const personOwned = [...schedules, ...warranties, ...policies].map((r) => r.id)
   return {
     type: { notIn: [...HEALTH_NOTIFICATION_TYPES] },
     // notIn alone would also drop notifications with no related entity (SQL NULL).

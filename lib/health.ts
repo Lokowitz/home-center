@@ -29,12 +29,7 @@ export const ALLERGY_SEVERITIES: FieldOption[] = [
   { value: "SEVERE", label: "Severe" },
 ]
 
-export const INSURANCE_KINDS: FieldOption[] = [
-  { value: "MEDICAL", label: "Medical" },
-  { value: "DENTAL", label: "Dental" },
-  { value: "VISION", label: "Vision" },
-  { value: "OTHER", label: "Other" },
-]
+export { INSURANCE_KINDS } from "@/lib/insurance"
 
 export function labelFor(options: FieldOption[], value: string): string {
   return options.find((o) => o.value === value)?.label ?? value

@@ -47,7 +47,7 @@ async function assetScope(
 export function documentTools(includeHealth: boolean, includeRooms = true): RegisteredTool[] {
   const hidden = hiddenRecordTypes(includeHealth, includeRooms)
   // With Health off its files stay out; with Rooms off, room files do.
-  const isHidden = (ref: { recordType: string; asset: { type: string; id: string } | null }) =>
+  const isHidden = (ref: { recordType: string; asset: { type: string; id: string } | null; insuranceKind?: string }) =>
     (!includeHealth && isHealthDocument(ref)) || (!includeRooms && ref.recordType === "ROOM")
 
   const list = defineTool({

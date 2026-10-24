@@ -21,7 +21,7 @@ export const EXTRACT_WORKER_GRACE_MS = 15_000
 /** Separates pages in AttachmentText.text. */
 export const PAGE_BREAK = "\f"
 
-/** Hidden from the assistant unless LlmSettings.healthDocumentsEnabled. Insurance is not one. */
+/** Hidden from the assistant unless LlmSettings.healthDocumentsEnabled. Insurance is handled by policy kind, not record type. */
 export const HEALTH_RECORD_TYPES = [
   "CONDITION", "OBSERVATION", "MEDICATION", "ALLERGY", "IMMUNIZATION",
 ] as const satisfies readonly AttachmentRecordType[]

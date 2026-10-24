@@ -4,7 +4,7 @@ import { useFormat } from "@/components/regional-provider"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
-import { AlarmClockOff, Bell, Pause, Wrench, ShieldCheck, Pill, Syringe, ShieldPlus } from "lucide-react"
+import { AlarmClockOff, Bell, Pause, Wrench, ShieldCheck, Pill, Syringe, ShieldPlus, Umbrella } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,6 +42,7 @@ const typeIcon: Record<string, React.ElementType> = {
   MEDICATION_REFILL: Pill,
   IMMUNIZATION_DUE: Syringe,
   INSURANCE_EXPIRING: ShieldPlus,
+  POLICY_RENEWAL: Umbrella,
   CUSTOM: Bell,
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  ageWords, allergyDoc, compose, INLINE_NOTE_CHARS, intervalWords, maintenanceDoc, medicationDoc, observationDoc, personDoc,
+  ageWords, allergyDoc, compose, INLINE_NOTE_CHARS, insuranceDoc, intervalWords, maintenanceDoc, medicationDoc, observationDoc, personDoc,
   propertyDoc, roomDoc, sentences, serviceDoc, vehicleDoc, warrantyDoc,
 } from "./text"
 import { createFormatter, DEFAULT_REGIONAL } from "@/lib/regional"
@@ -128,6 +128,16 @@ describe("record text", () => {
     const w = { id: "w1", productName: "Compressor", owner: null, vendor: null, purchaseDate: null, notes: null }
     expect(warrantyDoc({ ...w, expirationDate: day("2026-01-01") }, now).chunks[0]).toContain("Expired January 1, 2026.")
     expect(warrantyDoc({ ...w, expirationDate: day("2030-01-01") }, now).chunks[0]).toContain("Coverage runs until January 1, 2030.")
+  })
+
+  it("names a policy's kind and what it covers", () => {
+    const p = { id: "i1", carrier: "State Farm", planName: "HO-3", kind: "PROPERTY_OTHER", startDate: null, endDate: null, deductible: null, outOfPocketMax: null, notes: null, members: [], assets: ["Maple Street House", "Work Truck"] }
+    expect(insuranceDoc(p, now).chunks[0]).toContain("Other insurance policy from State Farm, plan HO-3.")
+    expect(insuranceDoc(p, now).chunks[0]).toContain("Covers Maple Street House, Work Truck.")
+    expect(insuranceDoc({ ...p, kind: "HOME", assets: [] }, now).chunks[0]).toContain("Home insurance policy")
+    // People on a non-health policy are health data: they stay out of the text that semantic search matches on.
+    expect(insuranceDoc({ ...p, kind: "LIFE", assets: [], members: ["Avery"] }, now).chunks[0]).not.toContain("Avery")
+    expect(insuranceDoc({ ...p, kind: "MEDICAL", assets: [], members: ["Avery"] }, now).chunks[0]).toContain("Covers Avery.")
   })
 
   it("summarises a person's health so 'who is allergic to…' finds them", () => {
