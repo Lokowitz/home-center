@@ -461,5 +461,10 @@ npm run build         # production build
 Images are built and published automatically by `.github/workflows/docker-publish.yml` on every push to `main`. To build locally: `docker build -t home-center .`
 
 ---
+## License
 
-<p align="center">Free and open source under the MIT licence.</p>
+HomeCenter is source-available software licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0/).
+
+You may use, modify, and redistribute HomeCenter for permitted noncommercial purposes, subject to the license terms. Commercial use requires separate permission from the copyright holder.
+
+HomeCenter is not open source under the standard Open Source Definition because the license restricts commercial use.
