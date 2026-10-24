@@ -571,7 +571,7 @@ const MAINTENANCE: {
   { ref: E(19), title: "Cabin water heater anode check", intervalDays: 730, dueInDays: 186 },
   { ref: E(20), title: "Dock lift cable inspection", intervalDays: 365, dueInDays: 205 },
   { ref: E(22), title: "Sharpen chainsaw chain", intervalDays: 180, dueInDays: 74 },
-  { ref: V(3), title: "Timing belt — 105k interval", intervalDays: null, dueInDays: null, intervalMiles: 105000, dueInMiles: 3200 },
+  { ref: V(3), title: "Timing belt — 105k interval", intervalDays: null, dueInDays: null, intervalMiles: 105000, dueInMiles: 3200, estimatedCost: 900 },
   { ref: E(1), title: "Clean dishwasher filter", intervalDays: 90, dueInDays: 33 },
 ]
 

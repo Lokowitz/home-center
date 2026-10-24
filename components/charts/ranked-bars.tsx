@@ -34,12 +34,15 @@ export function RankedBars({
   valueLabel = "Total",
   caption,
   size = "default",
+  countNoun = "record",
 }: {
   entries: RankedRow[]
   emptyMessage?: string
   valueLabel?: string
   caption?: string
   size?: "default" | "compact"
+  /// What each entry counts, singular: "record" for spending, "occurrence" for planned spend.
+  countNoun?: string
 }) {
   const fmt = useFormat()
   const { containerRef, cardRef, tip, offset, anchorProps } = useChartTooltip()
@@ -67,7 +70,7 @@ export function RankedBars({
               rows: [
                 { label: valueLabel, value: fmt.money(entry.total) },
                 {
-                  label: entry.count === 1 ? "1 record" : entry.count + " records",
+                  label: entry.count === 1 ? `1 ${countNoun}` : `${entry.count} ${countNoun}s`,
                   value: fmt.money(entry.count > 0 ? entry.total / entry.count : 0) + " avg",
                   muted: true,
                 },
@@ -109,7 +112,7 @@ export function RankedBars({
                         // value keeps a visible sliver rather than rendering as
                         // nothing at all.
                         style={{
-                          width: Math.max((entry.total / domainMax) * 100, 1.5) + "%",
+                          width: entry.total > 0 ? Math.max((entry.total / domainMax) * 100, 1.5) + "%" : "0%",
                           backgroundColor: "var(--cost-bar)",
                           animationDelay: Math.min(i * 30, 240) + "ms",
                         }}
@@ -173,7 +176,7 @@ export function RankedBars({
         columns={[
           { key: "label", label: "Name" },
           { key: "total", label: valueLabel, align: "right" },
-          { key: "count", label: "Records", align: "right" },
+          { key: "count", label: countNoun.charAt(0).toUpperCase() + countNoun.slice(1) + "s", align: "right" },
         ]}
         rows={entries.map((entry) => ({
           label: entry.depth ? "  " + entry.label : entry.label,

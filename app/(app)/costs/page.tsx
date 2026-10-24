@@ -1,11 +1,11 @@
 import Link from "next/link"
 import { X } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RankedBars } from "@/components/charts/ranked-bars"
+import { RankedBars, type RankedRow } from "@/components/charts/ranked-bars"
 import { TrendChart } from "@/components/charts/trend-chart"
 import { CompositionBar } from "@/components/charts/composition-bar"
 import { Sparkline } from "@/components/charts/sparkline"
-import { loadCostRecords } from "@/lib/costs-server"
+import { loadCostRecords, loadPlannedSchedules } from "@/lib/costs-server"
 import { loadFeatures } from "@/lib/features-server"
 import { loadAssetIndex } from "@/lib/assets-server"
 import { assetHref, assetIcon } from "@/lib/assets"
@@ -20,10 +20,13 @@ import {
 } from "@/lib/costs"
 import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
+import { forecastByMonth, forecastSchedules, largestPlanned, mileageNote, type Forecast } from "@/lib/forecast"
+import { localDay } from "@/lib/equipment-life"
 
 const TOP_ASSETS = 8
 const TOP_VENDORS = 6
 const BIGGEST_EXPENSES = 8
+const TOP_PLANNED = 8
 /// Months of history behind the year-to-date tile.
 const TILE_MONTHS = 12
 /// Buckets in the hero's trailing average. Three is enough to damp a single
@@ -55,6 +58,17 @@ export default async function CostsPage({
   const now = new Date()
   const [allRows, assets, features] = await Promise.all([loadCostRecords(), loadAssetIndex(), loadFeatures()])
   const typeFilters = features.health ? ASSET_TYPE_FILTERS : ASSET_TYPE_FILTERS.filter((t) => t.value !== "PERSON")
+  // Every one of these arrives from the query string, so every one is whitelisted
+  // against a known set before it reaches a filter.
+  const typeParam = typeof params.type === "string" ? params.type : undefined
+  const assetType = typeFilters.some((t) => t.value === typeParam)
+    ? (typeParam as AssetType)
+    : undefined
+
+  // Planned spend follows the asset-type filter only; year, bucket and category are about history.
+  const today = localDay(now)
+  const forecast = forecastSchedules(await loadPlannedSchedules(assetType ? { assetType } : undefined), today)
+  const plannedPanel = <PlannedPanel forecast={forecast} today={today} assets={assets} fmt={fmt} />
 
   if (allRows.length === 0) {
     return (
@@ -66,16 +80,11 @@ export default async function CostsPage({
             Add a cost to a service record and this page will start reporting on it.
           </p>
         </div>
+        {plannedPanel}
       </div>
     )
   }
 
-  // Every one of these arrives from the query string, so every one is whitelisted
-  // against a known set before it reaches a filter.
-  const typeParam = typeof params.type === "string" ? params.type : undefined
-  const assetType = typeFilters.some((t) => t.value === typeParam)
-    ? (typeParam as AssetType)
-    : undefined
   const yearRaw = typeof params.year === "string" ? params.year : undefined
   const yearParam = Number(yearRaw ?? NaN)
   // The page opens on the current year, monthly, across all assets. "all" is an
@@ -130,6 +139,7 @@ export default async function CostsPage({
           <p className="font-medium">No costs match those filters</p>
           <p className="mt-1 text-sm">Try a different year, asset type, or category.</p>
         </div>
+        {plannedPanel}
       </div>
     )
   }
@@ -286,7 +296,49 @@ export default async function CostsPage({
           </ul>
         </Panel>
       </div>
+
+      {plannedPanel}
     </div>
+  )
+}
+
+/// Reminders with an estimated cost, spread over the next 12 months. No card at all
+/// when nothing is estimated and nothing is waiting on a mileage.
+function PlannedPanel({
+  forecast,
+  today,
+  assets,
+  fmt,
+}: {
+  forecast: Forecast
+  today: Date
+  assets: Awaited<ReturnType<typeof loadAssetIndex>>
+  fmt: Formatter
+}) {
+  if (forecast.total === 0 && forecast.mileageOnly === 0) return null
+  const note = mileageNote(forecast.mileageOnly)
+  const monthRows: RankedRow[] = forecastByMonth(forecast.occurrences, today).map((m) => ({
+    ...m,
+    label: m.start.toLocaleString(undefined, { month: "short", year: "numeric", timeZone: "UTC" }),
+  }))
+  const itemRows: RankedRow[] = largestPlanned(forecast.occurrences, TOP_PLANNED).map((item) => ({
+    key: item.scheduleId,
+    label: `${item.title} · ${assets.assetName(item.assetType, item.assetId) ?? "Unknown"}`,
+    total: item.total,
+    count: item.count,
+    share: item.share,
+    href: `${assetHref(item.assetType, item.assetId)}?tab=${item.assetType === "PERSON" ? "reminders" : "maintenance"}&open=${item.scheduleId}`,
+  }))
+
+  return (
+    <Panel title="Planned, next 12 months">
+      <div className="text-[22px] font-semibold leading-none">{fmt.money(forecast.total)}</div>
+      {note && <p className="mt-1.5 text-xs text-muted-foreground">{note}</p>}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RankedBars entries={monthRows} valueLabel="Planned" caption="Planned spend by month" size="compact" countNoun="occurrence" />
+        <RankedBars entries={itemRows} valueLabel="Planned" caption="Largest planned items" size="compact" countNoun="occurrence" emptyMessage="Nothing planned with a date." />
+      </div>
+    </Panel>
   )
 }
 

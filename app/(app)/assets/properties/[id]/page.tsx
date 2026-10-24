@@ -87,7 +87,7 @@ export default async function PropertyDetailPage({
           {property.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(property.purchaseDate)} />}
         </div>
 
-        <AssetCostPanel assetType="PROPERTY" assetId={id} purchasePrice={property.purchasePrice} ownedSince={property.purchaseDate} />
+        <AssetCostPanel assetType="PROPERTY" assetId={id} purchasePrice={property.purchasePrice} ownedSince={property.purchaseDate} equipmentIds={equipmentIds} />
 
         {property.notes && (
           <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground whitespace-pre-wrap">

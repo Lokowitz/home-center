@@ -1,6 +1,6 @@
 import { TrendChart } from "@/components/charts/trend-chart"
 import { Meter } from "@/components/charts/meter"
-import { loadCostRecords } from "@/lib/costs-server"
+import { loadCostRecords, loadPlannedSchedules } from "@/lib/costs-server"
 import { prisma } from "@/lib/prisma"
 import { costPerYearOwned, nextDueMeter, warrantyMeter, type StatusMeter, type Tone } from "@/lib/asset-status"
 import {
@@ -9,6 +9,8 @@ import {
 } from "@/lib/costs"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { getFormat } from "@/lib/regional-server"
+import { forecastSchedules } from "@/lib/forecast"
+import { localDay } from "@/lib/equipment-life"
 
 /// Below this many years of history, yearly columns would be one or two marks —
 /// not a chart, just a number drawn tall. Short histories get quarters instead.
@@ -25,6 +27,7 @@ export async function AssetCostPanel({
   purchasePrice,
   ownedSince,
   meterUnit,
+  equipmentIds,
 }: {
   assetType: AssetType
   assetId: string
@@ -33,12 +36,31 @@ export async function AssetCostPanel({
   ownedSince?: Date | null
   /// Vehicles only. Its presence is what turns on the cost-per-unit row.
   meterUnit?: MeterUnit
+  /// A property's equipment: their reminders count toward its planned figure. History stays the asset's own.
+  equipmentIds?: string[]
 }) {
   const fmt = await getFormat()
-  const rows = await loadCostRecords({ assetId, assetType })
-  // An asset nobody has spent on gets no panel at all — an empty one would be a
-  // row of dashes claiming to be information.
-  if (rows.length === 0) return null
+  const [rows, plannedSchedules] = await Promise.all([
+    loadCostRecords({ assetId, assetType }),
+    loadPlannedSchedules({
+      assets: [{ assetType, assetId }, ...(equipmentIds ?? []).map((id) => ({ assetType: "EQUIPMENT" as const, assetId: id }))],
+    }),
+  ])
+  const planned = forecastSchedules(plannedSchedules, localDay(new Date())).total
+  // An asset nobody has spent on, and nothing is planned for, gets no panel at all —
+  // an empty one would be a row of dashes claiming to be information.
+  if (rows.length === 0 && planned === 0) return null
+  // Planned spend with no history yet: just that figure. The rest describes past spending.
+  if (rows.length === 0) {
+    return (
+      <div className="space-y-4 rounded-lg border bg-card p-4">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cost</div>
+        <dl className="space-y-1.5 text-sm">
+          <Row label="Planned, next 12 months" value={fmt.money(planned)} />
+        </dl>
+      </div>
+    )
+  }
 
   const now = new Date()
   const [schedules, warranties] = await Promise.all([
@@ -102,6 +124,7 @@ export async function AssetCostPanel({
           </>
         )}
         {perYear != null && <Row label="Per year owned" value={fmt.money(perYear)} />}
+        {planned > 0 && <Row label="Planned, next 12 months" value={fmt.money(planned)} />}
       </dl>
 
       {/* Looking ahead rather than back: what is due next, and how long the
