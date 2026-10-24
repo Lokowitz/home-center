@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import path from "node:path"
-import { rename, rm } from "node:fs/promises"
+import { readdir, readFile, rename, rm } from "node:fs/promises"
 import { createMigratedDb, seedSample, SAMPLE_FILES, tempDir } from "./test-support"
 import { integrityCheck, latestMigration, modelCounts, referencedFiles, vacuumInto } from "./snapshot"
 import { appMigrations } from "./paths"
@@ -68,5 +68,34 @@ describe("snapshot", () => {
     await vacuumInto(path.join(dir, "moved.db"), db)
     await modelCounts(db)
     await rm(db)
+  })
+
+  it("keeps reminders through the manual reference migration and clears the link when the file goes", async () => {
+    const dir = await tempDir()
+    const db = path.join(dir, "old.db")
+    await createMigratedDb(db, { upTo: "20261024154941_equipment_value_and_lifespan" })
+    const { openDb } = await import("./snapshot")
+    const c = openDb(db)
+    const t = "2026-01-01T00:00:00.000Z"
+    await c.executeMultiple(`
+      INSERT INTO "User" (id, name, email, passwordHash, role) VALUES ('u1', 'Admin', 'admin@example.test', 'hash', 'ADMIN');
+      INSERT INTO "Property" (id, name, address, updatedAt) VALUES ('p1', 'Main House', '1 Elm St', '${t}');
+      INSERT INTO "MaintenanceSchedule" (id, assetId, assetType, title, estimatedCost, dueMonths, dueDay, updatedAt) VALUES ('m1', 'p1', 'PROPERTY', 'Winterize', 85, '10', 15, '${t}');
+      INSERT INTO "Attachment" (id, recordType, filename, originalName, mimeType, sizeBytes, uploadedById, assetType, assetId) VALUES ('d1', 'DOCUMENT', 'f-d1.pdf', 'manual.pdf', 'application/pdf', 5, 'u1', 'PROPERTY', 'p1');
+    `)
+    const migrations = path.resolve(__dirname, "../../prisma/migrations")
+    const folder = (await readdir(migrations)).find((n) => n.endsWith("_maintenance_manual_reference"))
+    expect(folder).toBeDefined()
+    await c.executeMultiple(await readFile(path.join(migrations, folder!, "migration.sql"), "utf8"))
+
+    const row = async () =>
+      (await c.execute(`SELECT estimatedCost, dueMonths, dueDay, referenceAttachmentId, referencePage FROM "MaintenanceSchedule" WHERE id = 'm1'`)).rows[0]
+    expect(await row()).toMatchObject({ estimatedCost: 85, dueMonths: "10", dueDay: 15, referenceAttachmentId: null, referencePage: null })
+
+    await c.execute(`UPDATE "MaintenanceSchedule" SET referenceAttachmentId = 'd1', referencePage = 3 WHERE id = 'm1'`)
+    await c.execute(`PRAGMA foreign_keys = ON`)
+    await c.execute(`DELETE FROM "Attachment" WHERE id = 'd1'`)
+    expect(await row()).toMatchObject({ referenceAttachmentId: null })
+    c.close()
   })
 })

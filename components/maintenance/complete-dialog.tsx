@@ -14,12 +14,15 @@ import { completeMaintenanceSchedule } from "@/lib/actions/maintenance"
 import { uploadAll } from "@/lib/upload-client"
 import type { MaintenanceSchedule, MeterUnit } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
+import { ManualLink, type ManualLinkTarget } from "./manual-link"
 
 /** Marks a reminder done and, unless unticked, logs it in the service history. */
-export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }: {
+export function CompleteDialog({ schedule, currentMileage, meterUnit, manual, onClose }: {
   schedule: MaintenanceSchedule
   currentMileage?: number | null
   meterUnit: MeterUnit
+  /** The reminder's manual link, when the caller has loaded it. */
+  manual?: ManualLinkTarget
   onClose: () => void
 }) {
   const router = useRouter()
@@ -64,6 +67,7 @@ export function CompleteDialog({ schedule, currentMileage, meterUnit, onClose }:
         <DialogHeader>
           <DialogTitle>Mark Complete: {schedule.title}</DialogTitle>
         </DialogHeader>
+        <ManualLink manual={manual} />
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

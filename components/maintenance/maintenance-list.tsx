@@ -12,6 +12,8 @@ import { ChevronDown, Pencil, Trash2, CheckCircle2, AlertTriangle, Clock, Pause,
 import { deleteMaintenanceSchedule, setMaintenanceScheduleActive } from "@/lib/actions/maintenance"
 import { MaintenanceFormDialog } from "./maintenance-form-dialog"
 import { CompleteDialog } from "./complete-dialog"
+import { ManualLink } from "./manual-link"
+import { resolveManual, type ManualOption } from "@/lib/manual-reference"
 import { isDoneOnce, repeatsLabel } from "@/lib/maintenance-schedule"
 import { SnoozeMenu } from "./snooze-menu"
 import { remindersHref } from "./add-reminders-submit"
@@ -52,6 +54,8 @@ interface Props {
   roomOptions?: RoomOption[]
   /** A new schedule's room (on an equipment page: the equipment's own). */
   defaultRoomId?: string | null
+  /** Files a reminder may link as its manual: its asset's documents and its own files. */
+  manualOptions?: ManualOption[]
   openId?: string
 }
 
@@ -81,7 +85,7 @@ function getStatus(s: MaintenanceScheduleWithAttachments, currentMileage: number
 const stickyActions =
   "sticky right-0 z-[1] bg-card shadow-[-10px_0_10px_-10px_rgb(0_0_0/0.25)] [tr:hover_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))] [tr:has([aria-expanded=true])_&]:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]"
 
-export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, roomOptions = [], defaultRoomId, openId }: Props) {
+export function MaintenanceList({ schedules: initialSchedules, assetId, assetType, currentMileage, meterUnit = "MILES", equipment, propertyName, roomOptions = [], defaultRoomId, manualOptions, openId }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const [schedules, setSchedules] = useState(initialSchedules)
@@ -190,6 +194,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                         {s.roomId && roomNames[s.roomId] && <Badge variant="outline" className="text-xs">{roomNames[s.roomId]}</Badge>}
                       </div>
                       {s.estimatedCost != null && <div className="text-xs text-muted-foreground">Est. {fmt.money(s.estimatedCost)}</div>}
+                      <ManualLink manual={resolveManual(s, manualOptions ?? [])} className="mt-0.5" />
                     </TableCell>
                     <TableCell className="max-w-[220px]">
                       {s.description ? (
@@ -302,6 +307,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
         roomOptions={roomOptions}
         defaultRoomId={defaultRoomId}
         meterUnit={meterUnit}
+        manualOptions={manualOptions}
       />
 
       {completing && (
@@ -309,6 +315,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
           schedule={completing}
           currentMileage={currentMileage}
           meterUnit={meterUnit}
+          manual={resolveManual(completing, manualOptions ?? [])}
           onClose={() => setCompleting(null)}
         />
       )}

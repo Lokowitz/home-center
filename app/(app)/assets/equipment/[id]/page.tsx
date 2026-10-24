@@ -7,6 +7,7 @@ import { Calendar, Download, Factory, Tag, Fingerprint, MapPin, Building2, Dolla
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { loadManualOptions } from "@/lib/manual-reference-server"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { EquipmentEditButton } from "@/components/equipment/equipment-edit-button"
@@ -34,7 +35,7 @@ export default async function EquipmentDetailPage({
   })
   if (!equipment) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, properties, documents, roomOptions] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, properties, documents, roomOptions, manualOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
@@ -42,6 +43,7 @@ export default async function EquipmentDetailPage({
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "EQUIPMENT", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     // Rooms of its property, for the room selects and badges; empty with Rooms off or no property.
     roomOptionsFor("EQUIPMENT", id),
+    loadManualOptions([{ assetType: "EQUIPMENT", assetId: id }]),
   ])
 
   const age = equipmentAge(equipment, localDay(new Date()))
@@ -129,7 +131,7 @@ export default async function EquipmentDetailPage({
             <WarrantyList warranties={warranties} assetId={id} assetType="EQUIPMENT" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} currentMileage={null} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="EQUIPMENT" roomOptions={roomOptions} defaultRoomId={equipment.roomId} currentMileage={null} manualOptions={manualOptions} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Manual, install guide, spec sheet: files for the equipment itself, not one service." />

@@ -53,6 +53,31 @@ describe("readable", () => {
   })
 
 
+  it("reminders: manual names the file and page", async () => {
+    const db = await snap()
+    const t = "2026-01-01T00:00:00.000Z"
+    const c = createClient({ url: fileUrl(db) })
+    try {
+      await c.executeMultiple(`
+        INSERT INTO "Attachment" (id, recordType, filename, originalName, mimeType, sizeBytes, uploadedById, assetType, assetId) VALUES
+          ('d1', 'DOCUMENT', 'f-d1.pdf', 'Owner manual.pdf', 'application/pdf', 1, 'u1', 'VEHICLE', 'v1');
+        INSERT INTO "MaintenanceSchedule" (id, assetId, assetType, title, referenceAttachmentId, referencePage, updatedAt) VALUES
+          ('m1', 'v1', 'VEHICLE', 'Oil', 'd1', 42, '${t}'),
+          ('m2', 'v1', 'VEHICLE', 'Tires', 'd1', NULL, '${t}'),
+          ('m3', 'v1', 'VEHICLE', 'Wipers', NULL, NULL, '${t}');
+      `)
+    } finally {
+      c.close()
+    }
+    await releaseDbHandles()
+    const { data } = await loadReadable(db, { kind: "all", includeHealth: false }, rawPlacement)
+    const manual = (title: string) => data.reminders.find((r) => r.title === title)!.manual
+    expect(manual("Oil")).toBe("Owner manual.pdf, p. 42")
+    expect(manual("Tires")).toBe("Owner manual.pdf")
+    expect(manual("Wipers")).toBeNull()
+    expect(csvTables(data)["reminders.csv"].split("\n")[0]).toContain("estimatedCost,manual,")
+  })
+
   it("equipment details: counts as, expected life, replacement cost", async () => {
     const db = await snap()
     const t = "2026-01-01T00:00:00.000Z"

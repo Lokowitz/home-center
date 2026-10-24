@@ -196,13 +196,14 @@ export const ENTITIES: Record<EntityKey, EntityDef> = {
   maintenanceSchedule: {
     model: "maintenanceSchedule", label: "Maintenance schedule", plural: "maintenance schedules",
     description: "Recurring, seasonal (set months) or one-time maintenance or checkups for an asset. For due/overdue status use the maintenance_status tool.",
-    nameField: "title", searchFields: ["title", "description"], ...polymorphic, keys: ["assetType", "assetId", "roomId"],
+    nameField: "title", searchFields: ["title", "description"], ...polymorphic, keys: ["assetType", "assetId", "roomId", "referenceAttachmentId"],
     fields: {
       title: s, description: s, intervalDays: int,
       intervalMiles: { type: "int", description: "Interval in the vehicle's meter unit" },
       estimatedCost: money,
       dueMonths: { type: "string", description: "Seasonal schedule: months 1-12, comma-separated, e.g. 4,10" },
       dueDay: { type: "int", description: "Day of the month for a seasonal schedule" },
+      referencePage: { type: "int", description: "Page of the reminder's linked manual. To read it, call read_document with attachmentId = referenceAttachmentId and fromPage = referencePage." },
       lastCompletedDate: date, lastCompletedMileage: int, nextDueDate: date, nextDueMileage: int,
       reminderDaysBefore: int, reminderMilesBefore: int, isActive: bool,
       assetType: enumOf(AssetType, "Kind of asset this belongs to"),

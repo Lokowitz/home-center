@@ -13,11 +13,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { createMaintenanceSchedule, updateMaintenanceSchedule } from "@/lib/actions/maintenance"
+import { createMaintenanceSchedule, suggestManualPage, updateMaintenanceSchedule } from "@/lib/actions/maintenance"
 import { deleteAttachment } from "@/lib/actions/attachments"
 import { ASSET_TYPES } from "@/lib/assets"
 import { useFormat } from "@/components/regional-provider"
 import { formatDueMonths, monthsMissing, parseDueMonths, scheduleKind } from "@/lib/maintenance-schedule"
+import { manualChoices, type ManualOption } from "@/lib/manual-reference"
 import { RoomSelect } from "@/components/rooms/room-select"
 import type { RoomOption } from "@/lib/rooms-server"
 import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
@@ -39,6 +40,8 @@ const schema = z.object({
   reminderDaysBefore: z.string().optional(),
   reminderMilesBefore: z.string().optional(),
   roomId: z.string().optional(),
+  referenceAttachmentId: z.string().optional(),
+  referencePage: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -46,6 +49,8 @@ type FormValues = z.infer<typeof schema>
 /** Starting values for a new reminder, such as the one "Plan replacement" prefills. */
 export type MaintenanceFormDefaults = Partial<Pick<FormValues, "title" | "repeat" | "nextDueDate" | "estimatedCost">>
 
+// Base UI Select has no empty option, so "None" is a sentinel mapped to "".
+const NO_MANUAL = "__none__"
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const INTERVAL_PRESETS = [
   { label: "Monthly", days: 30 },
@@ -78,6 +83,8 @@ interface Props {
   meterUnit?: MeterUnit
   /** A new schedule's starting values. Pass a stable object (state or memo): a new object resets the form. */
   defaults?: MaintenanceFormDefaults
+  /** Files a reminder may link as its manual. Missing hides the Manual row and keeps an edited reminder's stored link. */
+  manualOptions?: ManualOption[]
 }
 
 function targetKey(assetType: AssetType, assetId: string) {
@@ -95,12 +102,13 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES", defaults }: Props) {
+export function MaintenanceFormDialog({ open, onClose, assetId, assetType, schedule, attachments: initialAttachments = [], onAttachmentDeleted, equipmentOptions, propertyName = "This property", roomOptions = [], defaultRoomId, meterUnit = "MILES", defaults, manualOptions }: Props) {
   const fmt = useFormat()
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
   const [createdScheduleId, setCreatedScheduleId] = useState<string | null>(null)
   const [filePickerOpen, setFilePickerOpen] = useState(false)
+  const [finding, setFinding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -117,11 +125,15 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "" },
+    defaultValues: { assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "", referenceAttachmentId: "", referencePage: "" },
   })
 
   const [repeat, dueMonthsValue] = useWatch({ control: form.control, name: ["repeat", "dueMonths"] })
   const selectedMonths = parseDueMonths(dueMonthsValue)
+  const [targetType, targetId, pickedManual, titleValue] = useWatch({ control: form.control, name: ["assetType", "assetId", "referenceAttachmentId", "title"] })
+  // A stored file that isn't a choice any more (deleted, or the reminder moved to another asset) reads as None.
+  const choices = manualChoices(manualOptions ?? [], { assetType: targetType, assetId: targetId }, schedule?.id ?? createdScheduleId)
+  const pickedChoice = choices.find((c) => c.id === pickedManual)
 
   // A room that isn't one of the options (the equipment moved property since) would only fail to save, so it opens as None.
   const roomKey = roomOptions.map((r) => r.id).join(" ")
@@ -141,8 +153,10 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       reminderDaysBefore: schedule.reminderDaysBefore.toString(),
       reminderMilesBefore: schedule.reminderMilesBefore.toString(),
       roomId: schedule.roomId && roomKey.split(" ").includes(schedule.roomId) ? schedule.roomId : "",
+      referenceAttachmentId: schedule.referenceAttachmentId ?? "",
+      referencePage: schedule.referencePage?.toString() ?? "",
     } : {
-      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "",
+      assetId, assetType, title: "", description: "", intervalDays: "", intervalMiles: "", repeat: "every", dueMonths: "", dueDay: "", estimatedCost: "", nextDueDate: "", nextDueMileage: "", reminderDaysBefore: "14", reminderMilesBefore: "500", roomId: defaultRoomId ?? "", referenceAttachmentId: "", referencePage: "",
       ...defaults,
     })
   }, [schedule, open, form, assetId, assetType, defaultRoomId, roomKey, defaults])
@@ -171,8 +185,34 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
     const result = await deleteAttachment(attachment.id)
     if (result?.error) { toast.error(result.error); return }
     setRemovedIds((prev) => new Set(prev).add(attachment.id))
+    if (form.getValues("referenceAttachmentId") === attachment.id) {
+      form.setValue("referenceAttachmentId", "", { shouldDirty: true })
+      form.setValue("referencePage", "", { shouldDirty: true })
+    }
     onAttachmentDeleted?.(schedule.id, attachment.id)
     toast.success("Attachment removed.")
+  }
+
+  async function findPage() {
+    if (!pickedChoice) return
+    setFinding(true)
+    try {
+      const result = await suggestManualPage({
+        attachmentId: pickedChoice.id,
+        assetType: targetType,
+        assetId: targetId,
+        scheduleId: schedule?.id ?? createdScheduleId,
+        title: titleValue,
+      })
+      if ("error" in result) toast.error("Couldn't search this file.")
+      else if (result.page == null) toast.message("No page mentions this title. Type the page instead.")
+      else {
+        form.setValue("referencePage", String(result.page), { shouldDirty: true })
+        toast.success(`Found on page ${result.page}.`)
+      }
+    } finally {
+      setFinding(false)
+    }
   }
 
   async function onSubmit(values: FormValues) {
@@ -190,6 +230,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       dueDay: chosenRepeat === "months" ? values.dueDay : "",
       // No room select shown: send nothing, so an edit keeps the schedule's room.
       roomId: roomOptions.length > 0 ? values.roomId : undefined,
+      // Same for the manual: with no Manual row offered, an edit keeps the stored link.
+      referenceAttachmentId: manualOptions ? (pickedChoice ? values.referenceAttachmentId : "") : undefined,
+      referencePage: manualOptions ? (pickedChoice ? values.referencePage : "") : undefined,
     } as unknown as Parameters<typeof createMaintenanceSchedule>[0]
     const existingId = schedule?.id ?? createdScheduleId
     const result = existingId
@@ -199,7 +242,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
     if (result?.error) {
       const roomError = "roomId" in result.error ? result.error.roomId?.[0] : undefined
       const monthsError = "dueMonths" in result.error ? result.error.dueMonths?.[0] : undefined
-      toast.error(roomError ?? monthsError ?? "Please fix the errors and try again.")
+      const fileError = "referenceAttachmentId" in result.error ? result.error.referenceAttachmentId?.[0] : undefined
+      const pageError = "referencePage" in result.error ? result.error.referencePage?.[0] : undefined
+      toast.error(roomError ?? monthsError ?? fileError ?? pageError ?? "Please fix the errors and try again.")
       return
     }
 
@@ -267,6 +312,9 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                     // Equipment with a room fills a blank room; a chosen room stays.
                     const equipmentRoom = type === "EQUIPMENT" ? equipmentOptions.find((e) => e.id === rest.join(":"))?.roomId : null
                     if (equipmentRoom && !form.getValues("roomId")) form.setValue("roomId", equipmentRoom)
+                    // A manual filed on the old target can't follow the reminder to the new one.
+                    form.setValue("referenceAttachmentId", "")
+                    form.setValue("referencePage", "")
                   }}
                 >
                   <FormControl>
@@ -430,6 +478,47 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
                     <FormMessage />
                   </FormItem>
                 )} />
+              )}
+
+              {choices.length > 0 && (
+                <div className="col-span-2 space-y-2">
+                  <FormLabel>Manual</FormLabel>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={pickedChoice ? pickedChoice.id : NO_MANUAL}
+                      onValueChange={(value) => {
+                        if (!value) return
+                        const none = value === NO_MANUAL
+                        form.setValue("referenceAttachmentId", none ? "" : value, { shouldDirty: true })
+                        if (none) form.setValue("referencePage", "", { shouldDirty: true })
+                      }}
+                    >
+                      <SelectTrigger className="min-w-0 flex-1" aria-label="Manual">
+                        <SelectValue>
+                          {(v: string) => (v === NO_MANUAL ? "None" : choices.find((c) => c.id === v)?.name ?? "None")}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_MANUAL}>None</SelectItem>
+                        {choices.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {pickedChoice && (
+                      <>
+                        <FormField control={form.control} name="referencePage" render={({ field }) => (
+                          <Input type="number" min={1} max={9999} step={1} placeholder="42" aria-label="Page" className="w-24" {...field} />
+                        )} />
+                        {pickedChoice.hasText && (
+                          <Button type="button" variant="outline" size="sm" onClick={findPage} disabled={finding || !titleValue.trim()}>
+                            {finding ? "Searching…" : "Find page"}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
 
               <FormField control={form.control} name="description" render={({ field }) => (

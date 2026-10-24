@@ -549,39 +549,45 @@ model Warranty {
 // ─── Maintenance ──────────────────────────────────────────────────────────────
 
 model MaintenanceSchedule {
-  id                   String    @id @default(cuid())
-  assetId              String
-  assetType            AssetType
-  title                String
-  description          String?
-  intervalDays         Int?
-  intervalMiles        Int?
-  lastCompletedDate    DateTime?
-  lastCompletedMileage Int?
-  nextDueDate          DateTime?
-  nextDueMileage       Int?
-  reminderDaysBefore   Int       @default(14)
-  reminderMilesBefore  Int       @default(500)
+  id                    String      @id @default(cuid())
+  assetId               String
+  assetType             AssetType
+  title                 String
+  description           String?
+  intervalDays          Int?
+  intervalMiles         Int?
+  lastCompletedDate     DateTime?
+  lastCompletedMileage  Int?
+  nextDueDate           DateTime?
+  nextDueMileage        Int?
+  reminderDaysBefore    Int         @default(14)
+  reminderMilesBefore   Int         @default(500)
   /// False while paused: kept on the asset page, left out of due counts and notifications.
-  isActive             Boolean   @default(true)
+  isActive              Boolean     @default(true)
   /// Hidden from the dashboard and notifications until then. The due date doesn't move.
-  snoozedUntil         DateTime?
+  snoozedUntil          DateTime?
   /// What one occurrence is expected to cost.
-  estimatedCost        Float?
+  estimatedCost         Float?
   /// Calendar schedule: months 1–12, comma-separated and sorted. Can't be combined with an interval.
-  dueMonths            String?
+  dueMonths             String?
   /// Day of month (1–28) for a calendar schedule.
-  dueDay               Int?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  dueDay                Int?
+  /// A manual (or any file) to open when doing this: a DOCUMENT on the same asset or a file on this reminder. Cleared when the file is deleted.
+  referenceAttachmentId String?
+  referenceAttachment   Attachment? @relation("ScheduleManual", fields: [referenceAttachmentId], references: [id], onDelete: SetNull)
+  /// Page of that file, from 1. Ignored without a file.
+  referencePage         Int?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
 
   /// The room the task is for, if any. Copied to the service record on completion.
   roomId String?
   room   Room?   @relation(fields: [roomId], references: [id], onDelete: SetNull)
 
-  attachments Attachment[]
+  attachments Attachment[] @relation("ScheduleAttachments")
 
   @@index([roomId])
+  @@index([referenceAttachmentId])
 }
 
 // ─── Attachments ──────────────────────────────────────────────────────────────
@@ -605,7 +611,7 @@ model Attachment {
   warranty   Warranty? @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
 
   maintenanceScheduleId String?
-  maintenanceSchedule   MaintenanceSchedule? @relation(fields: [maintenanceScheduleId], references: [id], onDelete: Cascade)
+  maintenanceSchedule   MaintenanceSchedule? @relation("ScheduleAttachments", fields: [maintenanceScheduleId], references: [id], onDelete: Cascade)
 
   healthConditionId String?
   healthCondition   HealthCondition? @relation(fields: [healthConditionId], references: [id], onDelete: Cascade)
@@ -638,6 +644,8 @@ model Attachment {
   room   Room?   @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   text AttachmentText?
+
+  referencedBySchedules MaintenanceSchedule[] @relation("ScheduleManual")
 
   @@index([roomId])
   @@index([assetType, assetId])

@@ -320,23 +320,30 @@ async function writePhotos(jobs: PhotoJob[]) {
 
 // ─── Attachments (small generated PDFs, so records look documented) ──────────
 
-function receiptPdf(lines: string[]) {
-  const content =
-    "BT /F1 14 Tf 60 720 Td (" +
-    lines[0].replace(/[()\\]/g, "") +
-    ") Tj /F1 10 Tf 0 -28 Td " +
-    lines
-      .slice(1)
-      .map((l) => `(${l.replace(/[()\\]/g, "")}) Tj 0 -16 Td `)
-      .join("") +
-    "ET"
+/// One text page per entry: the first line is a heading, the rest are body lines.
+function pdfPages(pages: string[][]) {
+  const contents = pages.map(
+    (lines) =>
+      "BT /F1 14 Tf 60 720 Td (" +
+      lines[0].replace(/[()\\]/g, "") +
+      ") Tj /F1 10 Tf 0 -28 Td " +
+      lines
+        .slice(1)
+        .map((l) => `(${l.replace(/[()\\]/g, "")}) Tj 0 -16 Td `)
+        .join("") +
+      "ET"
+  )
 
+  // 1 catalog, 2 page tree, 3 font, then a page and its content stream per page.
+  const kids = pages.map((_, i) => `${4 + i * 2} 0 R`).join(" ")
   const objects = [
     "<</Type/Catalog/Pages 2 0 R>>",
-    "<</Type/Pages/Kids[3 0 R]/Count 1>>",
-    "<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>",
+    `<</Type/Pages/Kids[${kids}]/Count ${pages.length}>>`,
     "<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>",
-    `<</Length ${content.length}>>\nstream\n${content}\nendstream`,
+    ...contents.flatMap((content, i) => [
+      `<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 3 0 R>>>>/Contents ${5 + i * 2} 0 R>>`,
+      `<</Length ${content.length}>>\nstream\n${content}\nendstream`,
+    ]),
   ]
 
   let pdf = "%PDF-1.4\n"
@@ -351,6 +358,8 @@ function receiptPdf(lines: string[]) {
   pdf += `trailer\n<</Size ${objects.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF\n`
   return Buffer.from(pdf, "latin1")
 }
+
+const receiptPdf = (lines: string[]) => pdfPages([lines])
 
 async function attach(
   recordType: "SERVICE" | "WARRANTY" | "MAINTENANCE",
@@ -541,6 +550,8 @@ const MAINTENANCE: {
   ref: Ref; title: string; description?: string; intervalDays: number | null; dueInDays: number | null
   intervalMiles?: number; dueInMiles?: number; reminderDaysBefore?: number
   estimatedCost?: number; dueMonths?: string; dueDay?: number
+  /** Page of the demo furnace manual this reminder points at. */
+  manualPage?: number
 }[] = [
   // Overdue
   { ref: E(8), title: "Replace humidifier water panel", description: "Aprilaire #35 panel. Takes ten minutes.", intervalDays: 365, dueInDays: -21, estimatedCost: 24 },
@@ -548,7 +559,7 @@ const MAINTENANCE: {
   { ref: V(2), title: "Oil change", intervalDays: 180, dueInDays: -4, intervalMiles: 7500, dueInMiles: 500 },
 
   // Due soon
-  { ref: E(6), title: "Replace furnace filter", description: "16x25x4 media filter — the thick one.", intervalDays: 90, dueInDays: 6, reminderDaysBefore: 14, estimatedCost: 38 },
+  { ref: E(6), title: "Replace furnace filter", description: "16x25x4 media filter — the thick one.", intervalDays: 90, dueInDays: 6, reminderDaysBefore: 14, estimatedCost: 38, manualPage: 3 },
   { ref: P(0), title: "Winterize sprinklers", description: "Blow out the lines before the first hard freeze.", intervalDays: null, dueInDays: null, dueMonths: "10", dueDay: 15, estimatedCost: 85 },
   { ref: P(0), title: "Replace roof", description: "Shingles are rated for 30 years. Get quotes two years out.", intervalDays: null, dueInDays: 1095, estimatedCost: 14000 },
   { ref: E(11), title: "Test sump pump", description: "Pour a bucket into the pit and confirm it kicks on.", intervalDays: 90, dueInDays: 11 },
@@ -738,6 +749,30 @@ async function main() {
     }
   }
 
+  // A 3-page owner's manual filed on the Gas Furnace, so "Replace furnace filter" can point at page 3.
+  const furnace = resolve(E(6))
+  const manualBytes = pdfPages([
+    ["Carrier 59SC5A owner's manual", "Page 1: Safety", "Read all warnings before servicing the furnace."],
+    ["Thermostat settings", "Page 2: Thermostat settings", "Set the fan to auto for normal heating."],
+    ["Replacing the air filter", "Page 3: Replacing the air filter", "Use a 16x25x4 media filter.", "Turn the power off, slide the old filter out, and slide the new one in with the arrow toward the furnace."],
+  ])
+  const manualFilename = "furnace-manual.pdf"
+  const manualDir = path.join(UPLOAD_DIR, "document", furnace.assetId)
+  await mkdir(manualDir, { recursive: true })
+  await writeFile(path.join(manualDir, manualFilename), manualBytes)
+  const manual = await prisma.attachment.create({
+    data: {
+      recordType: "DOCUMENT",
+      filename: manualFilename,
+      originalName: "Carrier 59SC5A owner's manual.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: manualBytes.length,
+      uploadedById: user.id,
+      assetType: furnace.assetType,
+      assetId: furnace.assetId,
+    },
+  })
+
   for (const m of MAINTENANCE) {
     const asset = resolve(m.ref)
     const vehicle = m.ref.kind === "vehicle" ? vehicles[m.ref.index] : null
@@ -746,6 +781,8 @@ async function main() {
         ...asset, title: m.title, description: m.description ?? null,
         intervalDays: m.intervalDays, intervalMiles: m.intervalMiles ?? null,
         estimatedCost: m.estimatedCost ?? null,
+        referenceAttachmentId: m.manualPage ? manual.id : null,
+        referencePage: m.manualPage ?? null,
         dueMonths: m.dueMonths ?? null,
         dueDay: m.dueMonths ? m.dueDay ?? 1 : null,
         nextDueDate: m.dueMonths

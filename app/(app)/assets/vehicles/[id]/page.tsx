@@ -7,6 +7,7 @@ import { Calendar, Gauge, Palette, Download, Factory, Tag, Fingerprint, FileText
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { loadManualOptions } from "@/lib/manual-reference-server"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { VehicleEditButton } from "@/components/vehicles/vehicle-edit-button"
@@ -26,11 +27,12 @@ export default async function VehicleDetailPage({
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, documents] = await Promise.all([
+  const [serviceRecords, warranties, maintenanceSchedules, documents, manualOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "VEHICLE", assetId: id }, orderBy: { uploadedAt: "asc" } }),
+    loadManualOptions([{ assetType: "VEHICLE", assetId: id }]),
   ])
 
   return (
@@ -100,7 +102,7 @@ export default async function VehicleDetailPage({
             <WarrantyList warranties={warranties} assetId={id} assetType="VEHICLE" openId={tab === "warranties" ? open : undefined} />
           </TabsContent>
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="VEHICLE" currentMileage={vehicle.currentMileage} meterUnit={vehicle.meterUnit} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="VEHICLE" currentMileage={vehicle.currentMileage} meterUnit={vehicle.meterUnit} manualOptions={manualOptions} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Title, registration, owner's manual: files for the vehicle itself, not one service." />

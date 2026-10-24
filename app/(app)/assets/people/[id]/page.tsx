@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Cake, Download, Droplet, FileText, ShieldPlus, Stethoscope, Users, User } from "lucide-react"
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { loadManualOptions } from "@/lib/manual-reference-server"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
@@ -61,11 +62,12 @@ export default async function PersonDetailPage({
   if (!person) notFound()
 
   const where = { assetId: id, assetType: "PERSON" as const }
-  const [visits, schedules, providers, documents] = await Promise.all([
+  const [visits, schedules, providers, documents, manualOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.maintenanceSchedule.findMany({ where, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.provider.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PERSON", assetId: id }, orderBy: { uploadedAt: "asc" } }),
+    loadManualOptions([{ assetType: "PERSON", assetId: id }]),
   ])
 
   const age = person.dateOfBirth ? ageFrom(person.dateOfBirth, new Date()) : null
@@ -175,7 +177,7 @@ export default async function PersonDetailPage({
             <AllergiesSection personId={id} allergies={person.allergies} />
           </TabsContent>
           <TabsContent value="reminders" className="mt-4">
-            <MaintenanceList schedules={schedules} assetId={id} assetType="PERSON" currentMileage={null} openId={tab === "reminders" ? open : undefined} />
+            <MaintenanceList schedules={schedules} assetId={id} assetType="PERSON" currentMileage={null} manualOptions={manualOptions} openId={tab === "reminders" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Birth certificate, passport scan, advance directive: files for this person, not one visit." />

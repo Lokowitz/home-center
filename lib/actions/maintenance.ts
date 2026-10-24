@@ -14,6 +14,10 @@ import { firstDue, templatesFor } from "@/lib/maintenance-templates"
 import { alignCalendarDue, firstCalendarDue, formatDueMonths, normalizeRepeats, parseDueMonths } from "@/lib/maintenance-schedule"
 import { loadTemplateTarget } from "@/lib/maintenance-templates-server"
 import { checkRoom } from "@/lib/rooms-server"
+import { cleanReference, referenceAllowed, trustedTarget } from "@/lib/manual-reference"
+import { checkReference } from "@/lib/manual-reference-server"
+import { findManualPage } from "@/lib/manual-page"
+import { loadFeatures } from "@/lib/features-server"
 
 const schema = z.object({
   assetId: z.string().min(1),
@@ -33,6 +37,9 @@ const schema = z.object({
   reminderMilesBefore: z.coerce.number().int().min(1).default(500),
   /// Must be a room on the target's property; left out, an update keeps the schedule's room.
   roomId: z.string().optional(),
+  /// A file on the same asset or on this reminder, and a page of it. Left out, an update keeps the stored link.
+  referenceAttachmentId: z.string().optional(),
+  referencePage: z.string().or(z.number()).optional(),
 })
 
 /** Checks a sent roomId; `undefined` (none sent) means leave the room alone. */
@@ -40,6 +47,14 @@ async function roomFor(v: z.infer<typeof schema>) {
   if (v.roomId === undefined) return { roomId: undefined }
   const room = await checkRoom(v.roomId, v.assetType, v.assetId)
   return "error" in room ? { error: { roomId: [room.error] } } : room
+}
+
+/** Cleans and checks the sent manual reference; `value` undefined means leave it alone. */
+async function referenceFor(v: z.infer<typeof schema>, scheduleId: string | null) {
+  const cleaned = cleanReference({ attachmentId: v.referenceAttachmentId, page: v.referencePage })
+  if (!cleaned.ok) return { error: { referencePage: [cleaned.error] } }
+  const checked = await checkReference(cleaned.value, { assetType: v.assetType, assetId: v.assetId }, scheduleId)
+  return "error" in checked ? { error: { referenceAttachmentId: [checked.error] } } : { value: checked.value }
 }
 
 function clean(v: z.infer<typeof schema>) {
@@ -83,9 +98,11 @@ export async function createMaintenanceSchedule(data: z.infer<typeof schema>) {
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
   const room = await roomFor(parsed.data)
   if ("error" in room) return { error: room.error }
+  const reference = await referenceFor(parsed.data, null)
+  if ("error" in reference) return { error: reference.error }
   const fields = clean(parsed.data)
   if ("error" in fields) return { error: fields.error }
-  const row = await prisma.maintenanceSchedule.create({ data: { ...fields, roomId: room.roomId } })
+  const row = await prisma.maintenanceSchedule.create({ data: { ...fields, roomId: room.roomId, ...(reference.value ?? {}) } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")
@@ -99,9 +116,11 @@ export async function updateMaintenanceSchedule(id: string, data: z.infer<typeof
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
   const room = await roomFor(parsed.data)
   if ("error" in room) return { error: room.error }
+  const reference = await referenceFor(parsed.data, id)
+  if ("error" in reference) return { error: reference.error }
   const fields = clean(parsed.data)
   if ("error" in fields) return { error: fields.error }
-  await prisma.maintenanceSchedule.update({ where: { id }, data: { ...fields, roomId: room.roomId } })
+  await prisma.maintenanceSchedule.update({ where: { id }, data: { ...fields, roomId: room.roomId, ...(reference.value ?? {}) } })
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/maintenance")
   revalidatePath("/")
@@ -294,6 +313,44 @@ export async function addTemplateSchedules(assetType: AssetType, assetId: string
   await prisma.maintenanceSchedule.createMany({ data: rows })
   revalidateSchedule({ assetType, assetId })
   return { success: true, count: rows.length }
+}
+
+/**
+ * "Find page": the page of a linkable file that best matches a reminder title.
+ * Returns a page number only, and only for files the reminder could link.
+ */
+export async function suggestManualPage(input: {
+  attachmentId: string
+  assetType: AssetType
+  assetId: string
+  scheduleId: string | null
+  title: string
+}): Promise<{ page: number | null } | { error: string }> {
+  const session = await auth()
+  if (!session) redirect("/login")
+  const [file, saved, features] = await Promise.all([
+    prisma.attachment.findUnique({
+      where: { id: input.attachmentId },
+      select: {
+        recordType: true,
+        assetType: true,
+        assetId: true,
+        maintenanceScheduleId: true,
+        text: { select: { status: true, text: true } },
+      },
+    }),
+    input.scheduleId
+      ? prisma.maintenanceSchedule.findUnique({ where: { id: input.scheduleId }, select: { assetType: true, assetId: true } })
+      : null,
+    loadFeatures(),
+  ])
+  // A saved reminder's own asset decides, so a client can't dodge the Health check by naming another one.
+  const target = trustedTarget({ assetType: input.assetType, assetId: input.assetId }, saved)
+  if (!file || (input.scheduleId && !saved) || !referenceAllowed(file, target, input.scheduleId, features.health)) {
+    return { error: "Not found" }
+  }
+  if (!file.text || file.text.status !== "DONE" || !file.text.text) return { page: null }
+  return { page: findManualPage(file.text.text, input.title) }
 }
 
 function revalidateSchedule(s: { assetType: AssetType; assetId: string }) {

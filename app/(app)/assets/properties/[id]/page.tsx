@@ -7,6 +7,7 @@ import { MapPin, Calendar, DollarSign, Maximize, Download, Home, FileText } from
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { WarrantyList } from "@/components/warranties/warranty-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
+import { loadManualOptions } from "@/lib/manual-reference-server"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
@@ -47,8 +48,10 @@ export default async function PropertyDetailPage({
 
   const equipmentIds = equipment.map((e) => e.id)
 
-  const [equipmentServiceRecords, equipmentWarranties, equipmentMaintenanceSchedules] = equipmentIds.length
-    ? await Promise.all([
+  // The manuals need the equipment ids, so they load beside the equipment's own records.
+  const [[equipmentServiceRecords, equipmentWarranties, equipmentMaintenanceSchedules], manualOptions] = await Promise.all([
+    equipmentIds.length
+    ? Promise.all([
         prisma.serviceRecord.findMany({
           where: { assetId: { in: equipmentIds }, assetType: "EQUIPMENT" },
           include: { attachments: true },
@@ -65,7 +68,12 @@ export default async function PropertyDetailPage({
           orderBy: { nextDueDate: "asc" },
         }),
       ])
-    : [[], [], []]
+    : [[], [], []],
+    loadManualOptions([
+      { assetType: "PROPERTY", assetId: id },
+      ...equipmentIds.map((e) => ({ assetType: "EQUIPMENT" as const, assetId: e })),
+    ]),
+  ])
 
   const serviceRecords = [...propertyServiceRecords, ...equipmentServiceRecords]
   const warranties = [...propertyWarranties, ...equipmentWarranties]
@@ -144,7 +152,7 @@ export default async function PropertyDetailPage({
             </TabsContent>
           )}
           <TabsContent value="maintenance" className="mt-4">
-            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} openId={tab === "maintenance" ? open : undefined} />
+            <MaintenanceList schedules={maintenanceSchedules} assetId={id} assetType="PROPERTY" equipment={equipment} propertyName={property.name} roomOptions={roomOptions} manualOptions={manualOptions} openId={tab === "maintenance" ? open : undefined} />
           </TabsContent>
           <TabsContent value="documents" className="mt-4">
             <AssetDocuments assetId={id} documents={documents} hint="Deed, survey, closing papers, floor plans: files for the property itself, not one service." />
