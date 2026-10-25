@@ -7,7 +7,7 @@ import { updatePerson } from "@/lib/actions/people"
 import { personFields, personInitial } from "./person-fields"
 import type { Person } from "@/app/generated/prisma/client"
 
-export function PersonEditButton({ person, providers }: { person: Person; providers: { id: string; name: string }[] }) {
+export function PersonEditButton({ person, providers, policyChoices = [], policyIds = [] }: { person: Person; providers: { id: string; name: string }[]; policyChoices?: { id: string; name: string }[]; policyIds?: string[] }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -24,8 +24,9 @@ export function PersonEditButton({ person, providers }: { person: Person; provid
         title="Edit Person"
         submitLabel="Save Changes"
         successMessage="Person updated."
-        fields={personFields(providers)}
-        initial={personInitial(person)}
+        fields={personFields(providers, policyChoices)}
+        // The key only reaches updatePerson while the list is shown, so a hidden list never unlinks anything.
+        initial={personInitial(person, policyChoices.length > 0 ? policyIds : undefined)}
         onSubmit={(values) => updatePerson(person.id, values)}
       />
     </>

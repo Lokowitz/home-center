@@ -2,7 +2,8 @@ import { RELATIONSHIPS, toDateInput } from "@/lib/health"
 import type { FieldConfig, FormValues } from "@/lib/form-types"
 import type { Person } from "@/app/generated/prisma/client"
 
-export function personFields(providers: { id: string; name: string }[]): FieldConfig[] {
+/// `policies` are the health and life policies that may cover a person. Edit only: empty hides the Insurance list.
+export function personFields(providers: { id: string; name: string }[], policies: { id: string; name: string }[] = []): FieldConfig[] {
   return [
     { name: "name", label: "Name", kind: "text", required: true, placeholder: "Jordan Rivera", wide: true, help: "person.name" },
     { name: "relationship", label: "Relationship", kind: "select", required: true, options: RELATIONSHIPS, help: "person.relationship" },
@@ -14,10 +15,14 @@ export function personFields(providers: { id: string; name: string }[]): FieldCo
       options: providers.map((p) => ({ value: p.id, label: p.name })),
     },
     { name: "notes", label: "Notes", kind: "textarea", wide: true, help: "person.notes" },
+    ...(policies.length > 0
+      ? [{ name: "insurancePolicyIds", label: "Insurance", kind: "checkboxes" as const, wide: true, help: "person.insurance", options: policies.map((p) => ({ value: p.id, label: p.name })) }]
+      : []),
   ]
 }
 
-export function personInitial(person?: Person | null): FormValues {
+/// `policyIds` are the policies covering this person now; leave it out when the Insurance list isn't shown.
+export function personInitial(person?: Person | null, policyIds?: string[]): FormValues {
   return {
     name: person?.name ?? "",
     relationship: person?.relationship ?? "SELF",
@@ -26,5 +31,6 @@ export function personInitial(person?: Person | null): FormValues {
     bloodType: person?.bloodType ?? "",
     primaryProviderId: person?.primaryProviderId ?? "",
     notes: person?.notes ?? "",
+    ...(policyIds ? { insurancePolicyIds: policyIds.join(",") } : {}),
   }
 }

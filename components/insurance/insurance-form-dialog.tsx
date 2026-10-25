@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { CheckList } from "@/components/forms/check-list"
 import { useFormat } from "@/components/regional-provider"
 import { createInsurancePolicy, updateInsurancePolicy } from "@/lib/actions/insurance"
 import { allowedLinks, coverageSuggestions, insuranceKindLabel, isHealthInsuranceKind, kindOptions } from "@/lib/insurance"
@@ -63,27 +64,6 @@ function toValues(policy: PolicyRow | null): FormValues {
     vehicleIds: policy?.vehicles.map((v) => v.id) ?? [],
     coverages: (policy?.coverages ?? []).map((c) => ({ label: c.label, limit: c.limit?.toString() ?? "", deductible: c.deductible?.toString() ?? "" })),
   }
-}
-
-function CheckList({ label, help, options, value, onChange }: { label: string; help: string; options: Named[]; value: string[]; onChange: (next: string[]) => void }) {
-  return (
-    <div className="col-span-2 space-y-1.5">
-      <FormLabel help={help}>{label}</FormLabel>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
-        {options.map((o) => (
-          <label key={o.id} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={value.includes(o.id)}
-              onChange={(e) => onChange(e.target.checked ? [...value, o.id] : value.filter((id) => id !== o.id))}
-            />
-            {o.name}
-          </label>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 interface Props {

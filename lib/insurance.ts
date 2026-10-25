@@ -210,3 +210,42 @@ export function belongingsComparison(
   const coverage = personalPropertyCoverage(policies)
   return coverage == null ? null : { belongings: contents.toReplaceOrPaid, coverage }
 }
+
+// ─── Linking from an asset's own edit dialog ─────────────────────────────────
+
+export type LinkSide = "members" | "properties" | "vehicles"
+
+/// Whether a policy of this kind may link to this side. People are "members"; properties and vehicles are assets.
+export function linksSide(kind: string, health: boolean, side: LinkSide): boolean {
+  const allowed = allowedLinks(kind, health)
+  return side === "members" ? allowed.members : allowed.assets
+}
+
+/// Kinds that may link to this side, in INSURANCE_KINDS order.
+export function eligibleKinds(side: LinkSide, health: boolean): InsuranceKindValue[] {
+  return INSURANCE_KINDS.map((k) => k.value as InsuranceKindValue).filter((kind) => linksSide(kind, health, side))
+}
+
+/// "State Farm · Homeowners HO-3 · Home": the kind is there because one carrier often writes both home and auto.
+export function policyChoiceLabel(p: { carrier: string; planName: string | null; kind: string }): string {
+  return [p.carrier, p.planName, insuranceKindLabel(p.kind)].filter(Boolean).join(" · ")
+}
+
+/// Connects and disconnects for one asset. Only eligible policies are touched; ids not in `policies`
+/// or not eligible are ignored. Output order follows `policies`.
+export function assetPolicyDiff(
+  side: LinkSide,
+  health: boolean,
+  policies: { id: string; kind: string; linked: boolean }[],
+  chosen: string[],
+): { connect: string[]; disconnect: string[] } {
+  const wanted = new Set(chosen)
+  const connect: string[] = []
+  const disconnect: string[] = []
+  for (const p of policies) {
+    if (!linksSide(p.kind, health, side)) continue
+    if (wanted.has(p.id) && !p.linked) connect.push(p.id)
+    else if (!wanted.has(p.id) && p.linked) disconnect.push(p.id)
+  }
+  return { connect, disconnect }
+}

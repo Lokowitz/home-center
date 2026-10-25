@@ -9,6 +9,7 @@ import { Cake, Download, Droplet, FileText, Stethoscope, Users, User } from "luc
 import { ServiceRecordList } from "@/components/service-records/service-record-list"
 import { MaintenanceList } from "@/components/maintenance/maintenance-list"
 import { loadManualOptions } from "@/lib/manual-reference-server"
+import { loadPolicyChoices } from "@/lib/insurance-server"
 import { AssetDocuments } from "@/components/attachments/asset-documents"
 import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
@@ -63,12 +64,14 @@ export default async function PersonDetailPage({
   if (!person) notFound()
 
   const where = { assetId: id, assetType: "PERSON" as const }
-  const [visits, schedules, providers, documents, manualOptions] = await Promise.all([
+  const [visits, schedules, providers, documents, manualOptions, policyChoices] = await Promise.all([
     prisma.serviceRecord.findMany({ where, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.maintenanceSchedule.findMany({ where, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.provider.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PERSON", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadManualOptions([{ assetType: "PERSON", assetId: id }]),
+    // The page is behind requireHealth(), so health and life policies are fair game here.
+    loadPolicyChoices("members", true),
   ])
 
   const age = person.dateOfBirth ? ageFrom(person.dateOfBirth, new Date()) : null
@@ -115,7 +118,7 @@ export default async function PersonDetailPage({
           <h1 className="font-heading text-2xl font-semibold">{person.name}</h1>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             <LogObservationButton personId={id} typeOptions={observationTypes} conditions={conditionOptions} />
-            <PersonEditButton person={person} providers={providers} />
+            <PersonEditButton person={person} providers={providers} policyChoices={policyChoices} policyIds={person.insurancePolicies.map((p) => p.id)} />
             <Link
               href={`/reports/people/${id}`}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"

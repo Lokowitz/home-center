@@ -3,17 +3,21 @@ import { HEALTH_WINDOWS } from "./health"
 import {
   allowedLinks,
   annualPremium,
+  assetPolicyDiff,
   belongingsComparison,
   coverageRows,
   coverageSuggestions,
   currentAndPrevious,
+  eligibleKinds,
   groupPolicies,
   HEALTH_POLICY_DAYS,
   insuranceKindLabel,
   isHealthInsuranceKind,
   kindOptions,
+  linksSide,
   linkWrites,
   personalPropertyCoverage,
+  policyChoiceLabel,
   policyStatus,
   premiumChange,
   premiumChangeLabel,
@@ -195,5 +199,55 @@ describe("premiums and coverage", () => {
     expect(belongingsComparison({ priced: 0, withReplacementCost: 0, toReplaceOrPaid: 0 }, home)).toBeNull()
     expect(belongingsComparison({ priced: 3, withReplacementCost: 2, toReplaceOrPaid: 18450 }, [{ kind: "HOME", coverages: [] }])).toBeNull()
     expect(belongingsComparison({ priced: 1, withReplacementCost: 0, toReplaceOrPaid: 0 }, home)).toEqual({ belongings: 0, coverage: 225000 })
+  })
+})
+
+describe("linking policies from an asset", () => {
+  it("lists the kinds each side can link", () => {
+    const assetKinds = ["HOME", "RENTERS", "AUTO", "UMBRELLA", "PROPERTY_OTHER"]
+    expect(eligibleKinds("properties", false)).toEqual(assetKinds)
+    expect(eligibleKinds("vehicles", false)).toEqual(assetKinds)
+    expect(eligibleKinds("properties", true)).toEqual(eligibleKinds("properties", false))
+    expect(eligibleKinds("members", true)).toEqual(["LIFE", "MEDICAL", "DENTAL", "VISION", "OTHER"])
+    expect(eligibleKinds("members", false)).toEqual([])
+    expect(linksSide("LIFE", true, "vehicles")).toBe(false)
+    expect(linksSide("UMBRELLA", true, "members")).toBe(false)
+    expect(linksSide("AUTO", false, "properties")).toBe(true)
+  })
+
+  it("labels a policy choice", () => {
+    expect(policyChoiceLabel({ carrier: "State Farm", planName: "Homeowners HO-3", kind: "HOME" })).toBe("State Farm · Homeowners HO-3 · Home")
+    expect(policyChoiceLabel({ carrier: "Delta Dental", planName: null, kind: "DENTAL" })).toBe("Delta Dental · Dental")
+    expect(policyChoiceLabel({ carrier: "Aflac", planName: "", kind: "OTHER" })).toBe("Aflac · Other (health)")
+  })
+
+  it("connects and disconnects only this asset's eligible policies", () => {
+    const policies = [
+      { id: "home", kind: "HOME", linked: true },
+      { id: "umb", kind: "UMBRELLA", linked: false },
+      { id: "auto", kind: "AUTO", linked: true },
+    ]
+    expect(assetPolicyDiff("properties", false, policies, ["home", "umb"])).toEqual({ connect: ["umb"], disconnect: ["auto"] })
+    expect(assetPolicyDiff("properties", false, policies, ["home", "auto"])).toEqual({ connect: [], disconnect: [] })
+    expect(assetPolicyDiff("properties", false, policies, [])).toEqual({ connect: [], disconnect: ["home", "auto"] })
+    expect(assetPolicyDiff("properties", false, policies, ["umb", "umb"])).toEqual({ connect: ["umb"], disconnect: ["home", "auto"] })
+  })
+
+  it("ignores ids it may not link", () => {
+    expect(
+      assetPolicyDiff("properties", false, [{ id: "life", kind: "LIFE", linked: false }, { id: "med", kind: "MEDICAL", linked: false }], ["life", "med", "nope"]),
+    ).toEqual({ connect: [], disconnect: [] })
+    expect(assetPolicyDiff("properties", false, [{ id: "life", kind: "LIFE", linked: true }], [])).toEqual({ connect: [], disconnect: [] })
+    expect(
+      assetPolicyDiff("members", false, [{ id: "life", kind: "LIFE", linked: true }, { id: "med", kind: "MEDICAL", linked: false }], ["med"]),
+    ).toEqual({ connect: [], disconnect: [] })
+    expect(
+      assetPolicyDiff(
+        "members",
+        true,
+        [{ id: "life", kind: "LIFE", linked: false }, { id: "med", kind: "MEDICAL", linked: true }, { id: "home", kind: "HOME", linked: false }],
+        ["life", "home"],
+      ),
+    ).toEqual({ connect: ["life"], disconnect: ["med"] })
   })
 })

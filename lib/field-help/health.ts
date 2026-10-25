@@ -37,6 +37,11 @@ export const HEALTH_HELP: FieldHelpMap = {
     what: "Anything else worth keeping about this person, such as insurance quirks or how to reach them.",
     use: "Shows on their printed summary and is included in search.",
   },
+  "person.insurance": {
+    title: "Insurance",
+    what: "The health and life policies that cover this person.",
+    use: "Ticked policies show in the Insurance box on this page and list this person on the Insurance page. Unticking one removes only this person from it.",
+  },
 
   // Providers
   "provider.name": {

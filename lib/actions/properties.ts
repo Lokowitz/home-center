@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { deleteAssetWithRecords } from "@/lib/asset-delete-server"
+import { assetPolicyLinks } from "@/lib/insurance-server"
 import { propertySchema as schema, propertyData as clean, type PropertyInput } from "@/lib/asset-input"
 
 export async function createProperty(data: PropertyInput) {
@@ -19,16 +20,26 @@ export async function createProperty(data: PropertyInput) {
   return { success: true, id: row.id }
 }
 
-export async function updateProperty(id: string, data: PropertyInput) {
+/** `policyIds` is the Insurance list ticked in the dialog; left out, the property's policy links stay as they are. */
+export async function updateProperty(id: string, data: PropertyInput, policyIds?: string[]) {
   const session = await auth()
   if (!session) redirect("/login")
 
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.property.update({ where: { id }, data: clean(parsed.data) })
+  // A property's policies never depend on Health, so this always looks them up as if it were off.
+  const links = policyIds ? await assetPolicyLinks("properties", id, policyIds, false) : null
+  await prisma.property.update({
+    where: { id },
+    data: {
+      ...clean(parsed.data),
+      ...(links ? { insurancePolicies: { connect: links.connect.map((p) => ({ id: p })), disconnect: links.disconnect.map((p) => ({ id: p })) } } : {}),
+    },
+  })
   revalidatePath("/assets/properties")
   revalidatePath(`/assets/properties/${id}`)
+  if (links) revalidatePath("/insurance")
   return { success: true }
 }
 

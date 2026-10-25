@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react"
 import { PropertyFormDialog } from "./property-form-dialog"
 import type { Property } from "@/app/generated/prisma/client"
 
-export function PropertyEditButton({ property }: { property: Property }) {
+export function PropertyEditButton({ property, policyChoices, policyIds }: { property: Property; policyChoices?: { id: string; name: string }[]; policyIds?: string[] }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -16,7 +16,7 @@ export function PropertyEditButton({ property }: { property: Property }) {
       >
         <Pencil className="h-3.5 w-3.5" /> Edit
       </button>
-      <PropertyFormDialog open={open} onClose={() => setOpen(false)} property={property} />
+      <PropertyFormDialog open={open} onClose={() => setOpen(false)} property={property} policyChoices={policyChoices} policyIds={policyIds} />
     </>
   )
 }

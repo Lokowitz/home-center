@@ -13,7 +13,7 @@ import { AssetImageUploader } from "@/components/asset-image-uploader"
 import { PropertyEditButton } from "@/components/properties/property-edit-button"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { AssetInsurance } from "@/components/insurance/asset-insurance"
-import { loadAssetPolicies } from "@/lib/insurance-server"
+import { loadAssetPolicies, loadPolicyChoices } from "@/lib/insurance-server"
 import { belongingsComparison } from "@/lib/insurance"
 import { equipmentValueTotals } from "@/lib/equipment-value"
 import { getFormat } from "@/lib/regional-server"
@@ -38,7 +38,7 @@ export default async function PropertyDetailPage({
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
 
-  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features, policies] = await Promise.all([
+  const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features, policies, policyChoices] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
@@ -46,6 +46,7 @@ export default async function PropertyDetailPage({
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadFeatures(),
     loadAssetPolicies("PROPERTY", id),
+    loadPolicyChoices("properties", false),
   ])
   const { rooms, roomServiceRecords, roomSchedules } = features.rooms ? await loadRooms(id) : { rooms: [], roomServiceRecords: [], roomSchedules: [] }
   // For the room selects and badges on the Service and Maintenance tabs; empty with Rooms off.
@@ -114,7 +115,7 @@ export default async function PropertyDetailPage({
         <div className="flex items-start justify-between gap-4">
           <h1 className="font-heading text-2xl font-semibold">{property.name}</h1>
           <div className="flex shrink-0 items-center gap-2">
-            <PropertyEditButton property={property} />
+            <PropertyEditButton property={property} policyChoices={policyChoices} policyIds={policies.map((p) => p.id)} />
             <Link
               href={`/reports/properties/${id}`}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"

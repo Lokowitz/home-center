@@ -46,6 +46,11 @@ export const ASSET_HELP: FieldHelpMap = {
     what: "Anything else worth keeping about the property, like gate codes or the HOA contact.",
     use: "Shows on the property's page.",
   },
+  "property.insurance": {
+    title: "Insurance",
+    what: "The policies that cover this property, such as home, renters or umbrella.",
+    use: "Ticked policies show in the Insurance box on this page and list this property on the Insurance page. Unticking one removes only this property from it.",
+  },
 
   "vehicle.name": {
     title: "Nickname",
@@ -104,6 +109,11 @@ export const ASSET_HELP: FieldHelpMap = {
     title: "Notes",
     what: "Anything else worth keeping about the vehicle, like tire size or the plate number.",
     use: "Shows on the vehicle's page.",
+  },
+  "vehicle.insurance": {
+    title: "Insurance",
+    what: "The policies that cover this vehicle, such as auto or umbrella.",
+    use: "Ticked policies show in the Insurance box on this page and list this vehicle on the Insurance page. Unticking one removes only this vehicle from it.",
   },
 
   "room.name": {

@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect } from "react"
+import { CheckList } from "@/components/forms/check-list"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -29,6 +30,7 @@ const schema = z.object({
   currentMileage: z.string().optional(),
   meterUnit: z.enum(["MILES", "HOURS"]),
   notes: z.string().optional(),
+  policyIds: z.array(z.string()),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -37,9 +39,16 @@ interface Props {
   open: boolean
   onClose: () => void
   vehicle?: Vehicle | null
+  /** Policies that may cover a vehicle, for the Insurance list. Edit only: empty hides the list. */
+  policyChoices?: { id: string; name: string }[]
+  /** The policies linked to this vehicle now. */
+  policyIds?: string[]
 }
 
-export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
+const NO_CHOICES: { id: string; name: string }[] = []
+const NO_IDS: string[] = []
+
+export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_CHOICES, policyIds = NO_IDS }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const milesLabel = fmt.distanceWords.charAt(0).toUpperCase() + fmt.distanceWords.slice(1)
@@ -48,9 +57,13 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
     resolver: zodResolver(schema),
     defaultValues: {
       name: "", make: "", model: "", year: new Date().getFullYear().toString(),
-      vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "",
+      vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [],
     },
   })
+  const ticked = useWatch({ control: form.control, name: "policyIds" })
+  // Shown only when editing and there is at least one policy that could cover a vehicle.
+  const showInsurance = !!vehicle && policyChoices.length > 0
+  const linkedKey = policyIds.join(",")
 
   useEffect(() => {
     if (vehicle) {
@@ -66,19 +79,21 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
         currentMileage: vehicle.currentMileage?.toString() ?? "",
         meterUnit: vehicle.meterUnit,
         notes: vehicle.notes ?? "",
+        policyIds: linkedKey ? linkedKey.split(",") : [],
       })
     } else {
       form.reset({
         name: "", make: "", model: "", year: new Date().getFullYear().toString(),
-        vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "",
+        vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [],
       })
     }
-  }, [vehicle, open, form])
+  }, [vehicle, open, form, linkedKey])
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
+    const { policyIds: chosen, ...fields } = values
     const result = vehicle
-      ? await updateVehicle(vehicle.id, values as unknown as Parameters<typeof updateVehicle>[1])
-      : await createVehicle(values as unknown as Parameters<typeof createVehicle>[0])
+      ? await updateVehicle(vehicle.id, fields as unknown as Parameters<typeof updateVehicle>[1], showInsurance ? chosen : undefined)
+      : await createVehicle(fields as unknown as Parameters<typeof createVehicle>[0])
 
     if (result?.error) {
       toast.error("Please fix the errors and try again.")
@@ -192,6 +207,16 @@ export function VehicleFormDialog({ open, onClose, vehicle }: Props) {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {showInsurance && (
+                <CheckList
+                  label="Insurance"
+                  help="vehicle.insurance"
+                  options={policyChoices}
+                  value={ticked}
+                  onChange={(next) => form.setValue("policyIds", next, { shouldDirty: true })}
+                />
+              )}
             </div>
 
             <DialogFooter>

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireHealth } from "@/lib/features-server"
 import { personSchema } from "@/lib/health-schemas"
+import { assetPolicyLinks } from "@/lib/insurance-server"
 import { removeUploadDir } from "@/lib/upload-fs"
 import type { ActionResult, FormValues } from "@/lib/form-types"
 
@@ -30,9 +31,20 @@ export async function updatePerson(id: string, values: FormValues): Promise<Acti
   const parsed = personSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.person.update({ where: { id }, data: parsed.data })
+  // The Insurance list is only sent while it's shown; without the key the person's links stay as they are.
+  const links = "insurancePolicyIds" in values
+    ? await assetPolicyLinks("members", id, values.insurancePolicyIds.split(",").filter(Boolean), true)
+    : null
+  await prisma.person.update({
+    where: { id },
+    data: {
+      ...parsed.data,
+      ...(links ? { insurancePolicies: { connect: links.connect.map((p) => ({ id: p })), disconnect: links.disconnect.map((p) => ({ id: p })) } } : {}),
+    },
+  })
   revalidatePath("/assets/people")
   revalidatePath(`/assets/people/${id}`)
+  if (links) revalidatePath("/insurance")
   return { success: true }
 }
 

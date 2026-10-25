@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect } from "react"
+import { CheckList } from "@/components/forms/check-list"
 import { useFormat } from "@/components/regional-provider"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
@@ -30,6 +31,7 @@ const schema = z.object({
   yearBuilt: z.string().optional(),
   sqFt: z.string().optional(),
   notes: z.string().optional(),
+  policyIds: z.array(z.string()),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -38,18 +40,29 @@ interface Props {
   open: boolean
   onClose: () => void
   property?: Property | null
+  /** Policies that may cover a property, for the Insurance list. Edit only: empty hides the list. */
+  policyChoices?: { id: string; name: string }[]
+  /** The policies linked to this property now. */
+  policyIds?: string[]
 }
 
-export function PropertyFormDialog({ open, onClose, property }: Props) {
+const NO_CHOICES: { id: string; name: string }[] = []
+const NO_IDS: string[] = []
+
+export function PropertyFormDialog({ open, onClose, property, policyChoices = NO_CHOICES, policyIds = NO_IDS }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       name: "", type: "HOUSE", address: "",
-      purchaseDate: "", purchasePrice: "", yearBuilt: "", sqFt: "", notes: "",
+      purchaseDate: "", purchasePrice: "", yearBuilt: "", sqFt: "", notes: "", policyIds: [],
     },
   })
+  const ticked = useWatch({ control: form.control, name: "policyIds" })
+  // Shown only when editing and there is at least one policy that could cover a property.
+  const showInsurance = !!property && policyChoices.length > 0
+  const linkedKey = policyIds.join(",")
 
   useEffect(() => {
     if (property) {
@@ -62,16 +75,18 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
         yearBuilt: property.yearBuilt?.toString() ?? "",
         sqFt: property.sqFt?.toString() ?? "",
         notes: property.notes ?? "",
+        policyIds: linkedKey ? linkedKey.split(",") : [],
       })
     } else {
-      form.reset({ name: "", type: "HOUSE", address: "", purchaseDate: "", purchasePrice: "", yearBuilt: "", sqFt: "", notes: "" })
+      form.reset({ name: "", type: "HOUSE", address: "", purchaseDate: "", purchasePrice: "", yearBuilt: "", sqFt: "", notes: "", policyIds: [] })
     }
-  }, [property, open, form])
+  }, [property, open, form, linkedKey])
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
+    const { policyIds: chosen, ...fields } = values
     const result = property
-      ? await updateProperty(property.id, values as unknown as Parameters<typeof updateProperty>[1])
-      : await createProperty(values as unknown as Parameters<typeof createProperty>[0])
+      ? await updateProperty(property.id, fields as unknown as Parameters<typeof updateProperty>[1], showInsurance ? chosen : undefined)
+      : await createProperty(fields as unknown as Parameters<typeof createProperty>[0])
 
     if (result?.error) {
       toast.error("Please fix the errors and try again.")
@@ -164,6 +179,16 @@ export function PropertyFormDialog({ open, onClose, property }: Props) {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {showInsurance && (
+                <CheckList
+                  label="Insurance"
+                  help="property.insurance"
+                  options={policyChoices}
+                  value={ticked}
+                  onChange={(next) => form.setValue("policyIds", next, { shouldDirty: true })}
+                />
+              )}
             </div>
 
             <DialogFooter>
