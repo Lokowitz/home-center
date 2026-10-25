@@ -237,7 +237,7 @@ Update the volume path to the folder you created in step 1.
 | `AUTH_SECRET` | **Yes** | A random secret: `openssl rand -base64 32`. Without it, logins won't work. |
 | `AUTH_URL` | No | The address you'll browse to, e.g. `http://192.168.1.50:3000`. Leave blank to auto-detect it. |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | No | Your login, used once on first boot to create the admin account and ignored after that. If you remove `ADMIN_PASSWORD`, the password is `changeme` and you must change it on first login. Without `ADMIN_EMAIL`, the email is `admin@localhost`. |
-| `NOTIFY_INTERVAL_MINUTES` | No | How often to check for due maintenance and expiring warranties. Defaults to `360` (6 hours). Set `0` to turn reminders off. |
+| `NOTIFY_INTERVAL_MINUTES` | No | How often to check for due maintenance and expiring warranties. Defaults to `360` (6 hours). Set `0` to turn reminders off. An admin can override it under Settings → Notifications (minimum 5), no restart needed. |
 | `SMTP_HOST` | No | Your mail server, e.g. `smtp.gmail.com`. **Leave blank and no email is ever sent.** The in-app bell still works. |
 
 Everything else can stay at its default. Uploads (`/data/uploads`) and downloaded models (`/data/models`) are kept in the data folder automatically.
@@ -411,7 +411,7 @@ Settings → Data. **Back up now** makes a verified backup; a daily or weekly **
 
 Each backup is one file holding the database and every uploaded file. Protection is optional: none, a **recovery key** (the server can't open its own backups), or a **password zip** (opens in 7-Zip, WinRAR or Keka). From the command line: `npm run backup` and `npm run backup:verify -- <file>`.
 
-Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password and AI key. Protected backups carry them.
+Keep your `AUTH_SECRET`: an unprotected backup restored under a different one asks you to re-enter the mail password, AI key and push URL. Protected backups carry them.
 
 **Restoring** is done in the app (Settings → Data), or from the command line when the app won't start: stop HomeCenter, then `npm run restore -- <file>` (`--dry-run` to only look). The command line swaps the data in right away. The next start upgrades the database if the backup is older and finishes the restore (everyone is signed out, carried secrets are put back); in Docker that start is the container restarting. `npm start` outside Docker does not run `prisma migrate deploy`, so run `npx prisma migrate deploy` before starting if the backup came from an older version. A restore made in the app waits for a restart; `npm run restore -- --cancel` (or **Cancel staged restore** in Settings → Data) takes it back. In Docker, `docker compose run --rm --no-deps --user nextjs --entrypoint npm homecenter run restore -- /data/backups/<file> --yes` runs it in a fresh container.
 

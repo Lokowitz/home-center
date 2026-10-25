@@ -15,7 +15,8 @@ export type ProtectionConfig =
   | { mode: "key"; recipient: string; fingerprint: string }
   | { mode: "password"; password: string }
 
-export type Secrets = { mailPassword: string | null; llmApiKey: string | null }
+// The push fields are optional so archives made before push existed still read back.
+export type Secrets = { mailPassword: string | null; llmApiKey: string | null; pushUrl?: string | null; pushToken?: string | null }
 
 export type BackupInput = {
   dbPath: string
@@ -72,7 +73,7 @@ export async function createBackup(input: BackupInput): Promise<BackupOutcome> {
       input.onProgress?.(++done, refs.files.length)
     }
     const secrets = input.secrets
-    const hasSecrets = mode !== "none" && !!secrets && !!(secrets.mailPassword || secrets.llmApiKey)
+    const hasSecrets = mode !== "none" && !!secrets && !!(secrets.mailPassword || secrets.llmApiKey || secrets.pushUrl || secrets.pushToken)
     if (hasSecrets) await writer.addBytes(SECRETS_ENTRY, JSON.stringify(secrets))
     if (input.readable) await input.readable(snap, writer)
 

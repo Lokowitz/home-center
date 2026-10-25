@@ -127,6 +127,60 @@ export const SETTINGS_HELP: FieldHelpMap = {
     use: "Ticked accounts get due reminders in the bell, and by email if they chose that. Unticking someone stops new ones. What's already in their list stays.",
   },
 
+  // Settings → Notifications (everyone)
+  "email.digest": {
+    title: "Email notifications",
+    what: "How often HomeCenter emails you the reminders waiting for you. Each email lists everything pending.",
+    values: [
+      { label: "Off", effect: "No email. Reminders still show in the bell." },
+      { label: "As soon as possible", effect: "An email on every check that finds something pending. With a short check interval and repeat reminders, that is a lot of email." },
+      { label: "Daily", effect: "One email a day at the digest hour, if anything is pending." },
+      { label: "Weekly", effect: "One email on Monday at the digest hour, if anything is pending." },
+    ],
+  },
+  "repeat.mode": {
+    title: "Repeat reminders",
+    what: "How often you are reminded about the same due item. A new due date always starts fresh.",
+    use: "This applies to the bell, email and push. Checks run on the schedule an admin sets.",
+    values: [
+      { label: "Coming up, and on the due date", effect: "Two reminders per item: a heads-up when it enters its warning window, then one on the due date." },
+      { label: "Only once", effect: "One reminder per item, then nothing until it has a new due date." },
+      { label: "Every check until dismissed", effect: "A read item comes back on every check until you dismiss it. Very noisy unless checks are a day or more apart." },
+    ],
+  },
+
+  // Settings → Notifications (admin: schedule and push)
+  "notify.interval": {
+    title: "Check every",
+    what: "How many minutes pass between checks for due items. It sets when reminders are created, emailed and pushed.",
+    use: "0 turns checks off. The lowest is 5. Blank uses NOTIFY_INTERVAL_MINUTES, or 360 (6 hours). People on Every check until dismissed get reminded on every check.",
+  },
+  "push.type": {
+    title: "Service",
+    what: "Where push messages go. HomeCenter sends one message per check, listing everything new.",
+    values: [
+      { label: "Discord webhook", effect: "Posts to a channel. Make the webhook in the channel's Integrations settings." },
+      { label: "ntfy", effect: "Posts to an ntfy topic, on ntfy.sh or your own server." },
+      { label: "Telegram bot", effect: "Messages a chat through a bot you made with BotFather." },
+      { label: "Generic JSON webhook", effect: "Sends a JSON POST. Use it for Apprise API, Home Assistant and similar." },
+    ],
+  },
+  "push.url": {
+    title: "Webhook URL",
+    what: "The address HomeCenter sends the message to. For ntfy, include the topic, like https://ntfy.sh/my-topic.",
+    use: "Stored encrypted. Anyone with a Discord webhook URL can post to the channel, so keep it private. Leave it blank to keep the saved one.",
+  },
+  "push.token": {
+    title: "Token",
+    what: "For Telegram, the bot token from BotFather. For ntfy and JSON, an optional access token sent as a Bearer header.",
+    use: "Stored encrypted. Leave it blank to keep the saved one.",
+  },
+  "push.chat-id": {
+    title: "Chat ID",
+    what: "The Telegram chat the bot messages. Message the bot once, then look up the ID with getUpdates.",
+    use: "Groups have a negative number. Not a secret.",
+  },
+
   // Settings → Users
   "users.name": {
     title: "Name",

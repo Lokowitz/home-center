@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { FieldHelp } from "@/components/ui/field-help"
 import { updateEmailDigest } from "@/lib/actions/users"
 import type { EmailDigest } from "@/app/generated/prisma/client"
 
@@ -51,6 +52,7 @@ export function EmailPreferences({
       <CardHeader className="px-5">
         <CardTitle className="flex items-center gap-2">
           Email notifications
+          <FieldHelp id="email.digest" />
           {!mailConfigured && <Badge variant="outline">Not configured</Badge>}
         </CardTitle>
         <CardDescription>

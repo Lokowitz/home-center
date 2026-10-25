@@ -969,6 +969,29 @@ model BackupRun {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+/// Server-wide notification setup: how often the check runs and the one push
+/// endpoint. A singleton, like MailSettings.
+model NotificationSettings {
+  id              String    @id @default("singleton")
+  /// Minutes between checks; 0 turns them off. null falls back to
+  /// NOTIFY_INTERVAL_MINUTES, then 360.
+  intervalMinutes Int?
+  pushEnabled     Boolean   @default(false)
+  /// DISCORD, NTFY, TELEGRAM or JSON — see lib/notifications/push-format.ts.
+  pushType        String?
+  /// Webhook URL (it carries the secret for Discord), AES-256-GCM via
+  /// lib/secret-box.ts. Never leaves the server.
+  pushUrlEnc      String?
+  /// Telegram bot token, or an optional bearer token for ntfy and JSON. Encrypted.
+  pushTokenEnc    String?
+  /// Telegram chat ID. Not a secret.
+  pushChatId      String?
+  /// The last failed send, shown on the settings page; cleared on success.
+  pushLastError   String?
+  pushLastOkAt    DateTime?
+  updatedAt       DateTime  @updatedAt
+}
+
 model Notification {
   id                String           @id @default(cuid())
   type              NotificationType
@@ -981,6 +1004,9 @@ model Notification {
   /// Set once this notification has gone out in a digest email. Null means it
   /// is still pending delivery, so a failed send is simply retried next pass.
   emailedAt         DateTime?
+  /// Set once this notification has gone to the push endpoint (or was already
+  /// there when push was turned on). Null means pending, so a failed send is retried.
+  pushedAt          DateTime?
   /// Set when the user dismisses it: hidden from the list and the bell until
   /// they choose to show hidden notifications.
   dismissedAt       DateTime?

@@ -14,7 +14,7 @@ export type SettingsSection = {
 }
 
 export const SETTINGS_SECTIONS: SettingsSection[] = [
-  { id: "notifications", label: "Notifications", description: "How often you're emailed about due items", icon: Bell, adminOnly: false },
+  { id: "notifications", label: "Notifications", description: "Reminders, email and push, and how often checks run", icon: Bell, adminOnly: false },
   { id: "appearance", label: "Appearance", description: "How the site is laid out on this device", icon: Palette, adminOnly: false },
   { id: "features", label: "Features", description: "Turn optional parts of the site on or off", icon: ToggleRight, adminOnly: true },
   { id: "regional", label: "Regional", description: "Currency, units and date format", icon: Globe, adminOnly: true },

@@ -30,13 +30,16 @@ export function protectionConfig(s: BackupSettings): ProtectionConfig {
 }
 
 export async function loadSecrets(): Promise<Secrets> {
-  const [mail, llm] = await Promise.all([
+  const [mail, llm, push] = await Promise.all([
     prisma.mailSettings.findUnique({ where: { id: SETTINGS_ID }, select: { passwordEnc: true } }),
     prisma.llmSettings.findUnique({ where: { id: "singleton" }, select: { apiKeyEnc: true } }),
+    prisma.notificationSettings.findUnique({ where: { id: "singleton" }, select: { pushUrlEnc: true, pushTokenEnc: true } }),
   ])
   return {
     mailPassword: mail?.passwordEnc ? decrypt(mail.passwordEnc) : null,
     llmApiKey: llm?.apiKeyEnc ? decrypt(llm.apiKeyEnc) : null,
+    pushUrl: push?.pushUrlEnc ? decrypt(push.pushUrlEnc) : null,
+    pushToken: push?.pushTokenEnc ? decrypt(push.pushTokenEnc) : null,
   }
 }
 

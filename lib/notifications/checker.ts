@@ -266,10 +266,10 @@ export async function checkAndNotify(): Promise<number> {
       await notificationService.send(w)
       fresh++
     } else if (decision.action === "resurface") {
-      // Back to unread with today's wording, and pending email again.
+      // Back to unread with today's wording, and pending email and push again.
       await prisma.notification.update({
         where: { id: decision.id },
-        data: { title: w.title, message: w.message, stage: w.stage, isRead: false, emailedAt: null, createdAt: now },
+        data: { title: w.title, message: w.message, stage: w.stage, isRead: false, emailedAt: null, pushedAt: null, createdAt: now },
       })
       fresh++
     }

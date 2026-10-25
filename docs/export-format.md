@@ -110,7 +110,7 @@ homecenter-YYYY-MM-DD-HHmm.hcbackup
   secrets.json        only in protected backups: { "mailPassword", "llmApiKey" } in plain text inside the protection
 ```
 
-An unprotected backup never contains `secrets.json`. Restoring one under a different `AUTH_SECRET` means re-entering the mail password and AI key.
+An unprotected backup never contains `secrets.json`. Restoring one under a different `AUTH_SECRET` means re-entering the mail password, AI key and push URL.
 
 ### Protection wrappers
 

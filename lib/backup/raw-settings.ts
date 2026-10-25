@@ -53,9 +53,12 @@ export async function readRawSecrets(dbPath: string): Promise<Secrets> {
   try {
     const mail = await c.execute(`SELECT passwordEnc FROM "MailSettings" WHERE id = 'singleton'`).catch(emptyIfMissing)
     const llm = await c.execute(`SELECT apiKeyEnc FROM "LlmSettings" WHERE id = 'singleton'`).catch(emptyIfMissing)
+    const push = await c.execute(`SELECT pushUrlEnc, pushTokenEnc FROM "NotificationSettings" WHERE id = 'singleton'`).catch(emptyIfMissing)
     const m = mail.rows[0]?.passwordEnc as string | undefined
     const k = llm.rows[0]?.apiKeyEnc as string | undefined
-    return { mailPassword: m ? decrypt(m) : null, llmApiKey: k ? decrypt(k) : null }
+    const pu = push.rows[0]?.pushUrlEnc as string | undefined
+    const pt = push.rows[0]?.pushTokenEnc as string | undefined
+    return { mailPassword: m ? decrypt(m) : null, llmApiKey: k ? decrypt(k) : null, pushUrl: pu ? decrypt(pu) : null, pushToken: pt ? decrypt(pt) : null }
   } finally {
     c.close()
   }

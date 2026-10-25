@@ -13,7 +13,7 @@ export type Stage = "REACHED" | "DUE"
 export const REPEAT_OPTIONS: { value: NotificationRepeat; label: string; hint: string }[] = [
   { value: "REACHED_AND_DUE", label: "When it's coming up, and on the due date", hint: "Two reminders per item: a heads-up, then one on the day." },
   { value: "ONCE", label: "Only once", hint: "A single reminder per item." },
-  { value: "UNTIL_DISMISSED", label: "Every check until dismissed", hint: "Comes back after you read it, until you dismiss it." },
+  { value: "UNTIL_DISMISSED", label: "Every check until dismissed", hint: "Comes back on every check after you read it, until you dismiss it. Very noisy: use only if checks run less than once a day." },
 ]
 
 /** An existing notification for the same person, type and item. */

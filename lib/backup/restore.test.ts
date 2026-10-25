@@ -40,7 +40,7 @@ async function world(protection: "none" | "key" | "password" = "none") {
   }
   const backup = await createBackup({
     dbPath: srcDb, uploadDir: path.join(src, "uploads"), folder: path.join(src, "backups"), workDir: path.join(src, "work"),
-    appVersion: "t", protection: cfg, secrets: { mailPassword: "smtp-pw", llmApiKey: null },
+    appVersion: "t", protection: cfg, secrets: { mailPassword: "smtp-pw", llmApiKey: null, pushUrl: "https://discord.example/hook", pushToken: "tk" },
   })
 
   const dst = await tempDir("hc-dst-")
@@ -103,6 +103,8 @@ describe("restore", () => {
     if (protection !== "none") {
       const enc = JSON.parse(await readFile(path.join(paths.restoreDir, "secrets.enc.json"), "utf8"))
       expect(decrypt(enc.mailPasswordEnc)).toBe("smtp-pw")
+      expect(decrypt(enc.pushUrlEnc)).toBe("https://discord.example/hook")
+      expect(decrypt(enc.pushTokenEnc)).toBe("tk")
     }
   })
 

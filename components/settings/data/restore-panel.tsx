@@ -23,9 +23,9 @@ const LABELS: Record<string, string> = {
   Provider: "Providers", InboxItem: "Intake items",
 }
 const SECRETS: Record<string, string> = {
-  carried: "The mail password and AI key come with this backup.",
-  "same-secret": "The mail password and AI key will work (same AUTH_SECRET).",
-  "re-enter": "You'll need to re-enter the mail password and AI key afterwards.",
+  carried: "The mail password, AI key and push URL come with this backup.",
+  "same-secret": "The mail password, AI key and push URL will work (same AUTH_SECRET).",
+  "re-enter": "You'll need to re-enter the mail password, AI key and push URL afterwards.",
   none: "",
 }
 const MANUAL_RESTART = "Restart HomeCenter yourself to finish the restore: stop it and start it again, or restart the container."

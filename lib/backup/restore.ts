@@ -44,7 +44,8 @@ async function secretsStatus(dbFile: string, manifest: Manifest): Promise<Secret
   try {
     const mail = await c.execute(`SELECT passwordEnc AS v FROM "MailSettings"`).catch(() => ({ rows: [] }))
     const llm = await c.execute(`SELECT apiKeyEnc AS v FROM "LlmSettings"`).catch(() => ({ rows: [] }))
-    const stored = [...mail.rows, ...llm.rows].map((r) => r.v as string | null).filter((v): v is string => !!v)
+    const pushRows = await c.execute(`SELECT pushUrlEnc AS v FROM "NotificationSettings" UNION ALL SELECT pushTokenEnc FROM "NotificationSettings"`).catch(() => ({ rows: [] }))
+    const stored = [...mail.rows, ...llm.rows, ...pushRows.rows].map((r) => r.v as string | null).filter((v): v is string => !!v)
     if (stored.length === 0) return "none"
     return stored.every((v) => decrypt(v) !== null) ? "same-secret" : "re-enter"
   } finally {
@@ -168,11 +169,13 @@ export async function stage(i: { paths: RestorePaths; now?: Date }): Promise<voi
       await r.extract(f.path, dest)
     }
     if (manifest.hasSecrets) {
-      const s = JSON.parse(await r.readText(SECRETS_ENTRY)) as { mailPassword: string | null; llmApiKey: string | null }
+      const s = JSON.parse(await r.readText(SECRETS_ENTRY)) as { mailPassword: string | null; llmApiKey: string | null; pushUrl?: string | null; pushToken?: string | null }
       // Re-wrapped under this server's AUTH_SECRET at once, so plaintext never rests on disk.
       await writeFile(path.join(d.staging, "secrets.enc.json"), JSON.stringify({
         mailPasswordEnc: s.mailPassword ? encrypt(s.mailPassword) : null,
         llmApiKeyEnc: s.llmApiKey ? encrypt(s.llmApiKey) : null,
+        pushUrlEnc: s.pushUrl ? encrypt(s.pushUrl) : null,
+        pushTokenEnc: s.pushToken ? encrypt(s.pushToken) : null,
       }))
     }
   } catch (e) {

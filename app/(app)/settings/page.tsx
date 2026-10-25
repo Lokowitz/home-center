@@ -6,6 +6,10 @@ import { EmailPreferences } from "@/components/settings/email-preferences"
 import { NotificationRecipients } from "@/components/settings/notification-recipients"
 import { RepeatPreferences } from "@/components/settings/repeat-preferences"
 import { MailSettings } from "@/components/settings/mail-settings"
+import { NotificationSchedule } from "@/components/settings/notification-schedule"
+import { PushSettings } from "@/components/settings/push-settings"
+import { loadNotificationConfig } from "@/lib/notifications/notification-settings"
+import { effectiveInterval } from "@/lib/notifications/interval"
 import { LlmSettings } from "@/components/settings/llm-settings"
 import { loadMailConfig, SETTINGS_ID } from "@/lib/notifications/mail-config"
 import { isMailConfigured } from "@/lib/notifications/mailer"
@@ -46,7 +50,7 @@ export default async function SettingsPage({
   // gating the whole page on ADMIN would leave ordinary users unable to turn
   // their own mail off. resolveSection keeps the admin-only sections from
   // non-admins, and only the open section's data is loaded.
-  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance, backup, regional] = await Promise.all([
+  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance, backup, regional, notify] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
@@ -83,6 +87,15 @@ export default async function SettingsPage({
       : Promise.resolve(null),
     is("data") ? loadBackupOverview() : Promise.resolve(null),
     is("regional") ? loadRegionalSettings() : Promise.resolve(null),
+    // Everyone sees how often checks run (it decides how noisy repeat reminders are);
+    // admins also get the schedule and push cards.
+    is("notifications")
+      ? Promise.all([
+          loadNotificationConfig(),
+          prisma.notificationSettings.findUnique({ where: { id: "singleton" }, select: { intervalMinutes: true } }),
+          isAdmin ? prisma.user.count({ where: { receivesNotifications: true, notificationRepeat: "UNTIL_DISMISSED" } }) : Promise.resolve(0),
+        ])
+      : Promise.resolve(null),
   ])
   // A signed-in session whose user row is gone — the demo seeder wipes users,
   // so a cookie from before it survives the account it points at. Redirecting
@@ -125,8 +138,29 @@ export default async function SettingsPage({
                 mailConfigured={isMailConfigured(mail)}
                 receivesNotifications={me.receivesNotifications}
               />
-              <RepeatPreferences repeat={me.notificationRepeat} />
+              <RepeatPreferences repeat={me.notificationRepeat} intervalMinutes={notify?.[0].interval.minutes ?? 360} />
               {isAdmin && <NotificationRecipients users={recipients} currentUserId={session.user.id} />}
+              {isAdmin && notify && (
+                <>
+                  <NotificationSchedule
+                    savedMinutes={notify[1]?.intervalMinutes?.toString() ?? ""}
+                    effectiveMinutes={notify[0].interval.minutes}
+                    fallbackMinutes={effectiveInterval(null, process.env.NOTIFY_INTERVAL_MINUTES).minutes}
+                    source={notify[0].interval.source}
+                    untilDismissedPeople={notify[2]}
+                  />
+                  <PushSettings
+                    // The URL and token are never sent, only whether they're stored.
+                    initial={{ enabled: notify[0].push.enabled, type: notify[0].push.type, chatId: notify[0].push.target.chatId ?? "" }}
+                    hasStoredUrl={notify[0].push.hasUrl}
+                    hasStoredToken={notify[0].push.hasToken}
+                    unreadable={notify[0].push.unreadable}
+                    lastError={notify[0].push.lastError}
+                    lastOk={notify[0].push.lastOkAt ? notify[0].push.lastOkAt.toLocaleString() : null}
+                    intervalMinutes={notify[0].interval.minutes}
+                  />
+                </>
+              )}
             </div>
           )}
 
