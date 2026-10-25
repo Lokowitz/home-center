@@ -47,8 +47,9 @@ const FormItem = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>)
 }
 
 const FormLabel = ({ className, ...props }: React.ComponentPropsWithoutRef<typeof Label>) => {
-  const { error, formItemId } = useFormField()
-  return <Label className={cn(error && "text-destructive", className)} htmlFor={formItemId} {...props} />
+  const { error, formItemId, name } = useFormField()
+  // Outside a FormField (a group heading, a custom control) there's no input with this id to point at.
+  return <Label className={cn(error && "text-destructive", className)} htmlFor={name ? formItemId : undefined} {...props} />
 }
 
 const FormControl = ({ ...props }: { children: React.ReactElement }) => {

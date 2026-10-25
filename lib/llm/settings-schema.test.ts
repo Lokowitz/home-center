@@ -55,9 +55,10 @@ describe("parseLlmSettings", () => {
     })
   })
 
-  it("clears hidden when turning the assistant on", () => {
+  it("keeps hidden while on: saving Advanced settings must not bring the assistant back", () => {
     const r = parseLlmSettings({ ...base, hidden: true })
-    expect(r).toMatchObject({ ok: true, value: { enabled: true, hidden: false } })
+    expect(r).toMatchObject({ ok: true, value: { enabled: true, hidden: true } })
+    expect(parseLlmSettings({ ...base, hidden: false })).toMatchObject({ ok: true, value: { enabled: true, hidden: false } })
   })
 
   it("keeps hidden while off", () => {
@@ -146,6 +147,19 @@ describe("time limit and extra request JSON", () => {
 })
 
 describe("isOffNetworkUrl", () => {
+  it("only treats fc/fd/fe80 as private for IPv6 addresses, not for host names", () => {
+    expect(isOffNetworkUrl("https://fcapi.example.com/v1")).toBe(true)
+    expect(isOffNetworkUrl("https://fdn.openrouter-proxy.com/v1")).toBe(true)
+    expect(isOffNetworkUrl("http://[fe80::1]/v1")).toBe(false)
+    expect(isOffNetworkUrl("http://[fc00::7]/v1")).toBe(false)
+  })
+
+  it("judges an IPv4-mapped IPv6 address by its IPv4 part", () => {
+    expect(isOffNetworkUrl("http://[::ffff:192.168.1.5]:11434/v1")).toBe(false)
+    expect(isOffNetworkUrl("http://[::ffff:10.0.0.9]/v1")).toBe(false)
+    expect(isOffNetworkUrl("http://[::ffff:8.8.8.8]/v1")).toBe(true)
+  })
+
   it("is false for this machine, the LAN and Docker hostnames", () => {
     for (const url of [
       "http://localhost:11434/v1",

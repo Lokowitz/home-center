@@ -56,18 +56,24 @@ export default async function CostsPage({
   const params = await searchParams
   const fmt = await getFormat()
   const now = new Date()
-  const [allRows, assets, features] = await Promise.all([loadCostRecords(), loadAssetIndex(), loadFeatures()])
-  const typeFilters = features.health ? ASSET_TYPE_FILTERS : ASSET_TYPE_FILTERS.filter((t) => t.value !== "PERSON")
   // Every one of these arrives from the query string, so every one is whitelisted
   // against a known set before it reaches a filter.
   const typeParam = typeof params.type === "string" ? params.type : undefined
-  const assetType = typeFilters.some((t) => t.value === typeParam)
-    ? (typeParam as AssetType)
-    : undefined
-
+  const requestedType = ASSET_TYPE_FILTERS.some((t) => t.value === typeParam) ? (typeParam as AssetType) : undefined
   // Planned spend follows the asset-type filter only; year, bucket and category are about history.
+  // It loads beside the rest: it only needs the type, and with Health off it returns nothing for people.
+  const [allRows, assets, features, plannedSchedules] = await Promise.all([
+    loadCostRecords(),
+    loadAssetIndex(),
+    loadFeatures(),
+    loadPlannedSchedules(requestedType ? { assetType: requestedType } : undefined),
+  ])
+  const typeFilters = features.health ? ASSET_TYPE_FILTERS : ASSET_TYPE_FILTERS.filter((t) => t.value !== "PERSON")
+  const assetType = typeFilters.some((t) => t.value === requestedType) ? requestedType : undefined
+  // ?type=PERSON with Health off falls back to every asset, as the rest of the page does.
+  const planned = assetType === requestedType ? plannedSchedules : await loadPlannedSchedules(undefined)
   const today = localDay(now)
-  const forecast = forecastSchedules(await loadPlannedSchedules(assetType ? { assetType } : undefined), today)
+  const forecast = forecastSchedules(planned, today)
   const plannedPanel = <PlannedPanel forecast={forecast} today={today} assets={assets} fmt={fmt} />
 
   if (allRows.length === 0) {

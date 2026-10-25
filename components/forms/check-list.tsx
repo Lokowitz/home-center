@@ -1,6 +1,7 @@
 "use client"
 
-import { FormLabel } from "@/components/ui/form"
+import { useId } from "react"
+import { Label } from "@/components/ui/label"
 
 /** A labelled row of checkboxes with a "?" help popover. `value` is the ticked ids. Spans both columns of a two-column form grid. */
 export function CheckList({
@@ -16,10 +17,12 @@ export function CheckList({
   value: string[]
   onChange: (next: string[]) => void
 }) {
+  const labelId = useId()
   return (
     <div className="col-span-2 space-y-1.5">
-      <FormLabel help={help}>{label}</FormLabel>
-      <div className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
+      <Label id={labelId} help={help}>{label}</Label>
+      {/* The group takes its name from the label, so a screen reader announces "Insurance" before the boxes. */}
+      <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
         {options.map((o) => (
           <label key={o.id} className="flex items-center gap-2 text-sm">
             <input
