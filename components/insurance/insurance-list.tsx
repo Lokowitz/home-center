@@ -16,9 +16,11 @@ interface Props {
   vehicles: { id: string; name: string }[]
   health: boolean
   openId?: string
+  /** Shown instead of the usual empty state when the property filter left nothing. */
+  emptyText?: string | null
 }
 
-export function InsuranceList({ policies, people, properties, vehicles, health, openId }: Props) {
+export function InsuranceList({ policies, people, properties, vehicles, health, openId, emptyText }: Props) {
   const [editing, setEditing] = useState<PolicyRow | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -47,8 +49,14 @@ export function InsuranceList({ policies, people, properties, vehicles, health, 
 
       {groups.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No policies yet</p>
-          <p className="text-sm mt-1">Add a policy, then attach the declarations page or card photos on its card.</p>
+          {emptyText ? (
+            <p className="font-medium">{emptyText}</p>
+          ) : (
+            <>
+              <p className="font-medium">No policies yet</p>
+              <p className="text-sm mt-1">Add a policy, then attach the declarations page or card photos on its card.</p>
+            </>
+          )}
         </div>
       ) : (
         groups.map((g) => (

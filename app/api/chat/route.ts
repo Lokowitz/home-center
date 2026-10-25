@@ -14,6 +14,7 @@ import { documentAccess } from "@/lib/documents/tool-helpers"
 import type { AgentEvent } from "@/lib/llm/types"
 import { getFormat } from "@/lib/regional-server"
 import { loadFeatures } from "@/lib/features-server"
+import { loadHiddenEntityIds, loadPropertyScope } from "@/lib/property-filter-server"
 
 export const runtime = "nodejs"
 
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
   const { health, rooms } = await loadFeatures()
   // With Health off, health files are out of reach whatever the assistant's own setting says.
   const docs = documentAccess(await loadDocumentSettings(), { ...config, healthDocumentsEnabled: health && config.healthDocumentsEnabled })
+  // The chat panel's fetch is same-origin, so the property filter cookie comes along:
+  // the assistant sees what the page around it sees.
+  const scope = await loadPropertyScope()
+  const hiddenEntityIds = await loadHiddenEntityIds(scope)
 
   // Per-question limit from Settings; each model call separately fails only after
   // a stretch with no output (see IDLE_TIMEOUT_MS in lib/llm/client.ts).
@@ -77,10 +82,10 @@ export async function POST(request: Request) {
         const now = new Date()
         await runAgent({
           history: health ? parsed.data.messages : stripDraftLines(parsed.data.messages),
-          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, rooms, fmt: await getFormat(), today: parsed.data.today }),
+          systemPrompt: buildSystemPrompt({ now, extra: config.systemPrompt, maxRounds, documents: docs.enabled, health, rooms, fmt: await getFormat(), today: parsed.data.today, viewing: scope?.propertyName }),
           chat,
           tools: chatTools(docs, health, config.healthDocumentsEnabled, rooms),
-          ctx: { userId, now, health, rooms, today: parsed.data.today },
+          ctx: { userId, now, health, rooms, today: parsed.data.today, scope, hiddenEntityIds },
           signal,
           model,
           maxRounds,

@@ -14,7 +14,10 @@ import { VehicleEditButton } from "@/components/vehicles/vehicle-edit-button"
 import { getFormat } from "@/lib/regional-server"
 import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { AssetInsurance } from "@/components/insurance/asset-insurance"
+import { loadPropertyScope, loadPropertyFilterChoices } from "@/lib/property-filter-server"
 import { loadAssetPolicies, loadPolicyChoices } from "@/lib/insurance-server"
+import { HiddenByFilter } from "@/components/hidden-by-filter"
+import { assetInScope } from "@/lib/property-filter"
 
 export default async function VehicleDetailPage({
   params,
@@ -29,14 +32,22 @@ export default async function VehicleDetailPage({
   const vehicle = await prisma.vehicle.findUnique({ where: { id } })
   if (!vehicle) notFound()
 
-  const [serviceRecords, warranties, maintenanceSchedules, documents, manualOptions, policies, policyChoices] = await Promise.all([
+  const scope = await loadPropertyScope()
+  if (!assetInScope(scope, "VEHICLE", id)) {
+    const owner = vehicle.propertyId
+      ? await prisma.property.findUnique({ where: { id: vehicle.propertyId }, select: { name: true } })
+      : null
+    return <HiddenByFilter propertyName={scope!.propertyName} ownerName={owner?.name} />
+  }
+  const [serviceRecords, warranties, maintenanceSchedules, documents, manualOptions, policies, policyChoices, propertyChoices] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "VEHICLE" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "VEHICLE", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadManualOptions([{ assetType: "VEHICLE", assetId: id }]),
     loadAssetPolicies("VEHICLE", id),
-    loadPolicyChoices("vehicles", false),
+    loadPolicyChoices("vehicles", false, scope),
+    loadPropertyFilterChoices(scope),
   ])
 
   return (
@@ -76,7 +87,7 @@ export default async function VehicleDetailPage({
         <div className="flex items-start justify-between gap-4">
           <h1 className="font-heading text-2xl font-semibold">{vehicle.name}</h1>
           <div className="flex shrink-0 items-center gap-2">
-            <VehicleEditButton vehicle={vehicle} policyChoices={policyChoices} policyIds={policies.map((p) => p.id)} />
+            <VehicleEditButton vehicle={vehicle} policyChoices={policyChoices} policyIds={policies.map((p) => p.id)} propertyChoices={propertyChoices ?? undefined} />
             <Link
               href={`/reports/vehicles/${id}`}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"

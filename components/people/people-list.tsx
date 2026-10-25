@@ -13,7 +13,7 @@ import { useAssetView } from "@/components/assets/use-asset-view"
 import { EntityFormDialog } from "@/components/forms/entity-form-dialog"
 import { createPerson, deletePerson, updatePerson } from "@/lib/actions/people"
 import { ageFrom, labelFor, RELATIONSHIPS } from "@/lib/health"
-import { personFields, personInitial } from "./person-fields"
+import { personFields, personInitial, propertiesWithLinked } from "./person-fields"
 import type { Accessor } from "@/lib/use-client-table"
 import type { AssetView } from "@/lib/asset-view"
 import type { Person } from "@/app/generated/prisma/client"
@@ -26,9 +26,15 @@ interface Props {
   people: PersonRow[]
   providers: { id: string; name: string }[]
   initialView: AssetView
+  /** Properties to pick from. Absent: no Property field and a person's link is left alone. */
+  propertyChoices?: { id: string; name: string }[]
+  /** Shown instead of the usual empty state when the property filter left nothing. */
+  emptyText?: string | null
+  /** Property a new person starts on; null: Not assigned. */
+  newPropertyId?: string | null
 }
 
-export function PeopleList({ people, providers, initialView }: Props) {
+export function PeopleList({ people, providers, initialView, propertyChoices, emptyText, newPropertyId }: Props) {
   const router = useRouter()
   const [view, setView] = useAssetView("people", initialView)
   const [editing, setEditing] = useState<PersonRow | null>(null)
@@ -120,8 +126,14 @@ export function PeopleList({ people, providers, initialView }: Props) {
 
       {people.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No people yet</p>
-          <p className="text-sm mt-1">Add household members to track visits, medical receipts, conditions and medications.</p>
+          {emptyText ? (
+            <p className="font-medium">{emptyText}</p>
+          ) : (
+            <>
+              <p className="font-medium">No people yet</p>
+              <p className="text-sm mt-1">Add household members to track visits, medical receipts, conditions and medications.</p>
+            </>
+          )}
         </div>
       ) : (
         <AssetCollection
@@ -146,8 +158,8 @@ export function PeopleList({ people, providers, initialView }: Props) {
         title={editing ? "Edit Person" : "Add Person"}
         submitLabel={editing ? "Save Changes" : "Add Person"}
         successMessage={editing ? "Person updated." : "Person added."}
-        fields={personFields(providers)}
-        initial={personInitial(editing)}
+        fields={personFields(providers, [], propertiesWithLinked(propertyChoices, editing))}
+        initial={personInitial(editing, undefined, !!propertyChoices, newPropertyId ?? "")}
         onSubmit={(values) => (editing ? updatePerson(editing.id, values) : createPerson(values))}
       />
     </>

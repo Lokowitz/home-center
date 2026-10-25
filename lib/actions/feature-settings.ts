@@ -7,7 +7,7 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import { FEATURE_SETTINGS_ID } from "@/lib/features-server"
 
-const schema = z.object({ healthEnabled: z.boolean(), roomsEnabled: z.boolean(), equipmentTabEnabled: z.boolean() })
+const schema = z.object({ healthEnabled: z.boolean(), roomsEnabled: z.boolean(), equipmentTabEnabled: z.boolean(), propertyFilterEnabled: z.boolean() })
 
 export async function updateFeatureSettings(data: z.infer<typeof schema>): Promise<{ error: string } | { success: true }> {
   const session = await auth()

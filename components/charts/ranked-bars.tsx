@@ -5,7 +5,7 @@ import { ChartTable } from "./primitives/chart-table"
 import { TooltipCard, useChartTooltip } from "./primitives/tooltip"
 import { Sparkline } from "./sparkline"
 import { niceMax, niceTicks } from "./primitives/scale"
-import { type RankedEntry } from "@/lib/costs"
+import { rankedRowKey, type RankedEntry } from "@/lib/costs"
 import { useFormat } from "@/components/regional-provider"
 
 // Nominal categories — assets, vendors — so every bar wears the same hue. Bar
@@ -140,7 +140,7 @@ export function RankedBars({
             }
 
             return (
-              <li key={entry.key}>
+              <li key={rankedRowKey(entry)}>
                 {entry.href ? (
                   <Link href={entry.href} {...shared}>
                     {row}

@@ -18,6 +18,9 @@ import { AssetCostPanel } from "@/components/costs/asset-cost-panel"
 import { getFormat } from "@/lib/regional-server"
 import { propertiesWithRooms, roomOptionsFor } from "@/lib/rooms-server"
 import { locationLabel } from "@/lib/rooms"
+import { HiddenByFilter } from "@/components/hidden-by-filter"
+import { assetInScope } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 
 export default async function EquipmentDetailPage({
   params,
@@ -35,11 +38,14 @@ export default async function EquipmentDetailPage({
   })
   if (!equipment) notFound()
 
+  const scope = await loadPropertyScope()
+  if (!assetInScope(scope, "EQUIPMENT", id)) return <HiddenByFilter propertyName={scope!.propertyName} ownerName={equipment.property?.name} />
+
   const [serviceRecords, warranties, maintenanceSchedules, properties, documents, roomOptions, manualOptions] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
     prisma.maintenanceSchedule.findMany({ where: { assetId: id, assetType: "EQUIPMENT" }, include: { attachments: true }, orderBy: { nextDueDate: "asc" } }),
-    propertiesWithRooms(),
+    propertiesWithRooms(scope),
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "EQUIPMENT", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     // Rooms of its property, for the room selects and badges; empty with Rooms off or no property.
     roomOptionsFor("EQUIPMENT", id),

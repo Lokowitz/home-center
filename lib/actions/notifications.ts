@@ -2,6 +2,9 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
+import { loadHiddenEntityIds, loadPropertyScope } from "@/lib/property-filter-server"
+import { notificationScopeWhere } from "@/lib/property-filter"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -17,7 +20,18 @@ export async function markNotificationRead(id: string) {
 }
 
 export async function markAllNotificationsRead() {
-  await prisma.notification.updateMany({ where: { userId: await userId(), isRead: false }, data: { isRead: true } })
+  const uid = await userId()
+  const scope = await loadPropertyScope()
+  // With no scope the where is exactly today's.
+  // Under a scope, two ORs can't share one object, so each goes in its own AND slot.
+  const where = scope
+    ? {
+        userId: uid,
+        isRead: false,
+        AND: [await visibleNotificationsWhere(await loadFeatures()), notificationScopeWhere(await loadHiddenEntityIds(scope))],
+      }
+    : { userId: uid, isRead: false }
+  await prisma.notification.updateMany({ where, data: { isRead: true } })
   revalidatePath("/notifications")
 }
 

@@ -12,6 +12,8 @@ import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/t
 import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { assetInScope, filteredEmptyText, ownedScopeWhere } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 import { RecordEditLink } from "@/components/service-records/record-edit-link"
 import { RecordsAddButton } from "@/components/service-records/records-add-button"
 import { emptyStateCopy } from "@/lib/intake-ui"
@@ -50,9 +52,11 @@ export default async function RecordsPage({
     tiebreaker: { id: "asc" },
   })
 
+  const scope = await loadPropertyScope()
   const where: Prisma.ServiceRecordWhereInput = {
     AND: [
       ownedWhere(await loadFeatures()),
+      ownedScopeWhere(scope),
       assetId ? { assetId } : {},
       q ? { OR: [{ title: { contains: q } }, { vendor: { contains: q } }, { description: { contains: q } }] } : {},
     ],
@@ -72,7 +76,7 @@ export default async function RecordsPage({
     // Aggregated over the whole filtered set — summing the current page would
     // silently turn this into "total cost of these 25 rows".
     prisma.serviceRecord.aggregate({ where, _sum: { cost: true } }),
-    loadAssetIndex(),
+    loadAssetIndex(scope),
   ])
 
   const pageCount = pageCountOf(total, per)
@@ -81,7 +85,7 @@ export default async function RecordsPage({
 
   const totalCost = costTotal._sum.cost ?? 0
   const assetOptions = (Object.entries(assets.names) as [AssetType, Record<string, string>][]).flatMap(([type, byId]) =>
-    Object.entries(byId).map(([id, name]) => ({ type, id, name }))
+    Object.entries(byId).filter(([id]) => assetInScope(scope, type, id)).map(([id, name]) => ({ type, id, name }))
   )
 
   return (
@@ -111,6 +115,8 @@ export default async function RecordsPage({
               <p className="font-medium">No records match those filters</p>
               <p className="text-sm mt-1">Try clearing the search or filter.</p>
             </>
+          ) : scope ? (
+            <p className="font-medium">{filteredEmptyText(scope)}</p>
           ) : (
             <p className="font-medium">{emptyStateCopy("records")}</p>
           )}

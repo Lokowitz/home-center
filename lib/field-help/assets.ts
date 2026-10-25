@@ -115,6 +115,11 @@ export const ASSET_HELP: FieldHelpMap = {
     what: "The policies that cover this vehicle, such as auto or umbrella.",
     use: "Ticked policies show in the Insurance box on this page and list this vehicle on the Insurance page. Unticking one removes only this vehicle from it.",
   },
+  "vehicle.property": {
+    title: "Property",
+    what: "The property this vehicle belongs to.",
+    use: "With the property filter on, a property with any vehicles linked shows only those. A property with none linked shows every vehicle.",
+  },
 
   "room.name": {
     title: "Name",

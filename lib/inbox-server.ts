@@ -4,6 +4,7 @@ import { loadFeatures } from "@/lib/features-server"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { EMPTY_ITEM_MAX_AGE_MS } from "@/lib/inbox"
 import { remindersInText } from "@/lib/maintenance-match"
+import { assetInScope, type PropertyScope } from "@/lib/property-filter"
 
 // Reads for the /intake page and the Intake badge.
 
@@ -130,8 +131,12 @@ export async function loadHouseholdNames(includePeople: boolean): Promise<string
 /**
  * Every item, newest first, with its files and suggested asset. Cleans up abandoned items first.
  * With `reminders`, each item's read text is matched against them (reminderMatches).
+ * With `scope`, a suggestion pointing outside the selected property reads as no suggestion; the item stays.
  */
-export async function listInboxItems(now: Date = new Date(), { reminders = [] }: { reminders?: ReminderRef[] } = {}): Promise<InboxList> {
+export async function listInboxItems(
+  now: Date = new Date(),
+  { reminders = [], scope = null }: { reminders?: ReminderRef[]; scope?: PropertyScope | null } = {},
+): Promise<InboxList> {
   await removeAbandoned(now)
   const [rows, features] = await Promise.all([
     prisma.inboxItem.findMany({
@@ -157,7 +162,8 @@ export async function listInboxItems(now: Date = new Date(), { reminders = [] }:
     loadHouseholdNames(features.health),
   ])
   const items = rows.map((r): InboxListItem => {
-    const name = r.suggestedAssetId ? names.get(r.suggestedAssetId) : undefined
+    const hidden = !!r.suggestedAssetType && !!r.suggestedAssetId && !assetInScope(scope, r.suggestedAssetType, r.suggestedAssetId)
+    const name = r.suggestedAssetId && !hidden ? names.get(r.suggestedAssetId) : undefined
     return {
       id: r.id,
       createdAt: r.createdAt,

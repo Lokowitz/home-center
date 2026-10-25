@@ -31,7 +31,10 @@ const schema = z.object({
   meterUnit: z.enum(["MILES", "HOURS"]),
   notes: z.string().optional(),
   policyIds: z.array(z.string()),
+  propertyId: z.string(),
 })
+
+const NO_PROPERTY = "__none__"
 
 type FormValues = z.infer<typeof schema>
 
@@ -43,12 +46,16 @@ interface Props {
   policyChoices?: { id: string; name: string }[]
   /** The policies linked to this vehicle now. */
   policyIds?: string[]
+  /** Properties to pick from. Absent: the field is hidden and the vehicle's link is left alone. */
+  propertyChoices?: { id: string; name: string }[]
+  /** Property a new vehicle starts on; null: Not assigned. Create only. */
+  newPropertyId?: string | null
 }
 
 const NO_CHOICES: { id: string; name: string }[] = []
 const NO_IDS: string[] = []
 
-export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_CHOICES, policyIds = NO_IDS }: Props) {
+export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_CHOICES, policyIds = NO_IDS, propertyChoices, newPropertyId }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const milesLabel = fmt.distanceWords.charAt(0).toUpperCase() + fmt.distanceWords.slice(1)
@@ -57,13 +64,16 @@ export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_C
     resolver: zodResolver(schema),
     defaultValues: {
       name: "", make: "", model: "", year: new Date().getFullYear().toString(),
-      vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [],
+      vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [], propertyId: newPropertyId ?? NO_PROPERTY,
     },
   })
   const ticked = useWatch({ control: form.control, name: "policyIds" })
   // Shown only when editing and there is at least one policy that could cover a vehicle.
   const showInsurance = !!vehicle && policyChoices.length > 0
   const linkedKey = policyIds.join(",")
+  // A filter can leave out the property this vehicle is linked to; keep it selectable so saving doesn't unlink it.
+  const linkedOutside = !!vehicle?.propertyId && !!propertyChoices && !propertyChoices.some((p) => p.id === vehicle.propertyId)
+  const propertyOptions = propertyChoices && (linkedOutside ? [...propertyChoices, { id: vehicle!.propertyId!, name: "Linked property" }] : propertyChoices)
 
   useEffect(() => {
     if (vehicle) {
@@ -80,17 +90,20 @@ export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_C
         meterUnit: vehicle.meterUnit,
         notes: vehicle.notes ?? "",
         policyIds: linkedKey ? linkedKey.split(",") : [],
+        propertyId: vehicle.propertyId ?? NO_PROPERTY,
       })
     } else {
       form.reset({
         name: "", make: "", model: "", year: new Date().getFullYear().toString(),
-        vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [],
+        vin: "", color: "", purchaseDate: "", purchasePrice: "", currentMileage: "", meterUnit: "MILES", notes: "", policyIds: [], propertyId: newPropertyId ?? NO_PROPERTY,
       })
     }
-  }, [vehicle, open, form, linkedKey])
+  }, [vehicle, open, form, linkedKey, newPropertyId])
 
   async function onSubmit(values: FormValues, then: "close" | "reminders" = "close") {
-    const { policyIds: chosen, ...fields } = values
+    const { policyIds: chosen, propertyId, ...rest } = values
+    // Only sent when the field was shown, so saving with the switch off never touches the link.
+    const fields = propertyChoices ? { ...rest, propertyId: propertyId === NO_PROPERTY ? "" : propertyId } : rest
     const result = vehicle
       ? await updateVehicle(vehicle.id, fields as unknown as Parameters<typeof updateVehicle>[1], showInsurance ? chosen : undefined)
       : await createVehicle(fields as unknown as Parameters<typeof createVehicle>[0])
@@ -191,6 +204,24 @@ export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_C
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {propertyOptions && (
+                <FormField control={form.control} name="propertyId" render={({ field }) => (
+                  <FormItem className="col-span-2">
+                    <FormLabel help="vehicle.property">Property</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="w-full"><SelectValue>{(v: string) => propertyOptions.find((p) => p.id === v)?.name ?? "Not assigned"}</SelectValue></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_PROPERTY}>Not assigned</SelectItem>
+                        {propertyOptions.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
 
               <FormField control={form.control} name="vin" render={({ field }) => (
                 <FormItem className="col-span-2">

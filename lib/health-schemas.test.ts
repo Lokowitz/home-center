@@ -27,6 +27,19 @@ describe("personSchema", () => {
   it("rejects an unknown relationship", () => {
     expect(personSchema.safeParse({ name: "A", relationship: "COUSIN" }).success).toBe(false)
   })
+
+  describe("propertyId", () => {
+    const valid = { name: "Sam", relationship: "CHILD" }
+    it("stays undefined when left out, so the link is untouched", () => {
+      expect(personSchema.parse(valid).propertyId).toBeUndefined()
+    })
+    it("keeps an id", () => {
+      expect(personSchema.parse({ ...valid, propertyId: "p1" }).propertyId).toBe("p1")
+    })
+    it("keeps an empty string, which the action turns into an unlink", () => {
+      expect(personSchema.parse({ ...valid, propertyId: "" }).propertyId).toBe("")
+    })
+  })
 })
 
 describe("date-order rules", () => {

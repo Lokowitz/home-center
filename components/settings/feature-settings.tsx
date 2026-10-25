@@ -8,9 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { updateFeatureSettings } from "@/lib/actions/feature-settings"
 
-type Values = { healthEnabled: boolean; roomsEnabled: boolean; equipmentTabEnabled: boolean }
+type Values = { healthEnabled: boolean; roomsEnabled: boolean; equipmentTabEnabled: boolean; propertyFilterEnabled: boolean }
 
-const FEATURE_NAMES = { healthEnabled: "Health", roomsEnabled: "Rooms", equipmentTabEnabled: "Equipment tab" } as const
+const FEATURE_NAMES = { healthEnabled: "Health", roomsEnabled: "Rooms", equipmentTabEnabled: "Equipment tab", propertyFilterEnabled: "Property filter" } as const
 
 export function FeatureSettings({ initial }: { initial: Values }) {
   const [values, setValues] = useState(initial)
@@ -27,7 +27,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         return
       }
       // One switch changes per save: say which, and which way.
-      const changed = (["healthEnabled", "roomsEnabled", "equipmentTabEnabled"] as const).find((k) => next[k] !== previous[k])
+      const changed = (["healthEnabled", "roomsEnabled", "equipmentTabEnabled", "propertyFilterEnabled"] as const).find((k) => next[k] !== previous[k])
       if (changed) toast.success(`${FEATURE_NAMES[changed]} turned ${next[changed] ? "on" : "off"}.`)
     })
   }
@@ -35,6 +35,7 @@ export function FeatureSettings({ initial }: { initial: Values }) {
   const on = values.healthEnabled
   const roomsOn = values.roomsEnabled
   const equipmentTabOn = values.equipmentTabEnabled
+  const propertyFilterOn = values.propertyFilterEnabled
 
   return (
     <div className="space-y-6">
@@ -114,6 +115,32 @@ export function FeatureSettings({ initial }: { initial: Values }) {
         <p className="ml-6 text-xs text-muted-foreground">
           Turned off, the Equipment tab disappears from properties and from the room window. Equipment itself is
           untouched and still reachable from the Equipment page.
+        </p>
+      </CardContent>
+    </Card>
+
+    <Card className="py-5">
+      <CardHeader className="px-5">
+        <CardTitle className="flex items-center gap-2">
+          Property filter
+          {propertyFilterOn ? <Badge variant="secondary">On</Badge> : <Badge variant="outline">Off</Badge>}
+        </CardTitle>
+        <CardDescription>A dropdown in the top bar that narrows the site to one property.</CardDescription>
+      </CardHeader>
+      <CardContent className="px-5 space-y-2">
+        <Label help="features.property-filter" className="leading-normal">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={propertyFilterOn}
+            disabled={pending}
+            onChange={(e) => save({ ...values, propertyFilterEnabled: e.target.checked })}
+          />
+          Show a property filter in the top bar
+        </Label>
+        <p className="ml-6 text-xs text-muted-foreground">
+          Pick a property and everything that belongs to your other properties is left out: lists, totals, search,
+          notifications and the assistant. Emails and push still cover everything.
         </p>
       </CardContent>
     </Card>

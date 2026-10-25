@@ -4,6 +4,7 @@ import { loadAssetIndex } from "@/lib/assets-server"
 import { assetHref } from "@/lib/assets"
 import { INBOX_TOOL_DESCRIPTION, inboxToolResult } from "../inbox"
 import { defineTool, type RegisteredTool } from "./registry"
+import { scopedNames } from "../property-scope"
 
 // Read-only: the assistant can say what's waiting in Intake and point to it,
 // never file anything (the roadmap keeps write tools out of the assistant).
@@ -16,7 +17,7 @@ export function inboxTool(includeHealth: boolean): RegisteredTool {
     description: INBOX_TOOL_DESCRIPTION,
     schema: z.object({}),
     label: () => "Checking Intake…",
-    async run() {
+    async run(_, ctx) {
       // Unlike listInboxItems, no clean-up of abandoned uploads: a tool call only reads.
       const [rows, index] = await Promise.all([
         prisma.inboxItem.findMany({
@@ -31,9 +32,11 @@ export function inboxTool(includeHealth: boolean): RegisteredTool {
         // With Health off it has no people, so a person's name can't leak through it.
         loadAssetIndex(),
       ])
+      // A suggestion the property filter hides isn't named, as on the Intake page.
+      const names = scopedNames(index.names, ctx.scope)
       return inboxToolResult(
         rows.map((r) => {
-          const name = r.suggestedAssetType && r.suggestedAssetId ? index.names[r.suggestedAssetType]?.[r.suggestedAssetId] : undefined
+          const name = r.suggestedAssetType && r.suggestedAssetId ? names[r.suggestedAssetType]?.[r.suggestedAssetId] : undefined
           return {
             createdAt: r.createdAt,
             status: r.status,
@@ -45,7 +48,7 @@ export function inboxTool(includeHealth: boolean): RegisteredTool {
             suggestedAsset: name && r.suggestedAssetType && r.suggestedAssetId
               ? { name, href: assetHref(r.suggestedAssetType, r.suggestedAssetId) }
               : null,
-            suggestedReason: r.suggestedReason,
+            suggestedReason: name ? r.suggestedReason : null,
             files: r.attachments.map((a) => a.originalName),
           }
         }),

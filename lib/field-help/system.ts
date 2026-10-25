@@ -17,6 +17,11 @@ export const SYSTEM_HELP: FieldHelpMap = {
     what: "Shows a property's equipment, and each room's, in a tab where you can list and edit it in place.",
     use: "Off removes the tab from properties and from the room window. The equipment itself stays and is still on the Equipment page.",
   },
+  "features.property-filter": {
+    title: "Show a property filter in the top bar",
+    what: "Adds a dropdown next to search for picking one property. Each device remembers its own choice.",
+    use: "Everything that belongs to your other properties is then left out: lists, totals, search, notifications and the assistant. Emails and push still cover everything. Nothing is deleted.",
+  },
 
   // Settings → Regional. Site-wide; labels only, nothing is converted.
   "regional.currency": {

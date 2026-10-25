@@ -28,7 +28,7 @@ import { SettingsNav } from "@/components/settings/settings-nav"
 import { FeatureSettings } from "@/components/settings/feature-settings"
 import { RegionalSettingsForm } from "@/components/settings/regional-settings"
 import { loadRegionalSettings } from "@/lib/regional-server"
-import { loadFeatures } from "@/lib/features-server"
+import { loadFeatures, loadPropertyFilterEnabled } from "@/lib/features-server"
 import { DataSettings } from "@/components/settings/data/data-settings"
 import { loadBackupOverview } from "@/lib/backup/overview-server"
 import { resolveSection, visibleSections, type SettingsSectionId } from "@/lib/settings-sections"
@@ -50,7 +50,7 @@ export default async function SettingsPage({
   // gating the whole page on ADMIN would leave ordinary users unable to turn
   // their own mail off. resolveSection keeps the admin-only sections from
   // non-admins, and only the open section's data is loaded.
-  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance, backup, regional, notify] = await Promise.all([
+  const [me, users, recipients, mail, storedMail, llm, docs, features, capture, appearance, backup, regional, notify, propertyFilterEnabled] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { emailDigest: true, email: true, receivesNotifications: true, notificationRepeat: true },
@@ -96,6 +96,7 @@ export default async function SettingsPage({
           isAdmin ? prisma.user.count({ where: { receivesNotifications: true, notificationRepeat: "UNTIL_DISMISSED" } }) : Promise.resolve(0),
         ])
       : Promise.resolve(null),
+    is("features") ? loadPropertyFilterEnabled() : Promise.resolve(false),
   ])
   // A signed-in session whose user row is gone — the demo seeder wipes users,
   // so a cookie from before it survives the account it points at. Redirecting
@@ -184,7 +185,7 @@ export default async function SettingsPage({
             </div>
           )}
 
-          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health, roomsEnabled: features.rooms, equipmentTabEnabled: features.equipmentTab }} />}
+          {is("features") && features &&<FeatureSettings initial={{ healthEnabled: features.health, roomsEnabled: features.rooms, equipmentTabEnabled: features.equipmentTab, propertyFilterEnabled }} />}
 
           {is("regional") && regional && <RegionalSettingsForm initial={regional} />}
 

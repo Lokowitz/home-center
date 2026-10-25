@@ -6,9 +6,10 @@ import { fuse } from "@/lib/documents/embed/fusion"
 import { embedderFor } from "@/lib/documents/embed/server"
 import type { Hit } from "@/lib/documents/index-db"
 import {
-  attachmentIdsForAsset, countNotIndexed, healthAttachmentIds, listDocumentRefs, loadDocumentRefs, OWNER_SELECT,
+  attachmentIdsForAsset, countNotIndexed, healthAttachmentIds, listDocumentRefs, loadDocumentRefs, outOfScopeAttachmentIds, OWNER_SELECT,
 } from "@/lib/documents/scope"
 import { describeAttachment } from "@/lib/documents/owner"
+import { attachmentOutOfScopeWhere } from "@/lib/property-filter"
 import { parseSearch } from "@/lib/documents/fts-query"
 import { passage } from "@/lib/documents/passage"
 import { readWindow } from "@/lib/documents/read-window"
@@ -29,6 +30,7 @@ import { ASSET_ARG, assetLinkRef, findAsset, toAssetType } from "./shortcuts"
 const SEARCH_POOL = 60
 const DEFAULT_LIMIT = 6
 const LIST_LIMIT = 25
+const OUT_OF_SCOPE = "That file isn't available while the property filter is on."
 
 /** The optional asset argument → the attachment ids it covers, or the reply findAsset wants sent instead. */
 async function assetScope(
@@ -66,7 +68,7 @@ export function documentTools(includeHealth: boolean, includeRooms = true): Regi
       if ("reply" in resolved) return resolved.reply
       const { attachmentIds, scope } = resolved
       const [{ total, refs }, index] = await Promise.all([
-        listDocumentRefs({ attachmentIds, recordTypes, includeHealth, limit: a.limit ?? LIST_LIMIT }),
+        listDocumentRefs({ attachmentIds, recordTypes, includeHealth, limit: a.limit ?? LIST_LIMIT, scope: ctx.scope }),
         loadAssetIndex(),
       ])
       const documents = refs.map((r) => listedDocument(r, r.asset ? index.names[r.asset.type]?.[r.asset.id] : undefined))
@@ -103,13 +105,15 @@ export function documentTools(includeHealth: boolean, includeRooms = true): Regi
       const { attachmentIds, scope } = resolved
 
       const chunkIndex = await searchIndex()
+      // Files the property filter hides; empty without a scope.
+      const outOfScope = new Set(await outOfScopeAttachmentIds(ctx.scope ?? null))
       const filter = {
         attachmentIds,
         recordTypes,
         excludeRecordTypes: hidden,
         // A person's visits, reminders and warranties aren't a health record type,
         // so the index can only exclude them by id.
-        excludeAttachmentIds: includeHealth ? [] : await healthAttachmentIds(),
+        excludeAttachmentIds: [...(includeHealth ? [] : await healthAttachmentIds()), ...outOfScope],
         limit: SEARCH_POOL,
       }
       const keyword = parsed ? await chunkIndex.search(parsed.match, filter) : []
@@ -128,14 +132,14 @@ export function documentTools(includeHealth: boolean, includeRooms = true): Regi
       const [refs, index, notIndexed] = await Promise.all([
         loadDocumentRefs(groups.map((g) => g.attachmentId)),
         loadAssetIndex(),
-        countNotIndexed({ attachmentIds, recordTypes, includeHealth }),
+        countNotIndexed({ attachmentIds, recordTypes, includeHealth, scope: ctx.scope }),
       ])
 
       const documents = groups.flatMap((g) => {
         const ref = refs.get(g.attachmentId)
         // Deleted since it was indexed (reconcile drops its chunks), or a hidden
         // health or room file — the index filter already excludes those; this is the second lock.
-        if (!ref || !ref.text || isHidden(ref)) return []
+        if (!ref || !ref.text || isHidden(ref) || outOfScope.has(ref.attachmentId)) return []
         const pages = ref.text.pageCount ?? 1
         return [compact({
           attachmentId: ref.attachmentId,
@@ -166,7 +170,10 @@ export function documentTools(includeHealth: boolean, includeRooms = true): Regi
       offset: z.number().int().min(0).optional().describe("Only to continue a cut page: next.offset from the previous result."),
     }),
     label: () => "Reading a document…",
-    async run(a) {
+    async run(a, ctx) {
+      if (ctx.scope && (await prisma.attachment.count({ where: { AND: [{ id: a.attachmentId }, attachmentOutOfScopeWhere(ctx.scope)] } }))) {
+        throw new ToolInputError(OUT_OF_SCOPE)
+      }
       const row = await prisma.attachment.findUnique({
         where: { id: a.attachmentId },
         select: { ...OWNER_SELECT, text: { select: { status: true, text: true, truncated: true } } },

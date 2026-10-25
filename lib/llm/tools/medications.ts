@@ -5,6 +5,8 @@ import { resolveAssetId } from "../asset-ids"
 import { toDay } from "../serialize"
 import { describeMedications, NOTES_BUDGET, withoutNotes, type MedRow } from "../medication-history"
 import type { ToolContext } from "../query"
+import { scopedNames, withScope } from "../property-scope"
+import { personChildScopeWhere, type PropertyScope } from "@/lib/property-filter"
 import { defineTool } from "./registry"
 
 // A person's medications as the Medications tab's timeline sees them. The rows
@@ -12,9 +14,9 @@ import { defineTool } from "./registry"
 // duplicates when listed raw; this is the shape that answers "what is she on",
 // "tell me about her fluoxetine" and "when did the dose change".
 
-function loadRows(personId: string | undefined): Promise<MedRow[]> {
+function loadRows(personId: string | undefined, scope: PropertyScope | null): Promise<MedRow[]> {
   return prisma.medication.findMany({
-    where: personId ? { personId } : {},
+    where: withScope(personId ? { personId } : {}, personChildScopeWhere(scope)),
     include: {
       person: { select: { id: true, name: true } },
       prescriber: { select: { name: true } },
@@ -36,8 +38,8 @@ export const medicationHistoryTool = defineTool({
   }),
   label: (a) => (a.medication ? `Reading the ${a.medication} history…` : "Reading medications…"),
   async run(a, ctx: ToolContext) {
-    const personId = a.person ? resolveAssetId((await loadAssetIndex()).names, a.person, ["PERSON"]) : undefined
-    const rows = await loadRows(personId)
+    const personId = a.person ? resolveAssetId(scopedNames((await loadAssetIndex()).names, ctx.scope), a.person, ["PERSON"]) : undefined
+    const rows = await loadRows(personId, ctx.scope ?? null)
     const { people, all } = describeMedications(rows, ctx.now, { medication: a.medication, current: a.current })
     if (people.length) {
       const reply = { asOf: toDay(ctx.now), people }

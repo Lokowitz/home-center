@@ -18,6 +18,8 @@ export type FieldConfig = {
   placeholder?: string
   /// select and checkboxes only. A non-required select gets a "None" choice.
   options?: FieldOption[]
+  /// select only: the label of the empty choice. Defaults to "None".
+  emptyLabel?: string
   /// text only: values offered as you type (the field still accepts anything).
   suggestions?: string[]
   /// Spans both columns of the dialog grid.

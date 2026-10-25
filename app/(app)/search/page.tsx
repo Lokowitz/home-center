@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { SearchX, Sparkles } from "lucide-react"
 import { globalSearch } from "@/lib/search/global-server"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 import type { Section, SemanticState } from "@/lib/search/types"
 import { AssetCard, DocumentCard, RecordCard } from "@/components/search/result-cards"
 import { searchHref, semanticOn } from "@/lib/search/href"
@@ -108,7 +109,8 @@ export default async function SearchPage({
     )
   }
 
-  const results = await globalSearch(q, { semantic })
+  const scope = await loadPropertyScope()
+  const results = await globalSearch(q, { semantic, scope })
   const jump = results.sections.map((s) => ({ key: s.key, title: s.title, count: `${s.items.length}${s.more ? "+" : ""}` }))
 
   return (

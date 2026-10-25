@@ -8,7 +8,17 @@ import { requireHealth } from "@/lib/features-server"
 import { personSchema } from "@/lib/health-schemas"
 import { assetPolicyLinks } from "@/lib/insurance-server"
 import { removeUploadDir } from "@/lib/upload-fs"
+import { propertyLinkWrite } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 import type { ActionResult, FormValues } from "@/lib/form-types"
+
+/** A non-empty propertyId must name a real property. */
+async function unknownProperty(propertyId: string | undefined) {
+  if (!propertyId) return false
+  return !(await prisma.property.findUnique({ where: { id: propertyId }, select: { id: true } }))
+}
+
+const BAD_PROPERTY = { error: { propertyId: ["Pick a property from the list."] } }
 
 export async function createPerson(values: FormValues): Promise<ActionResult> {
   const session = await auth()
@@ -17,8 +27,10 @@ export async function createPerson(values: FormValues): Promise<ActionResult> {
 
   const parsed = personSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+  if (await unknownProperty(parsed.data.propertyId)) return BAD_PROPERTY
 
-  const person = await prisma.person.create({ data: parsed.data })
+  const { propertyId, ...fields } = parsed.data
+  const person = await prisma.person.create({ data: { ...fields, ...propertyLinkWrite(propertyId) } })
   revalidatePath("/assets/people")
   return { success: true, id: person.id }
 }
@@ -27,18 +39,22 @@ export async function updatePerson(id: string, values: FormValues): Promise<Acti
   const session = await auth()
   if (!session) redirect("/login")
   await requireHealth()
+  const scope = await loadPropertyScope()
 
   const parsed = personSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
+  if (await unknownProperty(parsed.data.propertyId)) return BAD_PROPERTY
 
   // The Insurance list is only sent while it's shown; without the key the person's links stay as they are.
   const links = "insurancePolicyIds" in values
-    ? await assetPolicyLinks("members", id, values.insurancePolicyIds.split(",").filter(Boolean), true)
+    ? await assetPolicyLinks("members", id, values.insurancePolicyIds.split(",").filter(Boolean), true, scope)
     : null
+  const { propertyId, ...fields } = parsed.data
   await prisma.person.update({
     where: { id },
     data: {
-      ...parsed.data,
+      ...fields,
+      ...propertyLinkWrite(propertyId),
       ...(links ? { insurancePolicies: { connect: links.connect.map((p) => ({ id: p })), disconnect: links.disconnect.map((p) => ({ id: p })) } } : {}),
     },
   })

@@ -12,6 +12,8 @@ import { parseTableParams, pageCountOf, withParams, type SortMap } from "@/lib/t
 import type { Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { filteredEmptyText, ownedScopeWhere } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 
 const WARN_DAYS = 60
 const DEFAULT_SORT = "expires"
@@ -69,7 +71,8 @@ export default async function WarrantiesPage({
     : status === "active" ? { expirationDate: { gt: warnCutoff } }
     : {}
 
-  const owned = ownedWhere(await loadFeatures())
+  const scope = await loadPropertyScope()
+  const owned: Prisma.WarrantyWhereInput = { AND: [ownedWhere(await loadFeatures()), ownedScopeWhere(scope)] }
   const where: Prisma.WarrantyWhereInput = {
     AND: [
       owned,
@@ -81,8 +84,8 @@ export default async function WarrantiesPage({
   const [warranties, total, expiringSoon, assets] = await Promise.all([
     prisma.warranty.findMany({ where, orderBy, skip, take }),
     prisma.warranty.count({ where }),
-    // Headline stat stays global, not filter-scoped, matching prior behaviour.
-    prisma.warranty.count({ where: { ...owned, expirationDate: { gte: now, lte: warnCutoff } } }),
+    // Headline stat ignores the search and status filters (it follows the property filter).
+    prisma.warranty.count({ where: { AND: [owned, { expirationDate: { gte: now, lte: warnCutoff } }] } }),
     loadAssetIndex(),
   ])
 
@@ -110,10 +113,16 @@ export default async function WarrantiesPage({
 
       {total === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No warranties {q || status ? "match those filters" : "yet"}</p>
-          <p className="text-sm mt-1">
-            {q || status ? "Try clearing the search or filter." : "Add warranties from a property, vehicle, or equipment detail page."}
-          </p>
+          {scope && !q && !status ? (
+            <p className="font-medium">{filteredEmptyText(scope)}</p>
+          ) : (
+            <>
+              <p className="font-medium">No warranties {q || status ? "match those filters" : "yet"}</p>
+              <p className="text-sm mt-1">
+                {q || status ? "Try clearing the search or filter." : "Add warranties from a property, vehicle, or equipment detail page."}
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">

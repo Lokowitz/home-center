@@ -8,8 +8,15 @@ import { HEALTH_INSURANCE_KINDS } from "@/lib/insurance"
 export const FEATURE_SETTINGS_ID = "singleton"
 
 /** The saved switches, or the defaults (everything on) when nobody has saved them. Once per request. */
+const featureRow = cache(() => prisma.featureSettings.findUnique({ where: { id: FEATURE_SETTINGS_ID } }))
+
+/** Whether the top-bar property filter is on (default off). Shares the row with loadFeatures. */
+export const loadPropertyFilterEnabled = cache(async (): Promise<boolean> => {
+  return (await featureRow())?.propertyFilterEnabled ?? false
+})
+
 export const loadFeatures = cache(async (): Promise<Features> => {
-  const row = await prisma.featureSettings.findUnique({ where: { id: FEATURE_SETTINGS_ID } })
+  const row = await featureRow()
   return {
     health: row?.healthEnabled ?? DEFAULT_FEATURES.health,
     rooms: row?.roomsEnabled ?? DEFAULT_FEATURES.rooms,

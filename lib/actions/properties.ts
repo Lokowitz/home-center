@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { deleteAssetWithRecords } from "@/lib/asset-delete-server"
 import { assetPolicyLinks } from "@/lib/insurance-server"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 import { propertySchema as schema, propertyData as clean, type PropertyInput } from "@/lib/asset-input"
 
 export async function createProperty(data: PropertyInput) {
@@ -24,12 +25,13 @@ export async function createProperty(data: PropertyInput) {
 export async function updateProperty(id: string, data: PropertyInput, policyIds?: string[]) {
   const session = await auth()
   if (!session) redirect("/login")
+  const scope = await loadPropertyScope()
 
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
   // A property's policies never depend on Health, so this always looks them up as if it were off.
-  const links = policyIds ? await assetPolicyLinks("properties", id, policyIds, false) : null
+  const links = policyIds ? await assetPolicyLinks("properties", id, policyIds, false, scope) : null
   await prisma.property.update({
     where: { id },
     data: {

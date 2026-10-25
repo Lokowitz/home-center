@@ -192,6 +192,12 @@ export function byVendor(rows: CostRow[]): Map<string, Bucket> {
   })
 }
 
+/// React key for a row in a ranked list. A property's "Property itself" row repeats
+/// the property's own asset key one level down, so the key alone is not unique.
+export function rankedRowKey(entry: { key: string; depth?: number }): string {
+  return `${entry.depth ?? 0}:${entry.key}`
+}
+
 export type RankedEntry = {
   key: string
   label: string
@@ -237,6 +243,37 @@ export function yearToDate(rows: CostRow[], now: Date, year: number = now.getFul
   const start = new Date(year, 0, 1)
   const end = new Date(year, now.getMonth(), now.getDate(), 23, 59, 59, 999)
   return rows.filter((r) => r.date >= start && r.date <= end)
+}
+
+/// Last calendar year, one total per month, January to December. Drawn beside the
+/// first tile's rolling twelve months, it shows whether spending peaks in the same
+/// season each year.
+export function lastYearMonthly(rows: CostRow[], now: Date): { label: string; total: number }[] {
+  const year = now.getFullYear() - 1
+  return bucketed(inYear(rows, year), "month", costRange([], now, year)).map((p) => ({ label: p.fullLabel, total: p.total }))
+}
+
+/// One total per day for the last `days` days, oldest first, ending today. Days
+/// with nothing stay in as zero, so quiet stretches show as gaps.
+export function dailyTotals(rows: CostRow[], now: Date, days: number): { date: Date; total: number }[] {
+  const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const totals = rollup<string>(rows, (r) => dayKey(r.date))
+  return Array.from({ length: days }, (_, i) => {
+    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1 - i))
+    return { date, total: totals.get(dayKey(date))?.total ?? 0 }
+  })
+}
+
+const YEARLY_BARS = 12
+
+/// One total per calendar year, from the first year with a record to this one.
+/// Years with nothing in them stay in as zero, so a gap reads as a gap. Capped at
+/// the latest twelve so the bars stay readable.
+export function yearlyBars(rows: CostRow[], now: Date): { label: string; total: number }[] {
+  if (rows.length === 0) return []
+  return bucketed(rows, "year", costRange(rows, now))
+    .slice(-YEARLY_BARS)
+    .map((p) => ({ label: p.label, total: p.total }))
 }
 
 /// Divides all-time spend by the months elapsed since the earliest costed record,

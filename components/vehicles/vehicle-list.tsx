@@ -52,9 +52,14 @@ function toCard(v: Vehicle, fmt: Formatter) {
 interface Props {
   vehicles: Vehicle[]
   initialView: AssetView
+  propertyChoices?: { id: string; name: string }[]
+  /** Shown instead of the usual empty state when the property filter left nothing. */
+  emptyText?: string | null
+  /** Property a new vehicle starts on; null: Not assigned. */
+  newPropertyId?: string | null
 }
 
-export function VehicleList({ vehicles, initialView }: Props) {
+export function VehicleList({ vehicles, initialView, propertyChoices, emptyText, newPropertyId }: Props) {
   const router = useRouter()
   const fmt = useFormat()
   const [view, setView] = useAssetView("vehicles", initialView)
@@ -107,8 +112,14 @@ export function VehicleList({ vehicles, initialView }: Props) {
 
       {vehicles.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No vehicles yet</p>
-          <p className="text-sm mt-1">Add your first vehicle to get started.</p>
+          {emptyText ? (
+            <p className="font-medium">{emptyText}</p>
+          ) : (
+            <>
+              <p className="font-medium">No vehicles yet</p>
+              <p className="text-sm mt-1">Add your first vehicle to get started.</p>
+            </>
+          )}
         </div>
       ) : (
         <AssetCollection
@@ -132,6 +143,8 @@ export function VehicleList({ vehicles, initialView }: Props) {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         vehicle={editing}
+        propertyChoices={propertyChoices}
+        newPropertyId={newPropertyId}
       />
     </>
   )

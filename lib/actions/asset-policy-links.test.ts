@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const { db, requireHealth, revalidatePath } = vi.hoisted(() => ({
+const { db, requireHealth, revalidatePath, loadPropertyScope } = vi.hoisted(() => ({
   db: { policies: vi.fn(), propertyUpdate: vi.fn(), vehicleUpdate: vi.fn(), personUpdate: vi.fn() },
   requireHealth: vi.fn(async () => undefined),
   revalidatePath: vi.fn(),
+  loadPropertyScope: vi.fn(async (): Promise<PropertyScope | null> => null),
 }))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -19,7 +20,11 @@ vi.mock("next/navigation", () => ({ redirect: () => { throw new Error("redirect"
 vi.mock("@/lib/asset-delete-server", () => ({ deleteAssetWithRecords: async () => undefined }))
 vi.mock("@/lib/upload-fs", () => ({ removeUploadDir: async () => undefined }))
 vi.mock("@/lib/features-server", () => ({ requireHealth }))
+vi.mock("@/lib/property-filter-server", () => ({ loadPropertyScope }))
 
+import { policyScopeWhere, type PropertyScope } from "@/lib/property-filter"
+import { eligibleKinds } from "@/lib/insurance"
+import { healthKindWhere } from "@/lib/insurance-server"
 import { updateProperty } from "./properties"
 import { updateVehicle } from "./vehicles"
 import { updatePerson } from "./people"
@@ -28,9 +33,46 @@ const validProperty = { name: "Maple Street House", type: "HOUSE" as const, addr
 const validVehicle = { name: "Work Truck", make: "Ford", model: "F-150", year: 2020, meterUnit: "MILES" as const }
 const validPerson = { name: "Jordan Rivera", relationship: "SELF" }
 
+const homeScope: PropertyScope = {
+  propertyId: "home",
+  propertyName: "Home",
+  hiddenEquipmentIds: [],
+  hiddenVehicleIds: ["boat"],
+  hiddenPersonIds: ["ben"],
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   requireHealth.mockResolvedValue(undefined)
+  loadPropertyScope.mockResolvedValue(null)
+})
+
+describe("assetPolicyLinks under the property filter", () => {
+  it("asks only for in-scope policies, so an out-of-scope linked policy is never disconnected", async () => {
+    loadPropertyScope.mockResolvedValue(homeScope)
+    // The database applies the scope: the Rental-only auto policy linked to this vehicle isn't returned.
+    db.policies.mockResolvedValue([{ id: "homeAuto", kind: "AUTO", vehicles: [] }])
+    await updateVehicle("v1", validVehicle, ["homeAuto"])
+    const { where } = db.policies.mock.calls[0][0]
+    expect(where.AND).toContainEqual(policyScopeWhere(homeScope))
+    expect(db.vehicleUpdate.mock.calls[0][0].data.insurancePolicies).toEqual({ connect: [{ id: "homeAuto" }], disconnect: [] })
+  })
+
+  it("scopes the property and person lookups too", async () => {
+    loadPropertyScope.mockResolvedValue(homeScope)
+    db.policies.mockResolvedValue([])
+    await updateProperty("home", validProperty, [])
+    await updatePerson("h1", { ...validPerson, insurancePolicyIds: "" })
+    for (const call of db.policies.mock.calls) expect(call[0].where.AND).toContainEqual(policyScopeWhere(homeScope))
+  })
+
+  it("adds nothing to the lookup without a scope", async () => {
+    db.policies.mockResolvedValue([])
+    await updateVehicle("v1", validVehicle, [])
+    expect(db.policies.mock.calls[0][0].where).toEqual({
+      AND: [healthKindWhere(false), { kind: { in: eligibleKinds("vehicles", false) } }],
+    })
+  })
 })
 
 describe("updateProperty", () => {

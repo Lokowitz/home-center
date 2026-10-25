@@ -10,6 +10,12 @@ import { loadRegionalSettings } from "@/lib/regional-server"
 import { ReportOptionsPanel } from "@/components/report/report-options-panel"
 import { parseReportOptions } from "@/lib/report-options"
 import { loadReport, parseAssetSegment } from "@/lib/report-server"
+import type { AssetType } from "@/app/generated/prisma/client"
+import { prisma } from "@/lib/prisma"
+import { loadFeatures } from "@/lib/features-server"
+import { HiddenByFilter } from "@/components/hidden-by-filter"
+import { assetInScope } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 
 // Deliberately outside the (app) route group. That layout is a fixed-height
 // shell with a sidebar and `overflow-hidden`, which is right for an application
@@ -23,7 +29,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { type, id } = await params
   const assetType = parseAssetSegment(type)
-  if (!assetType) return { title: "Report" }
+  if (!assetType || !assetInScope(await loadPropertyScope(), assetType, id)) return { title: "Report" }
   const data = await loadReport(assetType, id)
   // The document title is what the browser puts on the printed page and offers
   // as the PDF's filename, so it is worth getting right.
@@ -41,6 +47,19 @@ export default async function ReportPage({
   const options = parseReportOptions(await searchParams)
   const assetType = parseAssetSegment(type)
   if (!assetType) notFound()
+
+  const scope = await loadPropertyScope()
+  if (!assetInScope(scope, assetType, id)) {
+    const owner = await hiddenOwner(assetType, id)
+    if (!owner) notFound()
+    return (
+      <div className="min-h-svh bg-muted/40 px-4 pt-16">
+        <div className="mx-auto w-full max-w-[8.5in]">
+          <HiddenByFilter propertyName={scope!.propertyName} ownerName={owner.name} />
+        </div>
+      </div>
+    )
+  }
 
   const data = await loadReport(assetType, id)
   if (!data) notFound()
@@ -78,4 +97,26 @@ export default async function ReportPage({
     </div>
     </RegionalProvider>
   )
+}
+
+/** Owner for the hidden panel, or null where loadReport would find nothing (no such asset, or a person with Health off). */
+async function hiddenOwner(assetType: AssetType, id: string): Promise<{ name?: string } | null> {
+  const select = { property: { select: { name: true } } }
+  switch (assetType) {
+    case "PROPERTY":
+      return prisma.property.findUnique({ where: { id }, select: { name: true } })
+    case "EQUIPMENT": {
+      const row = await prisma.equipment.findUnique({ where: { id }, select })
+      return row && { name: row.property?.name }
+    }
+    case "VEHICLE": {
+      const row = await prisma.vehicle.findUnique({ where: { id }, select })
+      return row && { name: row.property?.name }
+    }
+    case "PERSON": {
+      if (!(await loadFeatures()).health) return null
+      const row = await prisma.person.findUnique({ where: { id }, select })
+      return row && { name: row.property?.name }
+    }
+  }
 }

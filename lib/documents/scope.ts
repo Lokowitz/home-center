@@ -3,6 +3,7 @@ import type { AssetType, AttachmentRecordType, DocumentTextStatus, Prisma } from
 import { describeAttachment, type DocumentRef } from "./owner"
 import { HEALTH_RECORD_TYPES } from "./limits"
 import { HEALTH_INSURANCE_KINDS } from "@/lib/insurance"
+import { attachmentOutOfScopeWhere, type PropertyScope } from "@/lib/property-filter"
 
 // Database side of the document tools: which files belong to an asset, and
 // what each file belongs to.
@@ -32,12 +33,29 @@ export async function healthAttachmentIds(): Promise<string[]> {
   return rows.map((r) => r.id)
 }
 
+/** Ids of every file the property filter hides, for filtering the search index. Empty with the filter off. */
+export async function outOfScopeAttachmentIds(scope: PropertyScope | null): Promise<string[]> {
+  if (!scope) return []
+  const rows = await prisma.attachment.findMany({ where: attachmentOutOfScopeWhere(scope), select: { id: true } })
+  return rows.map((r) => r.id)
+}
+
+type ScopeFilter = {
+  attachmentIds: string[] | null
+  recordTypes: AttachmentRecordType[] | null
+  includeHealth: boolean
+  /** Property filter: files it hides are left out. */
+  scope?: PropertyScope | null
+}
+
 /** Shared filter for list_documents and the not-indexed count. */
-function scopeWhere(f: { attachmentIds: string[] | null; recordTypes: AttachmentRecordType[] | null; includeHealth: boolean }): Prisma.AttachmentWhereInput {
+function scopeWhere(f: ScopeFilter): Prisma.AttachmentWhereInput {
   return {
     ...(f.recordTypes ? { recordType: { in: f.recordTypes } } : {}),
     ...(f.attachmentIds ? { id: { in: f.attachmentIds } } : {}),
     ...(f.includeHealth ? {} : { NOT: healthWhere() }),
+    // In AND so it doesn't replace the health NOT above.
+    ...(f.scope ? { AND: [{ NOT: attachmentOutOfScopeWhere(f.scope) }] } : {}),
   }
 }
 
@@ -105,12 +123,7 @@ export async function attachmentIdsForAsset(type: AssetType, id: string): Promis
 export type ListedRef = LoadedRef & { uploadedAt: Date }
 
 /** Files in scope, newest first, for list_documents. Health files never appear or count unless included. */
-export async function listDocumentRefs(f: {
-  attachmentIds: string[] | null
-  recordTypes: AttachmentRecordType[] | null
-  includeHealth: boolean
-  limit: number
-}): Promise<{ total: number; refs: ListedRef[] }> {
+export async function listDocumentRefs(f: ScopeFilter & { limit: number }): Promise<{ total: number; refs: ListedRef[] }> {
   const where = scopeWhere(f)
   const [total, rows] = await Promise.all([
     prisma.attachment.count({ where }),
@@ -128,11 +141,7 @@ export async function listDocumentRefs(f: {
 }
 
 /** Files in scope the search couldn't see: not read yet, failed, or unsupported. Health files never count unless included. */
-export async function countNotIndexed(f: {
-  attachmentIds: string[] | null
-  recordTypes: AttachmentRecordType[] | null
-  includeHealth: boolean
-}): Promise<number> {
+export async function countNotIndexed(f: ScopeFilter): Promise<number> {
   return prisma.attachmentText.count({
     where: { status: { in: ["PENDING", "FAILED", "UNSUPPORTED"] }, attachment: scopeWhere(f) },
   })

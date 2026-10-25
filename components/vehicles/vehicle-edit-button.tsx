@@ -5,7 +5,7 @@ import { Pencil } from "lucide-react"
 import { VehicleFormDialog } from "./vehicle-form-dialog"
 import type { Vehicle } from "@/app/generated/prisma/client"
 
-export function VehicleEditButton({ vehicle, policyChoices, policyIds }: { vehicle: Vehicle; policyChoices?: { id: string; name: string }[]; policyIds?: string[] }) {
+export function VehicleEditButton({ vehicle, policyChoices, policyIds, propertyChoices }: { vehicle: Vehicle; policyChoices?: { id: string; name: string }[]; policyIds?: string[]; propertyChoices?: { id: string; name: string }[] }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -16,7 +16,7 @@ export function VehicleEditButton({ vehicle, policyChoices, policyIds }: { vehic
       >
         <Pencil className="h-3.5 w-3.5" /> Edit
       </button>
-      <VehicleFormDialog open={open} onClose={() => setOpen(false)} vehicle={vehicle} policyChoices={policyChoices} policyIds={policyIds} />
+      <VehicleFormDialog open={open} onClose={() => setOpen(false)} vehicle={vehicle} policyChoices={policyChoices} policyIds={policyIds} propertyChoices={propertyChoices} />
     </>
   )
 }

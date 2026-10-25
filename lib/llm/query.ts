@@ -1,6 +1,8 @@
 import { ENTITIES, ENTITY_KEYS, HEALTH_ENTITIES, ROOM_ENTITIES, entityKeysFor, type EntityDef, type EntityKey, type FieldDef, type FieldType, type RelationDef, type Row } from "./ontology"
 import { HEALTH_NOTIFICATION_TYPES } from "@/lib/features"
 import type { AgentEvent } from "./types"
+import type { PropertyScope } from "@/lib/property-filter"
+import { entityScopeWhere, nonEmpty } from "./property-scope"
 
 // Compiles tool arguments into Prisma query fragments through the ontology.
 // Pure: no Prisma import. Every name the model sends is checked against the
@@ -22,8 +24,12 @@ export type Filter = { field: string; op: Op; value?: unknown }
  * rooms: the same for Rooms.
  * today: the viewer's calendar day (YYYY-MM-DD), when the page sent it.
  * emit: sends an event straight to the page (only draft tools use it).
+ * scope, hiddenEntityIds: the property filter, from the chat route; absent or null means All properties.
  */
-export type ToolContext = { userId: string; now: Date; health?: boolean; rooms?: boolean; today?: string; emit?: (event: AgentEvent) => void }
+export type ToolContext = {
+  userId: string; now: Date; health?: boolean; rooms?: boolean; today?: string; emit?: (event: AgentEvent) => void
+  scope?: PropertyScope | null; hiddenEntityIds?: string[]
+}
 
 export const healthOn = (ctx?: Pick<ToolContext, "health">) => ctx?.health !== false
 export const roomsOn = (ctx?: Pick<ToolContext, "rooms">) => ctx?.rooms !== false
@@ -296,6 +302,7 @@ export function compileWhere(
   // Scope goes last and is ANDed, so nothing the model sends can widen it.
   if (def.scope) and.push(def.scope(ctx))
   and.push(...healthOffWhere(entity, ctx))
+  and.push(...nonEmpty(entityScopeWhere(entity, ctx)))
   return { where: and.length ? { AND: and } : {}, assetName, related }
 }
 
@@ -323,7 +330,7 @@ export function compileInclude(
   entity: EntityKey,
   include: string[] = [],
   fields?: string[],
-  ctx?: Pick<ToolContext, "health" | "rooms">
+  ctx?: Pick<ToolContext, "health" | "rooms" | "scope" | "hiddenEntityIds">
 ): { select: Row; children: { relation: string; entity: EntityKey }[] } {
   const def = ENTITIES[entity]
   const select = selectFor(entity, fields)
@@ -338,10 +345,17 @@ export function compileInclude(
       children.push({ relation: name, entity: rel.entity })
       continue
     }
+    // A visible policy or provider can list people and assets the property filter hides.
+    const scoped = entityScopeWhere(rel.entity, ctx ?? {})
     select[name] =
       rel.kind === "one"
         ? { select: selectFor(rel.entity) }
-        : { select: selectFor(rel.entity), orderBy: compileSort(rel.entity), take: CHILD_LIMIT }
+        : {
+            select: selectFor(rel.entity),
+            ...(Object.keys(scoped).length ? { where: scoped } : {}),
+            orderBy: compileSort(rel.entity),
+            take: CHILD_LIMIT,
+          }
   }
   // A person's own records always say whose they are. With only a personId a
   // model can't tell one child's fluoxetine from another's, and won't think to

@@ -32,6 +32,11 @@ export const HEALTH_HELP: FieldHelpMap = {
     what: "Their main doctor or clinic, picked from your Providers list.",
     use: "Shows as Primary care on their page and the printed summary, and adds the provider to their care team there.",
   },
+  "person.property": {
+    title: "Property",
+    what: "The property this person lives at or belongs to.",
+    use: "With the property filter on, a property with anyone linked shows only those people and their records. A property with no one linked shows everyone.",
+  },
   "person.notes": {
     title: "Notes",
     what: "Anything else worth keeping about this person, such as insurance quirks or how to reach them.",

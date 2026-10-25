@@ -26,15 +26,27 @@ import packageJson from "@/package.json"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 import { loadRegionalSettings } from "@/lib/regional-server"
 import { RegionalProvider } from "@/components/regional-provider"
+import { PropertyFilter } from "@/components/property-filter"
+import { loadHiddenEntityIds, loadPropertyFilterChoices, loadPropertyScope } from "@/lib/property-filter-server"
+import { notificationScopeWhere } from "@/lib/property-filter"
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
   if (!session) redirect("/login")
 
-  const [features, regional] = await Promise.all([loadFeatures(), loadRegionalSettings()])
+  const [features, regional, scope, propertyChoices] = await Promise.all([
+    loadFeatures(),
+    loadRegionalSettings(),
+    loadPropertyScope(),
+    loadPropertyFilterChoices(null),
+  ])
   const [notifications, llm, inbox, captureParser] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId: session.user.id, dismissedAt: null, ...(await visibleNotificationsWhere(features)) },
+      where: {
+        userId: session.user.id,
+        dismissedAt: null,
+        AND: [await visibleNotificationsWhere(features), notificationScopeWhere(await loadHiddenEntityIds(scope))],
+      },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
@@ -69,6 +81,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex flex-1 flex-col overflow-hidden">
           <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/60 bg-card/80 backdrop-blur-sm px-4">
             <MobileSidebarTrigger showAssistant={showAssistant} showHealth={features.health} intakeCount={sidebarIntake} />
+            {propertyChoices && (propertyChoices.length >= 2 || scope) && (
+              <PropertyFilter properties={propertyChoices} selectedId={scope?.propertyId ?? null} />
+            )}
             {/* On a phone search is an icon, so it sits with the other header buttons on the right. */}
             <div className="flex min-w-0 flex-1 justify-end sm:justify-center">
               <Suspense fallback={null}>

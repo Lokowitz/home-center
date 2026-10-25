@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { loadFeatures } from "@/lib/features-server"
 import { planRoomLinks } from "@/lib/rooms"
 import type { AssetType } from "@/app/generated/prisma/client"
+import { propertyScopeWhere, type PropertyScope } from "@/lib/property-filter"
 
 export type RoomOption = { id: string; name: string }
 
@@ -42,11 +43,12 @@ export async function linkEquipmentToRooms(propertyId: string): Promise<number> 
 
 export type PropertyWithRooms = { id: string; name: string; rooms: RoomOption[] }
 
-/** Every property with its rooms, for the equipment dialog's property select and location suggestions. Rooms empty when Rooms is off. */
-export async function propertiesWithRooms(): Promise<PropertyWithRooms[]> {
+/** Every in-scope property with its rooms, for the equipment dialog's property select and location suggestions. Rooms empty when Rooms is off. */
+export async function propertiesWithRooms(scope: PropertyScope | null = null): Promise<PropertyWithRooms[]> {
   const [{ rooms: on }, properties] = await Promise.all([
     loadFeatures(),
     prisma.property.findMany({
+      where: propertyScopeWhere(scope),
       select: { id: true, name: true, rooms: { select: { id: true, name: true }, orderBy: { name: "asc" } } },
       orderBy: { name: "asc" },
     }),

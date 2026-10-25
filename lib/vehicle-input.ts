@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { optionalNumber } from "./asset-input"
+import { propertyLinkWrite } from "./property-filter"
 
 export const vehicleSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -13,6 +14,8 @@ export const vehicleSchema = z.object({
   currentMileage: optionalNumber(z.coerce.number().int().min(0)),
   meterUnit: z.enum(["MILES", "HOURS"]).default("MILES"),
   notes: z.string().optional(),
+  /** Left out: the link stays as it is. Empty: unlink. */
+  propertyId: z.string().optional(),
 })
 
 export type VehicleInput = z.input<typeof vehicleSchema>
@@ -31,5 +34,6 @@ export function vehicleData(v: z.infer<typeof vehicleSchema>) {
     currentMileage: v.currentMileage ?? null,
     meterUnit: v.meterUnit,
     notes: v.notes || null,
+    ...propertyLinkWrite(v.propertyId),
   }
 }

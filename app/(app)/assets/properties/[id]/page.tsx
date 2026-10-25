@@ -20,6 +20,9 @@ import { getFormat } from "@/lib/regional-server"
 import { loadFeatures } from "@/lib/features-server"
 import { RoomList } from "@/components/rooms/room-list"
 import { PropertyEquipment } from "@/components/equipment/property-equipment"
+import { HiddenByFilter } from "@/components/hidden-by-filter"
+import { assetInScope } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 
 const typeLabel: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
@@ -38,6 +41,9 @@ export default async function PropertyDetailPage({
   const property = await prisma.property.findUnique({ where: { id } })
   if (!property) notFound()
 
+  const scope = await loadPropertyScope()
+  if (!assetInScope(scope, "PROPERTY", id)) return <HiddenByFilter propertyName={scope!.propertyName} ownerName={property.name} />
+
   const [propertyServiceRecords, propertyWarranties, propertyMaintenanceSchedules, equipment, documents, features, policies, policyChoices] = await Promise.all([
     prisma.serviceRecord.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { date: "desc" } }),
     prisma.warranty.findMany({ where: { assetId: id, assetType: "PROPERTY" }, include: { attachments: true }, orderBy: { expirationDate: "asc" } }),
@@ -46,7 +52,7 @@ export default async function PropertyDetailPage({
     prisma.attachment.findMany({ where: { recordType: "DOCUMENT", assetType: "PROPERTY", assetId: id }, orderBy: { uploadedAt: "asc" } }),
     loadFeatures(),
     loadAssetPolicies("PROPERTY", id),
-    loadPolicyChoices("properties", false),
+    loadPolicyChoices("properties", false, scope),
   ])
   const { rooms, roomServiceRecords, roomSchedules } = features.rooms ? await loadRooms(id) : { rooms: [], roomServiceRecords: [], roomSchedules: [] }
   // For the room selects and badges on the Service and Maintenance tabs; empty with Rooms off.

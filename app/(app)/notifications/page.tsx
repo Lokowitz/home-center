@@ -8,6 +8,8 @@ import { resolveNotificationHrefs } from "@/lib/notification-links"
 import { loadNotificationReminders } from "@/lib/notification-reminders"
 import { ReminderActions } from "@/components/maintenance/reminder-actions"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
+import { loadHiddenEntityIds, loadPropertyScope } from "@/lib/property-filter-server"
+import { notificationScopeWhere } from "@/lib/property-filter"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Bell, Eye, EyeOff, Wrench, ShieldCheck, Pill, Syringe, ShieldPlus, Umbrella } from "lucide-react"
@@ -32,7 +34,11 @@ export default async function NotificationsPage({
   const session = await auth()
   if (!session) redirect("/login")
   const showHidden = (await searchParams).hidden === "1"
-  const visible = await visibleNotificationsWhere(await loadFeatures())
+  const scope = await loadPropertyScope()
+  // Two ORs can't share one object, so each goes in its own AND slot.
+  const visible = {
+    AND: [await visibleNotificationsWhere(await loadFeatures()), notificationScopeWhere(await loadHiddenEntityIds(scope))],
+  }
 
   const [notifications, hiddenCount] = await Promise.all([
     prisma.notification.findMany({

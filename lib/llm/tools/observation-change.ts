@@ -7,6 +7,7 @@ import { healthOn, ToolInputError, type ToolContext } from "../query"
 import { toDay } from "../serialize"
 import { defineTool } from "./registry"
 import { numeric } from "./observation-draft"
+import { assetInScope } from "@/lib/property-filter"
 
 // Proposals only: the card's Apply / Delete button is the one write, and the
 // server action refuses if the entry changed after the card was made.
@@ -114,7 +115,11 @@ async function loadEntry(id: string): Promise<EntryRef | null> {
 }
 
 const depsFor = (ctx: ToolContext): ChangeDeps => ({
-  loadEntry,
+  // A person the property filter hides has no entries to change.
+  loadEntry: async (id) => {
+    const entry = await loadEntry(id)
+    return entry && assetInScope(ctx.scope ?? null, "PERSON", entry.personId) ? entry : null
+  },
   knownTypes: async (personId) =>
     (await prisma.observation.findMany({ where: { personId }, select: { type: true }, distinct: ["type"], take: 100 })).map((o) => o.type),
   today: ctx.today ?? toDay(ctx.now),

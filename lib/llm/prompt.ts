@@ -35,12 +35,13 @@ const DOCUMENTS_SECTION = [
   "- If nothing matched and notIndexed is above 0, say some files couldn't be searched yet.",
 ]
 
-export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true, rooms = true, fmt = DEFAULT_FORMAT, today }: { now: Date; today?: string; fmt?: Formatter; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean; rooms?: boolean }): string {
+export function buildSystemPrompt({ now, extra, maxRounds = DEFAULT_TOOL_ROUNDS, documents = false, health = true, rooms = true, fmt = DEFAULT_FORMAT, today, viewing }: { now: Date; today?: string; fmt?: Formatter; extra?: string | null; maxRounds?: number; documents?: boolean; health?: boolean; rooms?: boolean; viewing?: string }): string {
   return [
     health
       ? "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, people and their health records (including observations the family logs, like meltdowns or bad nights), care providers, insurance, service records and costs, warranties, and maintenance schedules."
       : "You are HomeCenter's household assistant. HomeCenter tracks a household's properties, vehicles, equipment, service records and costs, warranties, and maintenance schedules. Its health section (people, providers, health insurance, health records) is turned off: if asked about those, say it's turned off in Settings.",
     today ? `Today is ${today} (the user's local day).` : `Today is ${toDay(now)} (UTC).`,
+    ...(viewing ? [`The user is viewing ${viewing}. Items from other properties are hidden from you; if asked about them, say the property filter is hiding them.`] : []),
     "",
     "Rules:",
     "- Answer only from data returned by your tools. Never invent records, numbers or dates.",

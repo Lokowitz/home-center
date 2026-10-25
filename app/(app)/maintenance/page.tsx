@@ -16,6 +16,8 @@ import type { AssetType, Prisma } from "@/app/generated/prisma/client"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
 import { isDoneOnce } from "@/lib/maintenance-schedule"
+import { filteredEmptyText, ownedScopeWhere } from "@/lib/property-filter"
+import { loadPropertyScope } from "@/lib/property-filter-server"
 
 const DEFAULT_SORT = "nextDue"
 const DEFAULT_DIR = "asc"
@@ -59,7 +61,8 @@ export default async function MaintenancePage({
     tiebreaker: { id: "asc" },
   })
 
-  const where: Prisma.MaintenanceScheduleWhereInput = { isActive: true, ...ownedWhere(await loadFeatures()) }
+  const scope = await loadPropertyScope()
+  const where: Prisma.MaintenanceScheduleWhereInput = { isActive: true, ...ownedWhere(await loadFeatures()), ...ownedScopeWhere(scope) }
 
   const [schedules, total, statusRows, mileage, assets] = await Promise.all([
     prisma.maintenanceSchedule.findMany({ where, orderBy, skip, take }),
@@ -106,8 +109,14 @@ export default async function MaintenancePage({
 
       {total === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No maintenance schedules</p>
-          <p className="text-sm mt-1">Add schedules from a property, vehicle, or equipment detail page.</p>
+          {scope ? (
+            <p className="font-medium">{filteredEmptyText(scope)}</p>
+          ) : (
+            <>
+              <p className="font-medium">No maintenance schedules</p>
+              <p className="text-sm mt-1">Add schedules from a property, vehicle, or equipment detail page.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden bg-card">

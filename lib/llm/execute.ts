@@ -9,6 +9,7 @@ import {
 } from "./query"
 import { serializeRow } from "./serialize"
 import { aggregateRows, groupSpec, measureSpec, type MeasureInput } from "./aggregate"
+import { entityScopeWhere, nonEmpty } from "./property-scope"
 
 // Runs compiled queries. The only module in the query path that touches Prisma;
 // everything it executes was built and validated by query.ts through the ontology.
@@ -125,6 +126,7 @@ export async function getRecord(args: { entity: string; id: string; include?: st
       { id: args.id },
       ...(def.scope ? [def.scope(ctx)] : []),
       ...healthOffWhere(key, ctx),
+      ...nonEmpty(entityScopeWhere(key, ctx)),
     ],
   }
   const row = await delegate(key).findFirst({ where, select: plan.select })

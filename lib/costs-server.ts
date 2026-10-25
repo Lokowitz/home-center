@@ -4,6 +4,7 @@ import type { CostRow } from "@/lib/costs"
 import type { ForecastSchedule } from "@/lib/forecast"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
+import { ownedScopeWhere, type PropertyScope } from "@/lib/property-filter"
 
 /// One query, many rollups. Grouping happens in memory in lib/costs.ts because
 /// SQLite cannot group by an extracted year without raw SQL, because assetId is
@@ -14,13 +15,15 @@ import { loadFeatures } from "@/lib/features-server"
 export async function loadCostRecords(filter?: {
   assetId?: string
   assetType?: AssetType
+  /** Property filter; ignored when assetId names one asset. */
+  scope?: PropertyScope | null
 }): Promise<CostRow[]> {
   const features = await loadFeatures()
   if (!features.health && filter?.assetType === "PERSON") return []
   const rows = await prisma.serviceRecord.findMany({
     where: {
       cost: { not: null },
-      ...(filter?.assetId ? { assetId: filter.assetId } : {}),
+      ...(filter?.assetId ? { assetId: filter.assetId } : ownedScopeWhere(filter?.scope ?? null)),
       // With Health off, people's visits drop out of every total.
       ...(filter?.assetType ? { assetType: filter.assetType } : ownedWhere(features)),
     },
@@ -49,6 +52,8 @@ export async function loadCostRecords(filter?: {
 export async function loadPlannedSchedules(filter?: {
   assetType?: AssetType
   assets?: { assetType: AssetType; assetId: string }[]
+  /** Property filter; ignored when `assets` names the assets. */
+  scope?: PropertyScope | null
 }): Promise<ForecastSchedule[]> {
   const features = await loadFeatures()
   if (!features.health && filter?.assetType === "PERSON") return []
@@ -56,7 +61,9 @@ export async function loadPlannedSchedules(filter?: {
     where: {
       estimatedCost: { not: null },
       ...(filter?.assetType ? { assetType: filter.assetType } : ownedWhere(features)),
-      ...(filter?.assets ? { OR: filter.assets.map(({ assetType, assetId }) => ({ assetType, assetId })) } : {}),
+      ...(filter?.assets
+        ? { OR: filter.assets.map(({ assetType, assetId }) => ({ assetType, assetId })) }
+        : ownedScopeWhere(filter?.scope ?? null)),
     },
     select: {
       id: true,

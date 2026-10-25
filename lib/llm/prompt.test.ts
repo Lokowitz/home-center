@@ -19,6 +19,13 @@ describe("buildSystemPrompt", () => {
     expect(buildSystemPrompt({ now })).toContain("(UTC)")
   })
 
+  it("names the property the user is viewing", () => {
+    expect(buildSystemPrompt({ now, viewing: "Lake Cabin" })).toContain(
+      "The user is viewing Lake Cabin. Items from other properties are hidden from you; if asked about them, say the property filter is hiding them."
+    )
+    expect(buildSystemPrompt({ now })).not.toContain("viewing")
+  })
+
   it("carries the date, rules and data model", () => {
     const p = buildSystemPrompt({ now })
     expect(p).toContain("Today is 2026-09-26")

@@ -5,12 +5,24 @@ import { TemplatePicker } from "@/components/maintenance/template-picker"
 import { assetHref } from "@/lib/assets"
 import { templatesFor } from "@/lib/maintenance-templates"
 import { loadTemplateTarget } from "@/lib/maintenance-templates-server"
+import { prisma } from "@/lib/prisma"
+import { loadPropertyScope } from "@/lib/property-filter-server"
+import { assetInScope } from "@/lib/property-filter"
+import { HiddenByFilter } from "@/components/hidden-by-filter"
 import type { AssetType } from "@/app/generated/prisma/client"
 
 /** Body of /assets/{type}/[id]/reminders: pick default reminders for one asset. */
 export async function TemplatePickerPage({ assetType, assetId }: { assetType: AssetType; assetId: string }) {
   const target = await loadTemplateTarget(assetType, assetId)
   if (!target) notFound()
+
+  const scope = await loadPropertyScope()
+  if (!assetInScope(scope, assetType, assetId)) {
+    const owner = target.propertyId
+      ? await prisma.property.findUnique({ where: { id: target.propertyId }, select: { name: true } })
+      : null
+    return <HiddenByFilter propertyName={scope!.propertyName} ownerName={owner?.name} />
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

@@ -54,6 +54,8 @@ export const personSchema = z.object({
   bloodType: optionalText,
   primaryProviderId: optionalId,
   notes: optionalText,
+  /** Left out: the link stays as it is. Empty: unlink. */
+  propertyId: z.string().optional(),
 })
 
 export const providerSchema = z.object({

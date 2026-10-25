@@ -27,6 +27,15 @@ describe("vehicle input", () => {
     expect(parse({ purchasePrice: "18999.5" }).purchasePrice).toBe(18999.5)
   })
 
+  it("leaves the property link alone when the form doesn't send one", () => {
+    expect("propertyId" in parse({})).toBe(false)
+  })
+
+  it("clears the link on an empty value and sets it on an id", () => {
+    expect(parse({ propertyId: "" }).propertyId).toBeNull()
+    expect(parse({ propertyId: "p1" }).propertyId).toBe("p1")
+  })
+
   it("still rejects junk and negative mileage", () => {
     expect(vehicleSchema.safeParse({ ...base, currentMileage: "abc" }).success).toBe(false)
     expect(vehicleSchema.safeParse({ ...base, currentMileage: "-5" }).success).toBe(false)

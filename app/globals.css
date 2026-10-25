@@ -485,6 +485,16 @@
     to { opacity: 1; }
   }
 
+  @keyframes property-cue-trace {
+    from { stroke-dashoffset: 100; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    to { stroke-dashoffset: 0; opacity: 0; }
+  }
+  .property-cue {
+    animation: property-cue-trace 1.8s ease-in-out 1 both;
+  }
+
   .chart-grow {
     transform-origin: bottom;
     animation: chart-grow 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
@@ -516,6 +526,10 @@
     }
     .chart-draw {
       stroke-dasharray: none;
+    }
+    .property-cue {
+      animation: none;
+      opacity: 0;
     }
   }
 }

@@ -35,9 +35,11 @@ interface Props {
   equipment: Equipment[]
   properties: PropertyWithRooms[]
   initialView: AssetView
+  /** Shown instead of the usual empty state when the property filter left nothing. */
+  emptyText?: string | null
 }
 
-export function EquipmentList({ equipment, properties, initialView }: Props) {
+export function EquipmentList({ equipment, properties, initialView, emptyText }: Props) {
   const router = useRouter()
   const [view, setView] = useAssetView("equipment", initialView)
   const [editing, setEditing] = useState<Equipment | null>(null)
@@ -128,8 +130,14 @@ export function EquipmentList({ equipment, properties, initialView }: Props) {
 
       {equipment.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
-          <p className="font-medium">No equipment yet</p>
-          <p className="text-sm mt-1">Track appliances, HVAC, water heaters, tools — anything with a service history.</p>
+          {emptyText ? (
+            <p className="font-medium">{emptyText}</p>
+          ) : (
+            <>
+              <p className="font-medium">No equipment yet</p>
+              <p className="text-sm mt-1">Track appliances, HVAC, water heaters, tools — anything with a service history.</p>
+            </>
+          )}
         </div>
       ) : (
         <AssetCollection

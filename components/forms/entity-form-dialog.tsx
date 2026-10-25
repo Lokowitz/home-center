@@ -297,13 +297,14 @@ function FieldInput({ field, value, onChange }: { field: FieldConfig; value: str
 
   if (field.kind === "select") {
     const options = field.options ?? []
+    const emptyLabel = field.emptyLabel ?? "None"
     return (
       <Select value={value || NONE} onValueChange={(v) => onChange(!v || v === NONE ? "" : v)}>
         <SelectTrigger id={id} className="w-full">
-          <SelectValue>{(v: string) => options.find((o) => o.value === v)?.label ?? "None"}</SelectValue>
+          <SelectValue>{(v: string) => options.find((o) => o.value === v)?.label ?? emptyLabel}</SelectValue>
         </SelectTrigger>
         <SelectContent>
-          {!field.required && <SelectItem value={NONE}>None</SelectItem>}
+          {!field.required && <SelectItem value={NONE}>{emptyLabel}</SelectItem>}
           {options.map((o) => (
             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
           ))}

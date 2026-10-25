@@ -231,6 +231,8 @@ model Property {
 
   equipment Equipment[]
   rooms     Room[]
+  vehicles  Vehicle[]
+  people    Person[]
 
   insurancePolicies InsurancePolicy[]
 }
@@ -298,7 +300,13 @@ model Vehicle {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
+  /// The property it belongs to, for the property filter. Optional.
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
   insurancePolicies InsurancePolicy[]
+
+  @@index([propertyId])
 }
 
 model Equipment {
@@ -350,12 +358,18 @@ model Person {
   primaryProviderId String?
   primaryProvider   Provider? @relation("PrimaryProvider", fields: [primaryProviderId], references: [id], onDelete: SetNull)
 
+  /// The property this person belongs to, for the property filter. Optional.
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+
   conditions        HealthCondition[]
   medications       Medication[]
   allergies         Allergy[]
   immunizations     Immunization[]
   insurancePolicies InsurancePolicy[]
   observations      Observation[]
+
+  @@index([propertyId])
 }
 
 /// Shared household directory, not owned by one person.
@@ -847,14 +861,16 @@ model DocumentSettings {
 /// it everywhere — nav, pages, search, notifications, the assistant — without
 /// touching its data, so switching it back on brings everything back.
 model FeatureSettings {
-  id                  String   @id @default("singleton")
+  id                    String   @id @default("singleton")
   /// People, providers, health insurance and everything owned by a person.
-  healthEnabled       Boolean  @default(true)
+  healthEnabled         Boolean  @default(true)
   /// Rooms inside properties: paint, flooring, photos, and what is tagged to them.
-  roomsEnabled        Boolean  @default(true)
+  roomsEnabled          Boolean  @default(true)
   /// The Equipment tab on a property and on its rooms.
-  equipmentTabEnabled Boolean  @default(true)
-  updatedAt           DateTime @updatedAt
+  equipmentTabEnabled   Boolean  @default(true)
+  /// A property dropdown in the top bar that leaves out everything belonging to other properties. Off by default.
+  propertyFilterEnabled Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
 }
 
 /// How money, distances, areas and dates are written for this household.
