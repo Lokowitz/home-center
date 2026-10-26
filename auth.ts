@@ -2,6 +2,7 @@ import NextAuth, { CredentialsSignin } from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { storedEmail } from "@/lib/user-email-server"
 import { verifyLogin } from "@/lib/auth-credentials"
 import { refreshClaims } from "@/lib/auth-session"
 import { clientIp, createLoginThrottle } from "@/lib/login-throttle"
@@ -25,7 +26,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials, request) {
         const result = await verifyLogin(credentials, clientIp(request.headers), {
-          findUser: (email) => prisma.user.findUnique({ where: { email } }),
+          findUser: async (email) => prisma.user.findUnique({ where: { email: await storedEmail(email) } }),
           compare: (password, hash) => bcrypt.compare(password, hash),
           throttle,
         })

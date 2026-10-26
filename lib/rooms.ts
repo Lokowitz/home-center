@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { optionalNumber } from "./asset-input"
+import { nameText, optionalDateText, parseDateOnly } from "./input-limits"
 
 export const FLOORING_SUGGESTIONS = ["Hardwood", "Engineered wood", "Laminate", "Luxury vinyl plank", "Vinyl", "Tile", "Carpet", "Concrete", "Stone"]
 export const PAINT_SURFACES = ["Walls", "Ceiling", "Trim", "Doors", "Accent wall", "Cabinets"]
@@ -14,13 +15,13 @@ const paintSchema = z.object({
 
 export const roomSchema = z.object({
   propertyId: z.string(),
-  name: z.string().min(1, "Name is required"),
+  name: nameText("Name is required"),
   level: z.string().optional(),
   area: optionalNumber(z.coerce.number().positive()),
   dimensions: z.string().optional(),
   flooringType: z.string().optional(),
   flooringProduct: z.string().optional(),
-  flooringInstalled: z.string().optional(),
+  flooringInstalled: optionalDateText,
   notes: z.string().optional(),
   paints: z.array(paintSchema).default([]),
 })
@@ -37,7 +38,7 @@ export function roomData(v: z.infer<typeof roomSchema>) {
     dimensions: v.dimensions?.trim() || null,
     flooringType: v.flooringType?.trim() || null,
     flooringProduct: v.flooringProduct?.trim() || null,
-    flooringInstalled: v.flooringInstalled?.trim() ? new Date(v.flooringInstalled) : null,
+    flooringInstalled: v.flooringInstalled?.trim() ? parseDateOnly(v.flooringInstalled) : null,
     notes: v.notes?.trim() || null,
   }
 }

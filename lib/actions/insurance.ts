@@ -10,6 +10,7 @@ import { isHealthInsuranceKind, linkWrites, type LinkIds } from "@/lib/insurance
 import { loadPolicyLinkChoices } from "@/lib/insurance-server"
 import { keepHiddenLinks, type PropertyScope } from "@/lib/property-filter"
 import { loadPropertyScope } from "@/lib/property-filter-server"
+import { orGone } from "@/lib/gone"
 import { removeUploadDir } from "@/lib/upload-fs"
 import type { ActionResult, FormValues } from "@/lib/form-types"
 
@@ -89,7 +90,7 @@ export async function updateInsurancePolicy(id: string, values: PolicyInput): Pr
   if (!links.ok) return { error: { [links.field]: [links.error] } }
   const healthKind = isHealthInsuranceKind(data.kind)
 
-  await prisma.$transaction([
+  const saved = await orGone(() => prisma.$transaction([
     prisma.insuranceCoverage.deleteMany({ where: { policyId: id } }),
     prisma.insurancePolicy.update({
       where: { id },
@@ -103,7 +104,8 @@ export async function updateInsurancePolicy(id: string, values: PolicyInput): Pr
       },
     }),
     prisma.insuranceCoverage.createMany({ data: coverages.map((c) => ({ ...c, policyId: id })) }),
-  ])
+  ]))
+  if (saved) return { error: saved.error }
   revalidateInsurance()
   return { success: true }
 }

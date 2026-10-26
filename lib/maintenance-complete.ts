@@ -35,7 +35,7 @@ export function completeSchedule(schedule: CompletableSchedule, completedDate: D
   const computedDate = kind === "calendar"
     ? nextCalendarDue(parseDueMonths(schedule.dueMonths), schedule.dueDay ?? 1, later(completedDate, schedule.nextDueDate))
     : schedule.intervalDays
-    ? new Date(new Date(completedDate).setDate(completedDate.getDate() + schedule.intervalDays))
+    ? new Date(new Date(completedDate).setUTCDate(completedDate.getUTCDate() + schedule.intervalDays))
     : null
   const nextDueDate = kind === "once"
     ? null
@@ -70,7 +70,7 @@ export function skipSchedule(schedule: CompletableSchedule, now: Date, currentRe
     nextDueDate = nextCalendarDue(parseDueMonths(schedule.dueMonths), schedule.dueDay ?? 1, later(now, nextDueDate))
   } else if (schedule.intervalDays && nextDueDate) {
     const d = new Date(nextDueDate)
-    do d.setDate(d.getDate() + schedule.intervalDays)
+    do d.setUTCDate(d.getUTCDate() + schedule.intervalDays)
     while (d.getTime() <= now.getTime())
     nextDueDate = d
   }

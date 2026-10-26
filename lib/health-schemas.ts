@@ -3,25 +3,27 @@ import {
   AllergySeverity, ConditionStatus, InsuranceKind, PremiumPeriod, Relationship,
 } from "@/app/generated/prisma/enums"
 import { coverageRows } from "@/lib/insurance"
+import {
+  DATE_MESSAGE, MAX_INTERVAL_DAYS, MAX_NAME_LENGTH, NAME_MESSAGE, moneyAmount, numberText, parseDateOnly,
+} from "@/lib/input-limits"
 
 // Form values arrive as strings exactly as the inputs hold them. Each schema
 // trims, turns blanks into null, parses dates and numbers, and enforces the
 // date-order rules, so an action can hand `parsed.data` straight to Prisma.
 
-const isDate = (v: string) => !Number.isNaN(Date.parse(v))
-
-const requiredText = (message: string) => z.string().trim().min(1, message)
+const requiredText = (message: string) => z.string().trim().min(1, message).max(MAX_NAME_LENGTH, NAME_MESSAGE)
 const optionalText = z.string().trim().optional().transform((v) => v || null)
+const optionalName = z.string().trim().max(MAX_NAME_LENGTH, NAME_MESSAGE).optional().transform((v) => v || null)
 const optionalId = z.string().optional().transform((v) => v || null)
 
 const optionalDate = z
   .string()
   .optional()
-  .refine((v) => !v || isDate(v), "Enter a valid date")
-  .transform((v) => (v ? new Date(v) : null))
+  .refine((v) => !v?.trim() || parseDateOnly(v) !== null, DATE_MESSAGE)
+  .transform((v) => (v?.trim() ? parseDateOnly(v) : null))
 
 const requiredDate = (message: string) =>
-  z.string().min(1, message).refine(isDate, "Enter a valid date").transform((v) => new Date(v))
+  z.string().min(1, message).refine((v) => parseDateOnly(v) !== null, DATE_MESSAGE).transform((v) => parseDateOnly(v) as Date)
 
 const optionalWholeNumber = z
   .string()
@@ -29,11 +31,7 @@ const optionalWholeNumber = z
   .refine((v) => !v || /^\d+$/.test(v.trim()), "Enter a whole number")
   .transform((v) => (v ? Number(v) : null))
 
-const optionalMoney = z
-  .string()
-  .optional()
-  .refine((v) => !v || (!Number.isNaN(Number(v)) && Number(v) >= 0), "Enter 0 or more")
-  .transform((v) => (v ? Number(v) : null))
+const optionalMoney = numberText(moneyAmount()).transform((v) => (v?.trim() ? Number(v.trim()) : null))
 
 /// Adds an error on `later` when both dates are set and `later` precedes `earlier`.
 function notBefore(later: string, earlier: string, message: string) {
@@ -88,10 +86,10 @@ export const medicationSchema = z
     frequency: optionalText,
     prescriberId: optionalId,
     conditionId: optionalId,
-    pharmacy: optionalText,
+    pharmacy: optionalName,
     startDate: optionalDate,
     endDate: optionalDate,
-    refillIntervalDays: optionalWholeNumber,
+    refillIntervalDays: optionalWholeNumber.refine((v) => v === null || v <= MAX_INTERVAL_DAYS, `Enter ${MAX_INTERVAL_DAYS} days or fewer`),
     nextRefillDate: optionalDate,
     notes: optionalText,
   })
@@ -150,7 +148,7 @@ const commaIds = z.string().optional().transform((v) => (v ? v.split(",").filter
 export const insuranceSchema = z
   .object({
     carrier: requiredText("Carrier is required"),
-    planName: optionalText,
+    planName: optionalName,
     kind: z.nativeEnum(InsuranceKind),
     policyNumber: optionalText,
     groupNumber: optionalText,
@@ -182,12 +180,7 @@ export type PolicyInput = z.input<typeof insuranceSchema>
 
 export const premiumSchema = z.object({
   effectiveDate: requiredDate("Date is required"),
-  amount: z
-    .string()
-    .trim()
-    .min(1, "Amount is required")
-    .refine((v) => Number.isFinite(Number(v)) && Number(v) >= 0, "Enter 0 or more")
-    .transform(Number),
+  amount: numberText(moneyAmount(), "Amount is required").transform((v) => Number(v?.trim())),
   period: z.nativeEnum(PremiumPeriod).default("ANNUAL"),
   notes: optionalText,
 })

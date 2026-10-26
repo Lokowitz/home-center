@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils"
 import { withParams } from "@/lib/table-params"
 import type { AssetType } from "@/app/generated/prisma/client"
 import {
-  CATEGORY_ORDER, assetKey, averagePerMonth, dailyTotals, lastYearMonthly, yearlyBars, nestedByAsset, bucketed, byAsset, byCategory, byVendor, categoryColor,
+  CATEGORY_ORDER, assetKey, averagePerMonth, monthsBack, dailyTotals, lastYearMonthly, yearlyBars, nestedByAsset, bucketed, byAsset, byCategory, byVendor, categoryColor,
   categoryLabel, costRange, inYear, isGranularity, parseAssetKey, ranked,
   rollingAverage, stackedBuckets, sum, yearToDate, type CategoryKey, type CostRow,
   type Granularity,
@@ -108,7 +108,7 @@ export default async function CostsPage({
   // explicit value because an absent param now means "the default", not "no filter".
   // Falls back to every year when the current one has no costs, so a fresh January
   // doesn't open on an empty page.
-  const years = [...new Set(allRows.map((r) => r.date.getFullYear()))].sort((a, b) => b - a)
+  const years = [...new Set(allRows.map((r) => r.date.getUTCFullYear()))].sort((a, b) => b - a)
   const thisYear = now.getFullYear()
   const year =
     yearRaw === "all"
@@ -178,12 +178,12 @@ export default async function CostsPage({
     bucketed(
       typeRows,
       "month",
-      { start: new Date(now.getFullYear(), now.getMonth() - (TILE_MONTHS - 1), 1), end: now }
+      { start: monthsBack(now, TILE_MONTHS), end: localDay(now) }
     ).map((p) => ({ label: p.fullLabel, total: p.total }))
   )
   const lastYearHistory = withText(lastYearMonthly(typeRows, now))
   const yearBars = withText(yearlyBars(typeRows, now))
-  const dailyPoints = withText(dailyTotals(typeRows, now, DAILY_DAYS).map((d) => ({ label: fmt.date(d.date), total: d.total })))
+  const dailyPoints = withText(dailyTotals(typeRows, now, DAILY_DAYS).map((d) => ({ label: fmt.date(d.date, { utc: true }), total: d.total })))
 
   // Equipment rolls into its property only when the view includes equipment (All).
   // Filtered to Properties it is not in the rows at all, and filtered to Equipment
@@ -574,7 +574,7 @@ function FilterRow({
         <FilterGroup label="Category">
           <Link
             href={`/costs${withParams(params, { category: undefined })}`}
-            className="flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+            className="relative flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1 text-xs max-sm:before:absolute max-sm:before:top-1/2 max-sm:before:left-1/2 max-sm:before:h-10 max-sm:before:w-full max-sm:before:-translate-1/2 font-medium text-primary transition-colors hover:bg-primary/20"
           >
             <span
               aria-hidden="true"
@@ -608,7 +608,7 @@ function FilterLink({ label, href, active }: { label: string; href: string; acti
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150",
+        "relative rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-150 max-sm:before:absolute max-sm:before:top-1/2 max-sm:before:left-1/2 max-sm:before:h-10 max-sm:before:w-full max-sm:before:-translate-1/2",
         active
           ? "bg-primary/10 text-primary"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"

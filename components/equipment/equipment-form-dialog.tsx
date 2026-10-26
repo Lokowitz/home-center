@@ -19,6 +19,8 @@ import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-
 import { locationLabel, resolveRoomId } from "@/lib/rooms"
 import { VALUE_CLASSES, defaultValueClass, valueClassLabel, type ValueClass } from "@/lib/equipment-value"
 import type { PropertyWithRooms } from "@/lib/rooms-server"
+import { moneyAmount, nameText, numberText, optionalDateText, optionalNameText } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 
 // Base UI Select has no empty-string option, so "unassigned" needs a sentinel.
 const NO_PROPERTY = "__none__"
@@ -26,19 +28,19 @@ const NO_PROPERTY = "__none__"
 const DEFAULT_CLASS = "__default__"
 
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: nameText("Name is required"),
   category: z.enum(["APPLIANCE", "HVAC", "WATER", "ELECTRONICS", "TOOL", "OUTDOOR", "SECURITY", "OTHER"]),
-  manufacturer: z.string().optional(),
-  modelNumber: z.string().optional(),
-  serialNumber: z.string().optional(),
-  location: z.string().optional(),
+  manufacturer: optionalNameText,
+  modelNumber: optionalNameText,
+  serialNumber: optionalNameText,
+  location: optionalNameText,
   propertyId: z.string().optional(),
-  purchaseDate: z.string().optional(),
-  purchasePrice: z.string().optional(),
-  installDate: z.string().optional(),
+  purchaseDate: optionalDateText,
+  purchasePrice: numberText(moneyAmount()),
+  installDate: optionalDateText,
   valueClass: z.string().optional(),
   expectedLifeYears: z.string().optional(),
-  replacementCost: z.string().optional(),
+  replacementCost: numberText(moneyAmount()),
   notes: z.string().optional(),
 })
 
@@ -116,7 +118,7 @@ export function EquipmentFormDialog({ open, onClose, equipment, properties, defa
       : await createEquipment(payload)
 
     if (result?.error) {
-      toast.error("Please fix the errors and try again.")
+      showServerError(form, result.error)
       return
     }
     toast.success(equipment ? "Equipment updated." : "Equipment added.")

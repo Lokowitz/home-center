@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { deleteAssetWithRecords } from "@/lib/asset-delete-server"
+import { ignoreGone, orGone } from "@/lib/gone"
 import { equipmentSchema as schema, equipmentData as clean, type EquipmentInput } from "@/lib/asset-input"
 
 /**
@@ -38,7 +39,8 @@ export async function updateEquipment(id: string, data: EquipmentInput) {
   const parsed = schema.safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.equipment.update({ where: { id }, data: await withRoom(clean(parsed.data)) })
+  const saved = await orGone(async () => prisma.equipment.update({ where: { id }, data: await withRoom(clean(parsed.data)) }))
+  if (saved) return { error: saved.error }
   revalidatePath("/assets/equipment")
   revalidatePath(`/assets/equipment/${id}`)
   return { success: true }
@@ -48,7 +50,7 @@ export async function deleteEquipment(id: string) {
   const session = await auth()
   if (!session) redirect("/login")
 
-  await deleteAssetWithRecords("EQUIPMENT", id)
+  await ignoreGone(() => deleteAssetWithRecords("EQUIPMENT", id))
 
   revalidatePath("/assets/equipment")
   revalidatePath("/records")

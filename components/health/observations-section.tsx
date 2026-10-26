@@ -43,7 +43,7 @@ const columnsFor = (fmt: Formatter): EntityColumn<ObservationRow>[] => [
   },
   { key: "duration", label: "Duration", className: "whitespace-nowrap text-muted-foreground", cell: (o) => formatDuration(o.durationMinutes) },
   { key: "condition", label: "Condition", className: "text-muted-foreground", cell: (o) => o.condition?.name ?? "—" },
-  { key: "by", label: "Logged by", className: "text-muted-foreground", cell: (o) => o.createdBy?.name ?? "—" },
+  { key: "by", label: "Logged by", className: "text-muted-foreground", cell: (o) => o.createdBy?.name ?? "Deleted user" },
   { key: "files", label: "Files", cell: (o) => <AttachmentCount attachments={o.attachments} /> },
 ]
 

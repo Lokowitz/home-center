@@ -1,17 +1,18 @@
 import { z } from "zod"
 import { optionalNumber } from "./asset-input"
+import { boundedNumber, meterReading, moneyAmount, nameText, optionalDateText, optionalNameText, parseDateOnly } from "./input-limits"
 import { propertyLinkWrite } from "./property-filter"
 
 export const vehicleSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  year: z.coerce.number().int().min(1900).max(2100),
-  vin: z.string().optional(),
-  color: z.string().optional(),
-  purchaseDate: z.string().optional(),
-  purchasePrice: optionalNumber(z.coerce.number()),
-  currentMileage: optionalNumber(z.coerce.number().int().min(0)),
+  name: nameText("Name is required"),
+  make: nameText("Make is required"),
+  model: nameText("Model is required"),
+  year: boundedNumber(1900, 2100, { whole: true, message: "Enter a year from 1900 to 2100." }),
+  vin: optionalNameText,
+  color: optionalNameText,
+  purchaseDate: optionalDateText,
+  purchasePrice: optionalNumber(moneyAmount()),
+  currentMileage: optionalNumber(meterReading()),
   meterUnit: z.enum(["MILES", "HOURS"]).default("MILES"),
   notes: z.string().optional(),
   /** Left out: the link stays as it is. Empty: unlink. */
@@ -29,7 +30,7 @@ export function vehicleData(v: z.infer<typeof vehicleSchema>) {
     year: Number(v.year),
     vin: v.vin || null,
     color: v.color || null,
-    purchaseDate: v.purchaseDate ? new Date(v.purchaseDate) : null,
+    purchaseDate: v.purchaseDate ? parseDateOnly(v.purchaseDate) : null,
     purchasePrice: v.purchasePrice ?? null,
     currentMileage: v.currentMileage ?? null,
     meterUnit: v.meterUnit,

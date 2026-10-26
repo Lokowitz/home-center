@@ -147,8 +147,17 @@ export default async function SearchPage({
       {results.sections.length === 0 && (
         <div className="flex flex-col items-center rounded-xl border border-dashed p-12 text-center text-muted-foreground">
           <SearchX className="h-8 w-8" strokeWidth={1.5} />
-          <p className="mt-3 font-medium text-foreground">Nothing matched &ldquo;{results.query}&rdquo;</p>
-          <p className="mt-1 text-sm">Try fewer or different words{semantic ? "" : ", or turn on semantic search"}.</p>
+          {results.terms.length === 0 ? (
+            <>
+              <p className="mt-3 font-medium text-foreground">Nothing to search for in &ldquo;{results.query}&rdquo;</p>
+              <p className="mt-1 text-sm">Try a longer or different word.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-3 font-medium text-foreground">Nothing matched &ldquo;{results.query}&rdquo;</p>
+              <p className="mt-1 text-sm">Try fewer or different words{semantic ? "" : ", or turn on semantic search"}.</p>
+            </>
+          )}
         </div>
       )}
 

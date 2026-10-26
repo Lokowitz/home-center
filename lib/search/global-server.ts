@@ -29,7 +29,7 @@ import { HEALTH_INSURANCE_KINDS, renewalWindowDays } from "@/lib/insurance"
 import type { Hit } from "@/lib/documents/index-db"
 import {
   bestPerKey, byTier, idsNamed, matchKind, MAX_RECORD_DISTANCE, mergeSemantic, nearest, rankSections, RECORD_WINDOW, searchTerms,
-  semanticOnly, termsWhere,
+  semanticOnly, termsWhere, wildcardTermsMatch,
 } from "./query"
 import type { EntityKind } from "./entities/text"
 import type {
@@ -229,6 +229,7 @@ function matchKinds(terms: string[]) {
     /** Exact matches first, so partial ones don't push them past the section's limit. */
     rank<T extends { id: string }>(rows: T[], texts: (row: T) => (string | null | undefined)[]): T[] {
       if (!terms.length) return rows
+      rows = rows.filter((r) => wildcardTermsMatch(terms, texts(r)))
       for (const r of rows) kinds.set(r.id, matchKind(terms, texts(r)))
       const tier = (r: T) => (kinds.get(r.id) === "exact" ? 0 : 1)
       return [...rows].sort((a, b) => tier(a) - tier(b))
@@ -651,7 +652,7 @@ async function searchRecords(
 
   const pr = page(kinds.rank(providers, (r) => textsOf(r, FIELDS.provider)))
   const providerCards: RecordResult[] = pr.items.map((r) => ({
-    kind: "provider", id: r.id, href: "/providers",
+    kind: "provider", id: r.id, href: `/providers?open=${r.id}`,
     title: r.name, subtitle: [r.specialty, r.practice].filter(Boolean).join(" · ") || null,
     date: null, amount: null, status: null,
     facts: facts([["Phone", r.phone], ["Email", r.email], ["Address", r.address]]),

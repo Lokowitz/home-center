@@ -49,7 +49,7 @@ export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, 
   function run(action: () => Promise<{ error?: string } | undefined>, done: string) {
     startTransition(async () => {
       const result = await action()
-      if (!result || result.error) { toast.error("Something went wrong."); return }
+      if (!result || result.error) { toast.error(result?.error ?? "Something went wrong."); return }
       toast.success(done)
       onDone?.()
       router.refresh()
@@ -78,7 +78,7 @@ export function useReminderActions(schedule: Pick<ScheduleRef, "id" | "title">, 
 /** "Next due Nov 19, 2026." / "…or at 55,000." for the skip toast. */
 function nextDueText(next: { nextDueDate: Date | null; nextDueMileage: number | null }, fmt: Formatter) {
   const parts = [
-    next.nextDueDate ? fmt.date(next.nextDueDate) : null,
+    next.nextDueDate ? fmt.date(next.nextDueDate, { utc: true }) : null,
     next.nextDueMileage != null ? `at ${next.nextDueMileage.toLocaleString()}` : null,
   ].filter(Boolean)
   return parts.length ? `Next due ${parts.join(" or ")}.` : ""

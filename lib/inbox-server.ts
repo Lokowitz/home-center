@@ -167,7 +167,7 @@ export async function listInboxItems(
     return {
       id: r.id,
       createdAt: r.createdAt,
-      createdBy: r.createdBy.name,
+      createdBy: r.createdBy?.name ?? "Deleted user",
       status: r.status,
       parsedDate: r.parsedDate,
       parsedTotal: r.parsedTotal,

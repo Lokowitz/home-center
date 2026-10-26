@@ -225,7 +225,7 @@ export function RoomReminders({ room, schedules }: { room: RoomWithDetails; sche
               <Link href={href(s)} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted/40">
                 <span className="flex-1 truncate">{s.title}</span>
                 <SourceBadge room={room} r={s} />
-                <span className="shrink-0 text-muted-foreground">{s.nextDueDate ? `Due ${fmt.date(s.nextDueDate)}` : "No due date"}</span>
+                <span className="shrink-0 text-muted-foreground">{s.nextDueDate ? `Due ${fmt.date(s.nextDueDate, { utc: true })}` : "No due date"}</span>
               </Link>
             </li>
           ))}

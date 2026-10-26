@@ -20,19 +20,26 @@ import { NO_CATEGORY, fieldErrorTarget, fileFormPayload, parseAssetKey, type Fil
 // Type only: service-record-server reaches Prisma.
 import type { ServiceRecordInput } from "@/lib/service-record-server"
 import { useFormat } from "@/components/regional-provider"
+import { MAX_NAME_LENGTH, NAME_MESSAGE, meterReading, moneyAmount, nameText, numberTextCheck, fieldIssue, requiredDateText } from "@/lib/input-limits"
 
 const NO_LINK = "__none__"
 
 const schema = z.object({
   assetKey: z.string().min(1, "Choose what this is for"),
-  date: z.string().min(1, "Date is required"),
-  title: z.string().min(1, "Title is required"),
-  vendor: z.string(),
-  cost: z.string(),
+  date: requiredDateText("Date is required"),
+  title: nameText("Title is required"),
+  vendor: z.string().max(MAX_NAME_LENGTH, NAME_MESSAGE),
+  // Negative is allowed: a refund receipt.
+  cost: z.string().superRefine(numberTextCheck(moneyAmount({ negative: true }))),
   category: z.string(),
   mileageAtService: z.string(),
   scheduleId: z.string(),
   description: z.string(),
+}).superRefine((v, ctx) => {
+  // The mileage field only shows for a vehicle, and only then is it sent.
+  if (parseAssetKey(v.assetKey)?.assetType !== "VEHICLE") return
+  const message = fieldIssue(meterReading(), v.mileageAtService)
+  if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["mileageAtService"], message })
 }) satisfies z.ZodType<FileFormValues>
 
 /** "File it": turns an inbox item into a service record, prefilled from what was read. Mounted only while open. */

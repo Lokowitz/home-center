@@ -14,6 +14,7 @@ import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
 import { filteredEmptyText, ownedScopeWhere } from "@/lib/property-filter"
 import { loadPropertyScope } from "@/lib/property-filter-server"
+import { warrantyState, warrantyToday } from "@/lib/llm/warranty-status"
 
 const WARN_DAYS = 60
 const DEFAULT_SORT = "expires"
@@ -31,14 +32,12 @@ const SORTABLE: SortMap<Prisma.WarrantyOrderByWithRelationInput> = {
 
 function warrantyStatus(expirationDate: Date | null) {
   if (!expirationDate) return null
-  // Branch on the raw delta, not on rounded days: Math.ceil of a small negative
-  // returns -0, and -0 < 0 is false, so something that expired an hour ago used
-  // to fall through and render "0d left". The status filter is SQL-side
-  // (expirationDate < now), so the two have to agree on the same instant.
-  const ms = new Date(expirationDate).getTime() - Date.now()
-  if (ms < 0) return { label: "Expired", variant: "destructive" as const }
-  const daysLeft = Math.ceil(ms / 86400000)
-  if (daysLeft <= WARN_DAYS) return { label: `${daysLeft}d left`, variant: "secondary" as const }
+  // Whole days, so a warranty ending today reads "Today" rather than "Expired".
+  // The status filter is SQL-side (expirationDate < start of today), so the two
+  // have to agree on the same day.
+  const { state, daysLeft } = warrantyState(new Date(expirationDate), new Date(), WARN_DAYS)
+  if (state === "expired") return { label: "Expired", variant: "destructive" as const }
+  if (state === "expiring") return { label: daysLeft === 0 ? "Today" : `${daysLeft}d left`, variant: "secondary" as const }
   return { label: "Active", variant: "outline" as const }
 }
 
@@ -52,7 +51,7 @@ export default async function WarrantiesPage({
   const q = typeof params.q === "string" ? params.q : undefined
   const status = typeof params.status === "string" ? params.status : undefined
 
-  const now = new Date()
+  const now = warrantyToday(new Date())
   const warnCutoff = new Date(now.getTime() + WARN_DAYS * 86400000)
 
   const { page, per, skip, take, orderBy } = parseTableParams({
@@ -166,7 +165,7 @@ export default async function WarrantiesPage({
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{w.vendor ?? "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {w.expirationDate ? fmt.date(w.expirationDate) : "—"}
+                        {w.expirationDate ? fmt.date(w.expirationDate, { utc: true }) : "—"}
                       </td>
                       <td className="px-4 py-3">
                         {st ? <Badge variant={st.variant}>{st.label}</Badge> : <span className="text-muted-foreground">—</span>}

@@ -13,8 +13,8 @@ describe("property filter cue", () => {
     expect(cueActive({ selected: false, hidden: true, reducedMotion: true })).toBe(false)
   })
 
-  it("runs every two minutes for under two seconds", () => {
-    expect(CUE_INTERVAL_MS).toBe(120000)
+  it("runs every 20 seconds for about two seconds", () => {
+    expect(CUE_INTERVAL_MS).toBe(20000)
     expect(CUE_DURATION_MS).toBeGreaterThanOrEqual(1500)
     expect(CUE_DURATION_MS).toBeLessThanOrEqual(2000)
   })

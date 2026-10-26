@@ -50,14 +50,14 @@ function SearchForm({ className, urlQ, semantic }: { className?: string; urlQ: s
         onClick={() => setOpen(true)}
         aria-label="Search everything"
         aria-expanded={open}
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground sm:hidden"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground lg:hidden"
       >
         <Search className="h-4 w-4" />
       </button>
       <div
         className={cn(
-          "hidden w-full justify-center sm:flex",
-          open && "max-sm:fixed max-sm:inset-x-0 max-sm:top-0 max-sm:z-50 max-sm:flex max-sm:h-14 max-sm:items-center max-sm:gap-2 max-sm:border-b max-sm:border-border/60 max-sm:bg-card max-sm:px-4"
+          "hidden w-full justify-center lg:flex",
+          open && "max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:z-50 max-lg:flex max-lg:h-14 max-lg:items-center max-lg:gap-2 max-lg:border-b max-lg:border-border/60 max-lg:bg-card max-lg:px-4"
         )}
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false)
@@ -94,7 +94,7 @@ function SearchForm({ className, urlQ, semantic }: { className?: string; urlQ: s
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close search"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
           >
             <X className="h-4 w-4" />
           </button>

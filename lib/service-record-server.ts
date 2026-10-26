@@ -6,6 +6,8 @@ import type { MaintenanceSchedule } from "@/app/generated/prisma/client"
 import { scheduleCompletionWrites } from "@/lib/maintenance-complete-server"
 import { checkRoom } from "@/lib/rooms-server"
 import { z } from "zod"
+import { RANGE_DATE_MESSAGE, dateInRange, meterReading, moneyAmount, nameText, optionalNameText, parseDateOnly, requiredDateText } from "@/lib/input-limits"
+import { completeSchedule } from "@/lib/maintenance-complete"
 
 // Shared by the service record actions and the capture inbox, which files a
 // receipt as a new record in the same transaction that moves its files. Not a
@@ -14,14 +16,14 @@ import { z } from "zod"
 export const serviceRecordSchema = z.object({
   assetId: z.string().min(1),
   assetType: z.enum(ASSET_TYPES),
-  date: z.string().min(1, "Date is required"),
-  title: z.string().min(1, "Title is required"),
+  date: requiredDateText("Date is required"),
+  title: nameText("Title is required"),
   description: z.string().optional(),
-  vendor: z.string().optional(),
-  // "" is tried first: coerce would turn a blank field into 0.
-  cost: z.literal("").or(z.coerce.number()).optional(),
+  vendor: optionalNameText,
+  // "" is tried first: coerce would turn a blank field into 0. Negative is how a refund is entered.
+  cost: z.literal("").or(moneyAmount({ negative: true })).optional(),
   category: z.enum(SERVICE_CATEGORY_VALUES).optional().or(z.literal("")),
-  mileageAtService: z.literal("").or(z.coerce.number().int().min(0)).optional(),
+  mileageAtService: z.literal("").or(meterReading()).optional(),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
   /// Must be a room on the target's property; checked with `checkRoom` before saving.
@@ -37,7 +39,7 @@ export function cleanServiceRecord(v: ServiceRecordInput, userId: string) {
   return {
     assetId: v.assetId,
     assetType: v.assetType,
-    date: new Date(v.date),
+    date: parseDateOnly(v.date) as Date,
     title: v.title,
     description: v.description || null,
     vendor: v.vendor || null,
@@ -82,6 +84,8 @@ export async function prepareNewServiceRecord(
     ? await prisma.maintenanceSchedule.findFirst({ where: { id: scheduleId, assetType: row.assetType, assetId: row.assetId } })
     : null
   if (scheduleId && !schedule) return { error: { scheduleId: ["That reminder isn't on this asset."] } }
+  // A repeat interval saved before the limits can push the next due date out of range.
+  if (schedule && !dateInRange(completeSchedule(schedule, row.date, row.mileageAtService).nextDueDate)) return { error: { scheduleId: [RANGE_DATE_MESSAGE] } }
   return { ok: { row, schedule } }
 }
 

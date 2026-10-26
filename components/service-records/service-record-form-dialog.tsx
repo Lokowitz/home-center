@@ -24,6 +24,9 @@ import type { Attachment, ServiceRecord, MeterUnit, AssetType } from "@/app/gene
 import { useFormat } from "@/components/regional-provider"
 import { RoomSelect } from "@/components/rooms/room-select"
 import type { RoomOption } from "@/lib/rooms-server"
+import { localDay } from "@/lib/equipment-life"
+import { meterReading, moneyAmount, nameText, numberText, optionalNameText, requiredDateText } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 
 // Base UI Select has no empty-string option, so "no category" needs a sentinel.
 const NO_CATEGORY = "__none__"
@@ -32,13 +35,14 @@ const NO_LINK = "__none__"
 const schema = z.object({
   assetId: z.string(),
   assetType: z.enum(ASSET_TYPES),
-  date: z.string().min(1, "Date is required"),
-  title: z.string().min(1, "Title is required"),
+  date: requiredDateText("Date is required"),
+  title: nameText("Title is required"),
   description: z.string().optional(),
-  vendor: z.string().optional(),
-  cost: z.string().optional(),
+  vendor: optionalNameText,
+  // Negative is allowed here: it's how a refund is entered.
+  cost: numberText(moneyAmount({ negative: true })),
   category: z.string().optional(),
-  mileageAtService: z.string().optional(),
+  mileageAtService: numberText(meterReading()),
   providerId: z.string().optional(),
   conditionId: z.string().optional(),
   roomId: z.string().optional(),
@@ -46,6 +50,9 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
+
+// The fields that show their own message; an error on any other (the room, the reminder) is toasted.
+const SHOWN_FIELDS = ["date", "title", "description", "vendor", "cost", "category", "mileageAtService", "providerId", "conditionId"]
 
 interface Props {
   open: boolean
@@ -111,7 +118,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
     resolver: zodResolver(schema),
     defaultValues: {
       assetId, assetType,
-      date: new Date().toISOString().split("T")[0],
+      date: localDay(new Date()).toISOString().split("T")[0],
       title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "",
       providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "",
     },
@@ -144,7 +151,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
         scheduleId: "",
       })
     } else {
-      form.reset({ assetId, assetType, date: new Date().toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "" })
+      form.reset({ assetId, assetType, date: localDay(new Date()).toISOString().split("T")[0], title: "", description: "", vendor: "", cost: "", category: NO_CATEGORY, mileageAtService: "", providerId: "", conditionId: "", roomId: defaultRoomId ?? "", scheduleId: "" })
     }
   }, [record, open, form, assetId, assetType, defaultRoomId, roomKey])
 
@@ -193,8 +200,7 @@ export function ServiceRecordFormDialog({ open, onClose, assetId, assetType, rec
       : await createServiceRecord(payload)
 
     if (result?.error) {
-      const roomError = typeof result.error === "object" && "roomId" in result.error ? result.error.roomId?.[0] : undefined
-      toast.error(roomError ?? "Please fix the errors and try again.")
+      showServerError(form, result.error, SHOWN_FIELDS)
       return
     }
 

@@ -18,6 +18,7 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head"
 import { PaginationBar } from "@/components/ui/pagination-bar"
 import { useClientTable, type Accessor } from "@/lib/use-client-table"
 import type { SortDir } from "@/lib/table-params"
+import { warrantyState } from "@/lib/llm/warranty-status"
 import type { Attachment, Warranty, AssetType } from "@/app/generated/prisma/client"
 
 type WarrantyWithAttachments = Warranty & { attachments: Attachment[] }
@@ -45,13 +46,10 @@ interface Props {
 
 function warrantyStatus(expirationDate: Date | null) {
   if (!expirationDate) return null
-  // Same -0 guard as the global warranties page: Math.ceil of a small negative
-  // is -0, which is not < 0, so a warranty that lapsed hours ago would show
-  // "0d left" instead of "Expired".
-  const ms = new Date(expirationDate).getTime() - Date.now()
-  if (ms < 0) return { label: "Expired", variant: "destructive" as const }
-  const daysLeft = Math.ceil(ms / 86400000)
-  if (daysLeft <= 60) return { label: `${daysLeft}d left`, variant: "secondary" as const }
+  // Same whole-day rule as the global warranties page: ending today is not expired.
+  const { state, daysLeft } = warrantyState(new Date(expirationDate), new Date(), 60)
+  if (state === "expired") return { label: "Expired", variant: "destructive" as const }
+  if (state === "expiring") return { label: daysLeft === 0 ? "Today" : `${daysLeft}d left`, variant: "secondary" as const }
   return { label: "Active", variant: "outline" as const }
 }
 
@@ -173,10 +171,10 @@ export function WarrantyList({ warranties: initialWarranties, assetId, assetType
                         </TableCell>
                       )}
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {w.purchaseDate ? fmt.date(w.purchaseDate) : <span>—</span>}
+                        {w.purchaseDate ? fmt.date(w.purchaseDate, { utc: true }) : <span>—</span>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {w.expirationDate ? fmt.date(w.expirationDate) : <span>—</span>}
+                        {w.expirationDate ? fmt.date(w.expirationDate, { utc: true }) : <span>—</span>}
                       </TableCell>
                       <TableCell>
                         {status && <Badge variant={status.variant}>{status.label}</Badge>}

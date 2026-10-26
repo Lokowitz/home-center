@@ -121,7 +121,7 @@ export function PolicyCard({ policy: p, health, onEdit }: Props) {
                 {people.join(", ")}
               </>
             ) : (
-              healthKind ? "Nobody yet" : "Nothing linked yet"
+              healthKind || p.kind === "LIFE" ? "Nobody yet" : "Nothing linked yet"
             )}
           </dd>
           {current && (
@@ -148,8 +148,8 @@ export function PolicyCard({ policy: p, health, onEdit }: Props) {
               {p.coverages.map((c) => (
                 <li key={c.id} className="contents">
                   <span>{c.label}</span>
-                  <span className="text-right tabular-nums">{c.limit != null ? fmt.moneyWhole(c.limit) : "—"}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">{c.deductible != null ? `${fmt.moneyWhole(c.deductible)} ded.` : "—"}</span>
+                  <span className="text-right tabular-nums">{c.limit != null ? fmt.money(c.limit) : "—"}</span>
+                  <span className="text-right tabular-nums text-muted-foreground">{c.deductible != null ? `${fmt.money(c.deductible)} ded.` : "—"}</span>
                 </li>
               ))}
             </ul>

@@ -169,14 +169,14 @@ export default async function MaintenancePage({
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {s.nextDueDate ? fmt.date(s.nextDueDate) : isDoneOnce(s) ? "Done" : "—"}
+                        {s.nextDueDate ? fmt.date(s.nextDueDate, { utc: true }) : isDoneOnce(s) ? "Done" : "—"}
                         {s.nextDueMileage != null && <span className="block text-xs">{s.nextDueMileage.toLocaleString()} {fmt.meterShort(mileage.get(s.assetId)?.unit ?? "MILES")}</span>}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
                         {s.estimatedCost != null ? fmt.money(s.estimatedCost) : "—"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                        {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "Never"}
+                        {s.lastCompletedDate ? fmt.date(s.lastCompletedDate, { utc: true }) : "Never"}
                       </td>
                     </tr>
                   )

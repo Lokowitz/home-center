@@ -85,7 +85,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <PropertyFilter properties={propertyChoices} selectedId={scope?.propertyId ?? null} />
             )}
             {/* On a phone search is an icon, so it sits with the other header buttons on the right. */}
-            <div className="flex min-w-0 flex-1 justify-end sm:justify-center">
+            <div className="flex min-w-0 flex-1 justify-end lg:justify-center">
               <Suspense fallback={null}>
                 <GlobalSearch className="max-w-xl" />
               </Suspense>

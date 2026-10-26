@@ -18,6 +18,8 @@ import { useDropTarget } from "@/components/drop/drop-provider"
 import { createRoom, updateRoom, deleteRoom } from "@/lib/actions/rooms"
 import { FLOORING_SUGGESTIONS, PAINT_SURFACES, type RoomInput } from "@/lib/rooms"
 import { uploadAll } from "@/lib/upload-client"
+import { DATE_MESSAGE, MAX_NAME_LENGTH, NAME_MESSAGE, parseDateOnly } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 import { Plus, Trash2 } from "lucide-react"
 import { RoomEquipment, RoomFiles, RoomReminders, RoomServiceRecords, StagedFiles } from "./room-panels"
 import { ServiceRecordFormDialog } from "@/components/service-records/service-record-form-dialog"
@@ -35,13 +37,13 @@ const paintSchema = z
 
 const schema = z.object({
   propertyId: z.string(),
-  name: z.string().trim().min(1, "Name is required"),
+  name: z.string().trim().min(1, "Name is required").max(MAX_NAME_LENGTH, NAME_MESSAGE),
   level: z.string(),
   area: z.string(),
   dimensions: z.string(),
   flooringType: z.string(),
   flooringProduct: z.string(),
-  flooringInstalled: z.string(),
+  flooringInstalled: z.string().refine((v) => !v.trim() || parseDateOnly(v) !== null, DATE_MESSAGE),
   notes: z.string(),
   paints: z.array(paintSchema),
 })
@@ -169,12 +171,7 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
     const result = existingId ? await updateRoom(existingId, payload) : await createRoom(payload)
 
     if (result.error) {
-      if (typeof result.error === "string") { toast.error(result.error); return }
-      for (const field of FIELDS) {
-        const message = result.error[field]?.[0]
-        if (message) form.setError(field, { message })
-      }
-      toast.error("Please fix the errors and try again.")
+      showServerError(form, result.error, FIELDS)
       return
     }
 

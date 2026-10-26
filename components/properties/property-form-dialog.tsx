@@ -17,18 +17,21 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { createProperty, updateProperty } from "@/lib/actions/properties"
 import type { Property } from "@/app/generated/prisma/client"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
+import { boundedNumber, nameText, numberText, optionalDateText } from "@/lib/input-limits"
+import { propertyPrice } from "@/lib/asset-input"
+import { showServerError } from "@/components/forms/server-errors"
 
 const TYPE_LABELS: Record<string, string> = {
   HOUSE: "House", CONDO: "Condo", TOWNHOUSE: "Townhouse", LOT: "Lot / Land", OTHER: "Other",
 }
 
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: nameText("Name is required"),
   type: z.enum(["HOUSE", "CONDO", "TOWNHOUSE", "LOT", "OTHER"]),
   address: z.string().min(1, "Address is required"),
-  purchaseDate: z.string().optional(),
-  purchasePrice: z.string().optional(),
-  yearBuilt: z.string().optional(),
+  purchaseDate: optionalDateText,
+  purchasePrice: numberText(propertyPrice),
+  yearBuilt: numberText(boundedNumber(1800, 2100, { whole: true, message: "Enter a year from 1800 to 2100." })),
   sqFt: z.string().optional(),
   notes: z.string().optional(),
   policyIds: z.array(z.string()),
@@ -89,7 +92,7 @@ export function PropertyFormDialog({ open, onClose, property, policyChoices = NO
       : await createProperty(fields as unknown as Parameters<typeof createProperty>[0])
 
     if (result?.error) {
-      toast.error("Please fix the errors and try again.")
+      showServerError(form, result.error)
       return
     }
     toast.success(property ? "Property updated." : "Property added.")

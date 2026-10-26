@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { signOut } from "next-auth/react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge"
 import { FieldHelp } from "@/components/ui/field-help"
 import { createUser, updateUserRole, resetUserPassword, deleteUser, updateSelf, changeOwnPassword } from "@/lib/actions/users"
 import { MIN_PASSWORD_LENGTH } from "@/lib/password-change"
+import { nameText } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 import type { User as PrismaUser } from "@/app/generated/prisma/client"
 
 type User = Pick<PrismaUser, "id" | "name" | "email" | "role" | "mustResetPassword">
@@ -54,7 +56,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
         <Button onClick={() => setCreateOpen(true)}>Add User</Button>
       </div>
 
-      <div className="rounded-lg border overflow-hidden bg-card">
+      <div className="rounded-lg border overflow-x-auto bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-muted-foreground">
             <tr>
@@ -70,11 +72,11 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
             {users.map((u) => (
               <tr key={u.id} className="hover:bg-muted/20">
                 <td className="px-4 py-3 font-medium">
-                  {u.name}
+                  <span className="inline-block max-w-40 truncate align-bottom sm:max-w-64" title={u.name}>{u.name}</span>
                   {u.id === currentUserId && <Badge variant="outline" className="ml-2 text-xs">You</Badge>}
                   {u.mustResetPassword && <Badge variant="secondary" className="ml-2 text-xs">Must reset pw</Badge>}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">{u.email}</td>
+                <td className="max-w-64 truncate px-4 py-3 text-muted-foreground hidden sm:table-cell" title={u.email}>{u.email}</td>
                 <td className="px-4 py-3">
                   {u.id === currentUserId ? (
                     <Badge variant="secondary">{roleLabel[u.role]}</Badge>
@@ -90,7 +92,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
                     </Select>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-4 py-3 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-2">
                     {u.id === currentUserId ? (
                       <>
@@ -133,7 +135,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
           <DialogContent className="max-w-sm">
             <DialogHeader><DialogTitle>Temporary Password</DialogTitle></DialogHeader>
             <div className="space-y-3 text-sm">
-              <p>Share this temporary password with <strong>{tempPassword.name}</strong>. They will be required to set a new password on first login.</p>
+              <p className="break-words">Share this temporary password with <strong>{tempPassword.name}</strong>. They will be required to set a new password on first login.</p>
               <div className="rounded-md bg-muted px-4 py-3 font-mono text-lg tracking-widest text-center select-all">
                 {tempPassword.password}
               </div>
@@ -149,7 +151,7 @@ export function UserManagement({ users, currentUserId }: { users: User[]; curren
 }
 
 const createSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: nameText("Name is required"),
   email: z.string().min(1, "Email is required"),
   role: z.enum(["ADMIN", "USER"]),
 })
@@ -157,17 +159,24 @@ const createSchema = z.object({
 function CreateUserDialog({ open, onClose }: { open: boolean; onClose: (result?: { name: string; password: string }) => void }) {
   const form = useForm({ resolver: zodResolver(createSchema), defaultValues: { name: "", email: "", role: "USER" as const } })
 
+  // A fast double click can submit twice before the button disables.
+  const sending = useRef(false)
+
   async function onSubmit(values: z.infer<typeof createSchema>) {
-    const result = await createUser(values)
-    if (result?.error) {
-      const emailError = Array.isArray(result.error.email) ? result.error.email[0] : null
-      if (emailError) form.setError("email", { message: emailError })
-      toast.error("Failed to create user.")
-      return
+    if (sending.current) return
+    sending.current = true
+    try {
+      const result = await createUser(values)
+      if (result?.error) {
+        showServerError(form, result.error)
+        return
+      }
+      toast.success(`User created.`)
+      form.reset()
+      onClose({ name: values.name, password: result.tempPassword! })
+    } finally {
+      sending.current = false
     }
-    toast.success(`User created.`)
-    form.reset()
-    onClose({ name: values.name, password: result.tempPassword! })
   }
 
   return (
@@ -175,7 +184,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: (result?:
       <DialogContent className="max-w-sm">
         <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem><FormLabel help="users.name">Name *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
             )} />
@@ -209,7 +218,7 @@ function CreateUserDialog({ open, onClose }: { open: boolean; onClose: (result?:
 }
 
 const editSelfSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: nameText("Name is required"),
   email: z.string().min(1, "Email is required"),
   currentPassword: z.string(),
 })
@@ -224,11 +233,7 @@ function EditSelfDialog({ user, onClose }: { user: User; onClose: () => void }) 
   async function onSubmit(values: z.infer<typeof editSelfSchema>) {
     const result = await updateSelf(values)
     if (result?.error) {
-      const emailError = Array.isArray(result.error.email) ? result.error.email[0] : null
-      if (emailError) form.setError("email", { message: emailError })
-      const passwordError = "currentPassword" in result.error && Array.isArray(result.error.currentPassword) ? result.error.currentPassword[0] : null
-      if (passwordError) form.setError("currentPassword", { message: passwordError })
-      toast.error("Failed to update profile.")
+      showServerError(form, result.error)
       return
     }
     toast.success("Profile updated.")

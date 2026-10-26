@@ -18,6 +18,8 @@ import { deleteAttachment } from "@/lib/actions/attachments"
 import { ASSET_TYPES } from "@/lib/assets"
 import { useFormat } from "@/components/regional-provider"
 import { formatDueMonths, monthsMissing, parseDueMonths, scheduleKind } from "@/lib/maintenance-schedule"
+import { intervalDays, intervalMiles, meterReading, moneyAmount, nameText, numberText, fieldIssue, optionalDateText } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 import { manualChoices, type ManualOption } from "@/lib/manual-reference"
 import { RoomSelect } from "@/components/rooms/room-select"
 import type { RoomOption } from "@/lib/rooms-server"
@@ -27,24 +29,34 @@ import type { Attachment, MaintenanceSchedule, MeterUnit, AssetType } from "@/ap
 const schema = z.object({
   assetId: z.string(),
   assetType: z.enum(ASSET_TYPES),
-  title: z.string().min(1, "Title is required"),
+  title: nameText("Title is required"),
   description: z.string().optional(),
   intervalDays: z.string().optional(),
   intervalMiles: z.string().optional(),
   repeat: z.enum(["every", "months", "once"]),
   dueMonths: z.string().optional(),
   dueDay: z.string().optional(),
-  estimatedCost: z.string().optional(),
-  nextDueDate: z.string().optional(),
-  nextDueMileage: z.string().optional(),
-  reminderDaysBefore: z.string().optional(),
-  reminderMilesBefore: z.string().optional(),
+  estimatedCost: numberText(moneyAmount()),
+  nextDueDate: optionalDateText,
+  nextDueMileage: numberText(meterReading()),
+  reminderDaysBefore: numberText(intervalDays()),
+  reminderMilesBefore: numberText(intervalMiles()),
   roomId: z.string().optional(),
   referenceAttachmentId: z.string().optional(),
   referencePage: z.string().optional(),
+}).superRefine((v, ctx) => {
+  // The intervals are only sent (and only shown) for "Every"; miles only on a vehicle.
+  if (v.repeat !== "every") return
+  for (const [path, number] of [["intervalDays", intervalDays()], ["intervalMiles", v.assetType === "VEHICLE" ? intervalMiles() : null]] as const) {
+    const message = number && fieldIssue(number, v[path])
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [path], message })
+  }
 })
 
 type FormValues = z.infer<typeof schema>
+
+// The fields that show their own message; an error on any other (the room, months or manual) is toasted.
+const SHOWN_FIELDS = ["title", "description", "intervalDays", "intervalMiles", "dueDay", "estimatedCost", "nextDueDate", "nextDueMileage", "reminderDaysBefore", "reminderMilesBefore", "referencePage"]
 
 /** Starting values for a new reminder, such as the one "Plan replacement" prefills. */
 export type MaintenanceFormDefaults = Partial<Pick<FormValues, "title" | "repeat" | "nextDueDate" | "estimatedCost">>
@@ -240,11 +252,7 @@ export function MaintenanceFormDialog({ open, onClose, assetId, assetType, sched
       : await createMaintenanceSchedule(payload)
 
     if (result?.error) {
-      const roomError = "roomId" in result.error ? result.error.roomId?.[0] : undefined
-      const monthsError = "dueMonths" in result.error ? result.error.dueMonths?.[0] : undefined
-      const fileError = "referenceAttachmentId" in result.error ? result.error.referenceAttachmentId?.[0] : undefined
-      const pageError = "referencePage" in result.error ? result.error.referencePage?.[0] : undefined
-      toast.error(roomError ?? monthsError ?? fileError ?? pageError ?? "Please fix the errors and try again.")
+      showServerError(form, result.error, SHOWN_FIELDS)
       return
     }
 

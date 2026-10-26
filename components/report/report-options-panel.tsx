@@ -73,7 +73,7 @@ export function ReportOptionsPanel({ options }: { options: ReportOptions }) {
 
   return (
     <aside
-      className={`no-print sticky top-4 w-60 shrink-0 self-start rounded-lg border bg-background p-4 ${pending ? "opacity-70" : ""}`}
+      className={`no-print mt-12 w-full self-stretch md:sticky md:top-4 md:mt-0 md:w-60 md:shrink-0 md:self-start rounded-lg border bg-background p-4 ${pending ? "opacity-70" : ""}`}
       aria-label="Report contents"
     >
       <h2 className="mb-2 text-sm font-semibold">Include in report</h2>

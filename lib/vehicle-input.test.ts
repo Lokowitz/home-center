@@ -42,3 +42,39 @@ describe("vehicle input", () => {
     expect(vehicleSchema.safeParse({ ...base, currentMileage: "1.5" }).success).toBe(false)
   })
 })
+
+describe("vehicle limits", () => {
+  const ok = (extra: Record<string, unknown>) => vehicleSchema.safeParse({ ...base, ...extra }).success
+
+  it("takes a reading up to 10,000,000 and refuses more, negatives and fractions", () => {
+    expect(ok({ currentMileage: "10000000" })).toBe(true)
+    expect(ok({ currentMileage: "10000001" })).toBe(false)
+    expect(ok({ currentMileage: "-1" })).toBe(false)
+    expect(ok({ currentMileage: "1500.5" })).toBe(false)
+    expect(ok({ currentMileage: "1e21" })).toBe(false)
+  })
+
+  it("takes a price from 0 to 10,000,000 and refuses a negative one", () => {
+    expect(ok({ purchasePrice: "0" })).toBe(true)
+    expect(ok({ purchasePrice: "10000000" })).toBe(true)
+    expect(ok({ purchasePrice: "10000000.01" })).toBe(false)
+    expect(ok({ purchasePrice: "-100" })).toBe(false)
+    expect(ok({ purchasePrice: "1e30" })).toBe(false)
+  })
+
+  it("keeps the year from 1900 to 2100 and the purchase date from 1900 to 2200", () => {
+    expect(ok({ year: "1900" })).toBe(true)
+    expect(ok({ year: "2100" })).toBe(true)
+    expect(ok({ year: "1899" })).toBe(false)
+    expect(ok({ year: "2101" })).toBe(false)
+    expect(ok({ year: "275760" })).toBe(false)
+    expect(ok({ purchaseDate: "1900-01-01" })).toBe(true)
+    expect(ok({ purchaseDate: "2201-01-01" })).toBe(false)
+    expect(ok({ purchaseDate: "0001-01-01" })).toBe(false)
+  })
+
+  it("limits names to 200 characters", () => {
+    expect(ok({ name: "a".repeat(200) })).toBe(true)
+    expect(ok({ name: "a".repeat(201) })).toBe(false)
+  })
+})

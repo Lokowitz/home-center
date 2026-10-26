@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { orGone } from "@/lib/gone"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireHealth } from "@/lib/features-server"
@@ -36,7 +37,8 @@ export async function updateProvider(id: string, values: FormValues): Promise<Ac
   const parsed = providerSchema.safeParse(values)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  await prisma.provider.update({ where: { id }, data: parsed.data })
+  const saved = await orGone(() => prisma.provider.update({ where: { id }, data: parsed.data }))
+  if (saved) return { error: saved.error }
   revalidateProviders()
   return { success: true }
 }

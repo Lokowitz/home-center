@@ -178,3 +178,69 @@ describe("premiumSchema", () => {
     expect(premiumSchema.safeParse({ amount: "5" }).success).toBe(false)
   })
 })
+
+describe("input limits", () => {
+  const dateError = "Pick a date between 1900 and 2200."
+  const errors = (r: { success: boolean; error?: { flatten(): { fieldErrors: Record<string, string[] | undefined> } } }) =>
+    r.success ? {} : r.error!.flatten().fieldErrors
+
+  it("keeps health dates between 1900 and 2200", () => {
+    const give = (dateGiven: string) => immunizationSchema.safeParse({ vaccine: "Flu", dateGiven })
+    expect(give("1900-01-01").success).toBe(true)
+    expect(give("2200-12-31").success).toBe(true)
+    expect(errors(give("1899-12-31")).dateGiven).toEqual([dateError])
+    expect(errors(give("2201-01-01")).dateGiven).toEqual([dateError])
+    expect(give("0001-01-01").success).toBe(false)
+    expect(give("275760-01-01").success).toBe(false)
+    expect(observationSchema.safeParse({ date: "2024-02-30", type: "Cough" }).success).toBe(false)
+    expect(personSchema.safeParse({ name: "A", relationship: "SELF", dateOfBirth: "1850-01-01" }).success).toBe(false)
+    expect(personSchema.safeParse({ name: "A", relationship: "SELF", dateOfBirth: "1900-01-01" }).success).toBe(true)
+  })
+
+  it("keeps a policy's dates in range and its amounts from 0 to 10,000,000", () => {
+    const policy = (extra: Record<string, unknown>) => insuranceSchema.safeParse({ carrier: "Acme", kind: "HOME", ...extra })
+    expect(policy({ startDate: "1900-01-01", endDate: "2200-12-31" }).success).toBe(true)
+    expect(policy({ startDate: "1899-12-31" }).success).toBe(false)
+    expect(policy({ endDate: "2201-01-01" }).success).toBe(false)
+    expect(policy({ deductible: "10000000" }).success).toBe(true)
+    expect(errors(policy({ deductible: "10000001" })).deductible).toEqual(["Enter an amount from 0 to 10,000,000."])
+    expect(policy({ deductible: "-1" }).success).toBe(false)
+    expect(policy({ deductible: "1e21" }).success).toBe(false)
+    expect(policy({ outOfPocketMax: "10000001" }).success).toBe(false)
+    expect(policy({ coverages: [{ label: "Dwelling", limit: "10000000", deductible: "0" }] }).success).toBe(true)
+    expect(policy({ coverages: [{ label: "Dwelling", limit: "10000001" }] }).success).toBe(false)
+    expect(policy({ coverages: [{ label: "Dwelling", deductible: "-5" }] }).success).toBe(false)
+  })
+
+  it("limits a premium to 0 through 10,000,000 and keeps its date in range", () => {
+    const premium = (extra: Record<string, unknown>) => premiumSchema.safeParse({ effectiveDate: "2024-01-01", amount: "100", ...extra })
+    expect(premium({ amount: "0" }).success).toBe(true)
+    expect(premium({ amount: "10000000" }).success).toBe(true)
+    expect(premium({ amount: "10000001" }).success).toBe(false)
+    expect(premium({ amount: "-1" }).success).toBe(false)
+    expect(premium({ amount: "1e21" }).success).toBe(false)
+    expect(premium({ effectiveDate: "0001-01-01" }).success).toBe(false)
+    expect(premium({ effectiveDate: "275760-01-01" }).success).toBe(false)
+    const r = premium({ amount: "145.505" })
+    expect(r.success && r.data.amount).toBe(145.505)
+  })
+
+  it("limits a refill interval to 3650 days", () => {
+    const med = (refillIntervalDays: string) => medicationSchema.safeParse({ name: "Zyrtec", refillIntervalDays })
+    expect(med("3650").success).toBe(true)
+    expect(med("3651").success).toBe(false)
+    expect(med("99999999999").success).toBe(false)
+    expect(med("30").success).toBe(true)
+  })
+
+  it("limits names to 200 characters", () => {
+    const long = "a".repeat(201)
+    const exact = "a".repeat(200)
+    expect(personSchema.safeParse({ name: exact, relationship: "SELF" }).success).toBe(true)
+    expect(personSchema.safeParse({ name: long, relationship: "SELF" }).success).toBe(false)
+    expect(providerSchema.safeParse({ name: long }).success).toBe(false)
+    expect(insuranceSchema.safeParse({ carrier: exact, kind: "HOME" }).success).toBe(true)
+    expect(insuranceSchema.safeParse({ carrier: long, kind: "HOME" }).success).toBe(false)
+    expect(insuranceSchema.safeParse({ carrier: "Acme", kind: "HOME", planName: long }).success).toBe(false)
+  })
+})

@@ -39,7 +39,7 @@ export const RECORD_HELP: FieldHelpMap = {
   },
   "service.cost": {
     title: "Cost",
-    what: "What you paid.",
+    what: "What you paid. A negative amount records a refund.",
     use: "Adds to the asset's totals and the costs charts.",
   },
   "service.category": {

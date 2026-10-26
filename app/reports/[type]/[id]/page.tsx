@@ -73,14 +73,14 @@ export default async function ReportPage({
           panel can take the top-left corner; this row repeats the page's own
           column widths to line it up. */}
       <div className="no-print pointer-events-none fixed inset-x-0 top-4 z-20 flex justify-center gap-6">
-        {assetType === "PERSON" && <div className="w-60 shrink-0" aria-hidden="true" />}
+        {assetType === "PERSON" && <div className="hidden w-60 shrink-0 md:block" aria-hidden="true" />}
         <div className="w-full max-w-[8.5in]">
           <Link
             href={assetHref(assetType, id)}
-            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+            className="pointer-events-auto inline-flex max-w-[calc(100%-11rem)] items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-sm text-muted-foreground shadow-sm transition-colors hover:text-foreground sm:max-w-full"
           >
-            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            Back to {data.asset.name}
+            <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span className="truncate">Back to {data.asset.name}</span>
           </Link>
         </div>
       </div>
@@ -88,7 +88,7 @@ export default async function ReportPage({
         <PrintButton />
       </div>
 
-      <div className="mx-auto flex w-full items-start justify-center gap-6 print:block">
+      <div className="mx-auto flex w-full flex-col items-start justify-center gap-6 px-3 md:flex-row md:px-0 print:block print:px-0">
         {assetType === "PERSON" && <ReportOptionsPanel options={options} />}
         <div className="mt-12 w-full max-w-[8.5in] print:mt-0 print:max-w-none">
           <AssetReport data={data} options={options} />

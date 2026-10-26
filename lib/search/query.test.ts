@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  bestPerKey, highlight, idsNamed, matchKind, mergeSemantic, nearest, rankSections, searchTerms, semanticOnly, termsWhere,
+  bestPerKey, highlight, idsNamed, matchKind, mergeSemantic, nearest, rankSections, searchTerms, semanticOnly, termsWhere, wildcardTermsMatch,
 } from "./query"
 import type { Hit } from "@/lib/documents/index-db"
 import type { AssetResult, Section } from "./types"
@@ -45,6 +45,20 @@ describe("termsWhere", () => {
         { OR: [{ title: { contains: "civic" } }, { title: { contains: "oil" } }] },
       ],
     })
+  })
+})
+
+describe("wildcardTermsMatch", () => {
+  it("lets an underscore or percent match only itself", () => {
+    expect(wildcardTermsMatch(["qa_places"], ["QA-places"])).toBe(false)
+    expect(wildcardTermsMatch(["qa_places"], ["Visit QA_places today"])).toBe(true)
+    expect(wildcardTermsMatch(["50%"], ["500 units"])).toBe(false)
+    expect(wildcardTermsMatch(["50%"], ["50% off"])).toBe(true)
+  })
+
+  it("leaves other terms to the database", () => {
+    expect(wildcardTermsMatch(["civic"], ["Honda"])).toBe(true)
+    expect(wildcardTermsMatch(["qa_x", "civic"], [null, "qa_x"])).toBe(true)
   })
 })
 

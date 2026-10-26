@@ -30,7 +30,7 @@ export function AssetViewToggle({
             aria-pressed={active}
             title={option.label}
             className={cn(
-              "inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+              "relative inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors max-sm:before:absolute max-sm:before:top-1/2 max-sm:before:left-1/2 max-sm:before:size-10 max-sm:before:-translate-1/2",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
               active
                 ? "bg-sidebar-primary/10 text-sidebar-primary"

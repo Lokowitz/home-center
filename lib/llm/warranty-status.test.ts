@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { warrantyState } from "./warranty-status"
+import { warrantyState, warrantyToday } from "./warranty-status"
 
 const now = new Date("2026-09-27T12:00:00Z")
 const d = (s: string) => new Date(`${s}T14:00:00Z`)
@@ -13,6 +13,14 @@ describe("warrantyState", () => {
 
   it("counts a warranty ending today as still expiring", () => {
     expect(warrantyState(d("2026-09-27"), now, 30)).toEqual({ state: "expiring", daysLeft: 0 })
+  })
+
+  // The stored expiry is UTC midnight of its day. On a server west of UTC, the
+  // evening has already crossed into the next UTC day, but it is still the same day.
+  it("keeps a warranty ending today active in the evening, as stored UTC midnight", () => {
+    const evening = new Date(2026, 9, 25, 21)
+    expect(warrantyToday(evening)).toEqual(new Date(Date.UTC(2026, 9, 25)))
+    expect(warrantyState(new Date("2026-10-25T00:00:00Z"), evening, 30)).toEqual({ state: "expiring", daysLeft: 0 })
   })
 
   it("treats a missing expiry as open-ended", () => {

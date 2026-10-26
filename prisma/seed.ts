@@ -15,7 +15,7 @@ async function main() {
 
   // Read from env vars; fall back to insecure defaults that force a password reset
   const name = process.env.ADMIN_NAME ?? "Admin"
-  const email = process.env.ADMIN_EMAIL ?? "admin@localhost"
+  const email = (process.env.ADMIN_EMAIL ?? "admin@localhost").trim().toLowerCase()
   const password = process.env.ADMIN_PASSWORD ?? "changeme"
   const mustReset = !process.env.ADMIN_PASSWORD // force reset only when using the default
 

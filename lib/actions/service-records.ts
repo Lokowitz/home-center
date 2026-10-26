@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { orGone } from "@/lib/gone"
 import { revalidatePath } from "next/cache"
 import { assetHref } from "@/lib/assets"
 import type { AssetType, MeterUnit, Prisma } from "@/app/generated/prisma/client"
@@ -108,7 +109,8 @@ export async function updateServiceRecord(id: string, data: ServiceRecordInput) 
   if (room && "error" in room) return { error: { roomId: [room.error] } }
 
   const row = await withProviderVendor(cleanServiceRecord(parsed.data, session.user.id))
-  await prisma.serviceRecord.update({ where: { id }, data: { ...row, roomId: room?.roomId } })
+  const saved = await orGone(() => prisma.serviceRecord.update({ where: { id }, data: { ...row, roomId: room?.roomId } }))
+  if (saved) return { error: saved.error }
   revalidatePath(assetHref(parsed.data.assetType, parsed.data.assetId))
   revalidatePath("/records")
   return { success: true }

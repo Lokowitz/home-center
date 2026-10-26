@@ -30,7 +30,7 @@ const prisma = new PrismaClient({ adapter: new PrismaLibSql({ url }) })
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? "./uploads"
 const MANAGED_DIRS = ["properties", "vehicles", "equipment", "people", "service", "warranty", "maintenance", "condition", "insurance"]
 
-const ADMIN_EMAIL = process.env.DEMO_EMAIL ?? "demo@homecenter.local"
+const ADMIN_EMAIL = (process.env.DEMO_EMAIL ?? "demo@homecenter.local").trim().toLowerCase()
 const ADMIN_PASSWORD = process.env.DEMO_PASSWORD ?? "demo1234"
 const ADMIN_NAME = process.env.DEMO_NAME ?? "Alex Rivera"
 

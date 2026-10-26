@@ -27,15 +27,16 @@ const FormField = <
   )
 }
 
+const FormItemContext = React.createContext<{ id: string }>({} as { id: string })
+
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const { getFieldState, formState } = useFormContext()
   const fieldState = getFieldState(fieldContext.name, formState)
-  const id = React.useId()
+  // The FormItem's id, so the label, control and message all agree on one.
+  const { id } = React.useContext(FormItemContext)
   return { id, name: fieldContext.name, formItemId: `${id}-form-item`, formMessageId: `${id}-form-item-message`, ...fieldState }
 }
-
-const FormItemContext = React.createContext<{ id: string }>({} as { id: string })
 
 const FormItem = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
   const id = React.useId()

@@ -15,21 +15,10 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createWarranty, updateWarranty } from "@/lib/actions/warranties"
 import { deleteAttachment } from "@/lib/actions/attachments"
-import { ASSET_TYPES } from "@/lib/assets"
+import { warrantySchema as schema } from "@/lib/warranty-input"
+import { showServerError } from "@/components/forms/server-errors"
 import { Paperclip, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { Attachment, Warranty, AssetType } from "@/app/generated/prisma/client"
-
-const schema = z.object({
-  assetId: z.string(),
-  assetType: z.enum(ASSET_TYPES),
-  productName: z.string().min(1, "Product name is required"),
-  purchaseDate: z.string().optional(),
-  expirationDate: z.string().optional(),
-  vendor: z.string().optional(),
-  vendorPhone: z.string().optional(),
-  vendorEmail: z.string().optional(),
-  notes: z.string().optional(),
-})
 
 type FormValues = z.infer<typeof schema>
 
@@ -132,7 +121,7 @@ export function WarrantyFormDialog({ open, onClose, assetId, assetType, warranty
       ? await updateWarranty(existingId, payload)
       : await createWarranty(payload)
 
-    if (result?.error) { toast.error("Please fix the errors and try again."); return }
+    if (result?.error) { showServerError(form, result.error); return }
 
     const warrantyId = existingId ?? (result as { success: boolean; id?: string }).id
     if (warrantyId && !existingId) setCreatedWarrantyId(warrantyId)

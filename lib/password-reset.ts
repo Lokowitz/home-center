@@ -1,5 +1,5 @@
 import type { LoginThrottle } from "./login-throttle"
-import { isEmailAddress } from "./email-address"
+import { isEmailAddress, normalizeEmail } from "./email-address"
 import { MIN_PASSWORD_LENGTH } from "./password-change"
 
 // "Forgot password": an emailed one-time link to /reset-password. Kept free of
@@ -69,7 +69,7 @@ export function resetEmail(name: string | null, token: string, appUrl: string | 
 
 export async function requestPasswordReset(emailInput: unknown, ip: string, deps: RequestDeps): Promise<RequestResult> {
   if (!(await deps.mailReady())) return "unavailable"
-  const email = typeof emailInput === "string" ? emailInput.trim() : ""
+  const email = typeof emailInput === "string" ? normalizeEmail(emailInput) : ""
   if (!isEmailAddress(email)) return "invalid"
 
   if (deps.throttle.isBlocked(email, ip)) return "throttled"

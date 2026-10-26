@@ -30,12 +30,20 @@ function initialFor(p: Provider | null): FormValues {
 interface Props {
   providers: Provider[]
   stats: Record<string, { visits: number; spend: number }>
+  openId?: string
 }
 
-export function ProvidersTable({ providers, stats }: Props) {
+export function ProvidersTable({ providers, stats, openId }: Props) {
   const fmt = useFormat()
   const [editing, setEditing] = useState<Provider | null>(null)
   const [open, setOpen] = useState(false)
+
+  const [prevOpenId, setPrevOpenId] = useState<string | undefined>(undefined)
+  if (openId !== prevOpenId) {
+    setPrevOpenId(openId)
+    const match = openId ? providers.find((p) => p.id === openId) : undefined
+    if (match) { setEditing(match); setOpen(true) }
+  }
 
   const columns: EntityColumn<Provider>[] = [
     {

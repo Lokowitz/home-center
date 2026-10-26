@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { assetPolicyLinks } from "@/lib/insurance-server"
 import { loadPropertyScope } from "@/lib/property-filter-server"
+import { ignoreGone, orGone } from "@/lib/gone"
 import { vehicleSchema, vehicleData, type VehicleInput } from "@/lib/vehicle-input"
 import { deleteAssetWithRecords } from "@/lib/asset-delete-server"
 
@@ -41,13 +42,14 @@ export async function updateVehicle(id: string, data: VehicleInput, policyIds?: 
   if (await unknownProperty(parsed.data.propertyId)) return BAD_PROPERTY
 
   const links = policyIds ? await assetPolicyLinks("vehicles", id, policyIds, false, scope) : null
-  await prisma.vehicle.update({
+  const saved = await orGone(() => prisma.vehicle.update({
     where: { id },
     data: {
       ...vehicleData(parsed.data),
       ...(links ? { insurancePolicies: { connect: links.connect.map((p) => ({ id: p })), disconnect: links.disconnect.map((p) => ({ id: p })) } } : {}),
     },
-  })
+  }))
+  if (saved) return { error: saved.error }
   revalidatePath("/assets/vehicles")
   revalidatePath(`/assets/vehicles/${id}`)
   if (links) revalidatePath("/insurance")
@@ -58,7 +60,7 @@ export async function deleteVehicle(id: string) {
   const session = await auth()
   if (!session) redirect("/login")
 
-  await deleteAssetWithRecords("VEHICLE", id)
+  await ignoreGone(() => deleteAssetWithRecords("VEHICLE", id))
 
   revalidatePath("/assets/vehicles")
   revalidatePath("/records")

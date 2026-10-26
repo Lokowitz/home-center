@@ -34,7 +34,7 @@ export async function AssetInsurance({
       {belongings && (
         <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
           <div>Belongings to replace: {fmt.moneyWhole(belongings.belongings)}</div>
-          <div>Personal property coverage: {fmt.moneyWhole(belongings.coverage)}</div>
+          <div>Personal property coverage: {fmt.money(belongings.coverage)}</div>
         </div>
       )}
     </div>

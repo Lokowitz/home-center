@@ -59,6 +59,16 @@ export function termsWhere<W>(
   return { AND } as W
 }
 
+/**
+ * SQLite's LIKE reads `_` and `%` in a term as wildcards, so "qa_places" also
+ * finds "qa-places". For terms holding either, this checks the text really
+ * contains them as typed; other terms are left to the database.
+ */
+export function wildcardTermsMatch(terms: string[], texts: (string | null | undefined)[]): boolean {
+  const lower = texts.filter((t): t is string => !!t).map((t) => t.toLowerCase())
+  return terms.every((term) => !/[_%]/.test(term) || lower.some((t) => t.includes(term)))
+}
+
 /** Ids from `names` whose name contains `term` (already lowercase). */
 export function idsNamed(names: Record<string, string>, term: string): string[] {
   return Object.entries(names)

@@ -157,3 +157,21 @@ describe("planRoomLinks", () => {
     expect(planRoomLinks(twins, [{ id: "e1", roomId: null, location: "Bedroom" }])).toEqual([])
   })
 })
+
+describe("roomSchema limits", () => {
+  const base = { propertyId: "p1", name: "Kitchen" }
+  const ok = (extra: Record<string, unknown>) => roomSchema.safeParse({ ...base, ...extra }).success
+
+  it("keeps the flooring date between 1900 and 2200", () => {
+    expect(ok({ flooringInstalled: "1900-01-01" })).toBe(true)
+    expect(ok({ flooringInstalled: "2200-12-31" })).toBe(true)
+    expect(ok({ flooringInstalled: "1899-12-31" })).toBe(false)
+    expect(ok({ flooringInstalled: "2201-01-01" })).toBe(false)
+    expect(ok({ flooringInstalled: "  " })).toBe(true)
+  })
+
+  it("limits the name to 200 characters", () => {
+    expect(ok({ name: "a".repeat(200) })).toBe(true)
+    expect(ok({ name: "a".repeat(201) })).toBe(false)
+  })
+})

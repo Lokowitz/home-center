@@ -37,9 +37,11 @@ interface Props {
   initialView: AssetView
   /** Shown instead of the usual empty state when the property filter left nothing. */
   emptyText?: string | null
+  /** Property a new item starts on; null: Not assigned. */
+  newPropertyId?: string | null
 }
 
-export function EquipmentList({ equipment, properties, initialView, emptyText }: Props) {
+export function EquipmentList({ equipment, properties, initialView, emptyText, newPropertyId }: Props) {
   const router = useRouter()
   const [view, setView] = useAssetView("equipment", initialView)
   const [editing, setEditing] = useState<Equipment | null>(null)
@@ -98,7 +100,7 @@ export function EquipmentList({ equipment, properties, initialView, emptyText }:
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`More actions for "${e.name}"`}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors"
+          className="relative max-sm:before:absolute max-sm:before:top-1/2 max-sm:before:left-1/2 max-sm:before:size-10 max-sm:before:-translate-1/2 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors"
           onClick={(evt) => evt.stopPropagation()}
         >
           <MoreHorizontal className="h-4 w-4" />
@@ -117,7 +119,7 @@ export function EquipmentList({ equipment, properties, initialView, emptyText }:
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Equipment</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{equipment.length} item{equipment.length !== 1 ? "s" : ""}</p>
@@ -162,6 +164,7 @@ export function EquipmentList({ equipment, properties, initialView, emptyText }:
         onClose={() => setDialogOpen(false)}
         equipment={editing}
         properties={properties}
+        defaultPropertyId={newPropertyId ?? undefined}
       />
     </>
   )

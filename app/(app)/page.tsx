@@ -12,7 +12,9 @@ import { assetHref } from "@/lib/assets"
 import { scheduleDue, dueCandidateFilter, type Due } from "@/lib/maintenance-due"
 import { loadVehicleMileage } from "@/lib/maintenance-due-server"
 import { loadCostRecords } from "@/lib/costs-server"
-import { bucketed, priorPeriod, sum, yearToDate } from "@/lib/costs"
+import { bucketed, monthsBack, priorPeriod, sum, yearToDate } from "@/lib/costs"
+import { localDay } from "@/lib/equipment-life"
+import { warrantyToday } from "@/lib/llm/warranty-status"
 import { SpendArea } from "@/components/charts/spend-area"
 import { ownedWhere } from "@/lib/features"
 import { loadFeatures } from "@/lib/features-server"
@@ -44,7 +46,8 @@ export default async function DashboardPage() {
   const session = await auth()
 
   const now = new Date()
-  const in60 = new Date(now.getTime() + 60 * 86400000)
+  const today = warrantyToday(now)
+  const in60 = new Date(today.getTime() + 60 * 86400000)
   const [features, scope] = await Promise.all([loadFeatures(), loadPropertyScope()])
   const owned = ownedWhere(features)
   const ownedScope = ownedScopeWhere(scope)
@@ -60,7 +63,7 @@ export default async function DashboardPage() {
     prisma.equipment.count({ where: equipmentScopeWhere(scope) }),
     features.health ? prisma.person.count({ where: personScopeWhere(scope) }) : 0,
     prisma.serviceRecord.count({ where: { ...owned, ...ownedScope } }),
-    prisma.warranty.count({ where: { ...owned, ...ownedScope, expirationDate: { gt: now } } }),
+    prisma.warranty.count({ where: { ...owned, ...ownedScope, expirationDate: { gte: today } } }),
     // Unfiltered, so a household whose only data is hidden by a feature toggle
     // or the property filter is not called empty.
     prisma.person.count(),
@@ -73,7 +76,7 @@ export default async function DashboardPage() {
     }),
     loadVehicleMileage(),
     prisma.warranty.findMany({
-      where: { ...owned, ...ownedScope, expirationDate: { gte: now, lte: in60 } },
+      where: { ...owned, ...ownedScope, expirationDate: { gte: today, lte: in60 } },
       orderBy: { expirationDate: "asc" },
       take: 6,
     }),
@@ -103,8 +106,8 @@ export default async function DashboardPage() {
   const spendLastYear = sum(yearToDate(costRows, now, now.getFullYear() - 1))
   const spendDelta = spendLastYear > 0 ? (spendThisYear - spendLastYear) / spendLastYear : null
   const monthSpend = bucketed(costRows, "month", {
-    start: new Date(now.getFullYear(), now.getMonth() - (SPEND_MONTHS - 1), 1),
-    end: now,
+    start: monthsBack(now, SPEND_MONTHS),
+    end: localDay(now),
   })
   const monthSpendPrior = priorPeriod(costRows, monthSpend, "month")
 
@@ -214,7 +217,7 @@ export default async function DashboardPage() {
             ) : expiringWarranties.map((w) => {
               const assetName = assets.assetName(w.assetType, w.assetId)
               const href = assetHref(w.assetType, w.assetId)
-              const daysLeft = w.expirationDate ? Math.ceil((new Date(w.expirationDate).getTime() - now.getTime()) / 86400000) : null
+              const daysLeft = w.expirationDate ? Math.round((new Date(w.expirationDate).getTime() - today.getTime()) / 86400000) : null
               return (
                 <Link
                   key={w.id}

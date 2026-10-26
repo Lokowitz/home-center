@@ -12,6 +12,7 @@ import type { MaintenanceTemplate } from "@/lib/maintenance-templates"
 import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { cn } from "@/lib/utils"
 import { formatDueMonths, repeatsLabel } from "@/lib/maintenance-schedule"
+import { MAX_INTERVAL_DAYS, MAX_INTERVAL_MILES } from "@/lib/input-limits"
 
 type Row = { checked: boolean; days: string; miles: string }
 
@@ -104,6 +105,7 @@ export function TemplatePicker({ assetType, assetId, templates, existingTitles, 
                 <Input
                   type="number"
                   min={1}
+                  max={MAX_INTERVAL_DAYS}
                   inputMode="numeric"
                   aria-label={`${t.title}: days between`}
                   className="h-8 w-20"
@@ -118,6 +120,7 @@ export function TemplatePicker({ assetType, assetId, templates, existingTitles, 
                     <Input
                       type="number"
                       min={1}
+                      max={MAX_INTERVAL_MILES}
                       inputMode="numeric"
                       aria-label={`${t.title}: ${fmt.meterShort(meterUnit)} between`}
                       className="h-8 w-24"

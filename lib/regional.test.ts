@@ -17,6 +17,11 @@ describe("defaults reproduce today's output", () => {
   it("whole money", () => {
     expect(f.moneyWhole(1234.56)).toBe((1234.56).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }))
   })
+  it("rates keep two decimals, even in a currency with none", () => {
+    expect(f.moneyRate(0.15)).toBe("$0.15")
+    expect(fmt({ currency: "JPY" }).money(0.15)).toBe("¥0")
+    expect(fmt({ currency: "JPY" }).moneyRate(0.15)).toContain("0.15")
+  })
   it("units", () => {
     expect(f.meterShort("MILES")).toBe("mi")
     expect(f.meterShort("HOURS")).toBe("hrs")

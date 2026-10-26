@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { normalizeEmail } from "./email-address"
 import type { LoginThrottle } from "./login-throttle"
 
 // The sign-in check behind auth.ts, kept free of next-auth and Prisma so it can
@@ -34,7 +35,8 @@ const credentialsSchema = z.object({ email: z.string().min(1), password: z.strin
 export async function verifyLogin(input: unknown, ip: string, deps: LoginDeps): Promise<LoginResult> {
   const parsed = credentialsSchema.safeParse(input)
   if (!parsed.success) return { status: "invalid" }
-  const { email, password } = parsed.data
+  const email = normalizeEmail(parsed.data.email)
+  const { password } = parsed.data
 
   if (deps.throttle.isBlocked(email, ip)) return { status: "throttled" }
 

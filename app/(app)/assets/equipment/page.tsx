@@ -4,7 +4,7 @@ import { EquipmentList } from "@/components/equipment/equipment-list"
 import { propertiesWithRooms } from "@/lib/rooms-server"
 import { assetViewCookieName, parseAssetView } from "@/lib/asset-view"
 import { loadPropertyScope } from "@/lib/property-filter-server"
-import { equipmentScopeWhere, filteredEmptyText } from "@/lib/property-filter"
+import { equipmentScopeWhere, filteredEmptyText, newItemPropertyId } from "@/lib/property-filter"
 
 export default async function EquipmentPage() {
   const scope = await loadPropertyScope()
@@ -18,7 +18,7 @@ export default async function EquipmentPage() {
 
   return (
     <div className="space-y-6">
-      <EquipmentList equipment={equipment} properties={properties} initialView={initialView} emptyText={filteredEmptyText(scope)} />
+      <EquipmentList equipment={equipment} properties={properties} initialView={initialView} emptyText={filteredEmptyText(scope)} newPropertyId={newItemPropertyId(scope, equipment)} />
     </div>
   )
 }

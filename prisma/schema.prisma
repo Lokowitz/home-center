@@ -435,8 +435,8 @@ model Observation {
   person      Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
   conditionId String?
   condition   HealthCondition? @relation(fields: [conditionId], references: [id], onDelete: SetNull)
-  createdById String
-  createdBy   User             @relation(fields: [createdById], references: [id])
+  createdById String?
+  createdBy   User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   attachments Attachment[]
 
@@ -577,8 +577,9 @@ model ServiceRecord {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  createdById String
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  /// Null once the author's account is deleted; the record stays.
+  createdById String?
+  createdBy   User?  @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   /// The room the work was done in, if any.
   roomId String?
@@ -663,8 +664,8 @@ model Attachment {
   sizeBytes    Int
   uploadedAt   DateTime             @default(now())
 
-  uploadedById String
-  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+  uploadedById String?
+  uploadedBy   User?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   serviceRecordId String?
   serviceRecord   ServiceRecord? @relation(fields: [serviceRecordId], references: [id], onDelete: Cascade)
@@ -721,8 +722,8 @@ model Attachment {
 model InboxItem {
   id                 String      @id @default(cuid())
   createdAt          DateTime    @default(now())
-  createdById        String
-  createdBy          User        @relation(fields: [createdById], references: [id])
+  createdById        String?
+  createdBy          User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
   status             InboxStatus @default(PENDING)
   parsedDate         DateTime?
   parsedTotal        Float?

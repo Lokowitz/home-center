@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { CATEGORY_ORDER, categoriesFor, categoryColor, dailyTotals, lastYearMonthly, nestedByAsset, rankedRowKey, SERVICE_CATEGORY_VALUES, yearlyBars } from "./costs"
+import { CATEGORY_ORDER, bucketed, categoriesFor, categoryColor, dailyTotals, lastYearMonthly, monthsBack, nestedByAsset, rankedRowKey, SERVICE_CATEGORY_VALUES, sum, yearToDate, yearlyBars } from "./costs"
+import { localDay } from "./equipment-life"
 
 describe("service categories", () => {
   it("offers medical categories only for people", () => {
@@ -115,7 +116,7 @@ describe("tile history", () => {
 
 describe("dailyTotals", () => {
   const day = (y: number, m: number, d: number, cost: number, h = 12) => ({
-    id: `${y}-${m}-${d}-${cost}`, assetType: "PROPERTY" as const, assetId: "home", cost, date: new Date(y, m, d, h),
+    id: `${y}-${m}-${d}-${cost}`, assetType: "PROPERTY" as const, assetId: "home", cost, date: new Date(Date.UTC(y, m, d, h)),
     category: null, vendor: null, title: "t", mileageAtService: null,
   })
   const now = new Date(2026, 9, 25, 15)
@@ -123,8 +124,8 @@ describe("dailyTotals", () => {
   it("gives one entry per day, oldest first, ending today", () => {
     const out = dailyTotals([], now, 60)
     expect(out).toHaveLength(60)
-    expect(out[59].date).toEqual(new Date(2026, 9, 25))
-    expect(out[0].date).toEqual(new Date(2026, 7, 27))
+    expect(out[59].date).toEqual(new Date(Date.UTC(2026, 9, 25)))
+    expect(out[0].date).toEqual(new Date(Date.UTC(2026, 7, 27)))
   })
 
   it("adds up the costs of one day, whatever the time of day", () => {
@@ -141,7 +142,40 @@ describe("dailyTotals", () => {
 
   it("crosses a month and year boundary", () => {
     const out = dailyTotals([day(2025, 11, 31, 3)], new Date(2026, 0, 2), 5)
-    expect(out.map((d) => d.date.getDate())).toEqual([29, 30, 31, 1, 2])
+    expect(out.map((d) => d.date.getUTCDate())).toEqual([29, 30, 31, 1, 2])
     expect(out[2].total).toBe(3)
+  })
+})
+
+// Records are stored as UTC midnight. A record on the first or last day of a
+// period must land in that period whatever the server's time zone is.
+describe("period edges", () => {
+  const rec = (iso: string, cost: number) => ({
+    id: iso, assetType: "PROPERTY" as const, assetId: "home", cost, date: new Date(iso + "T00:00:00Z"),
+    category: null, vendor: null, title: "t", mileageAtService: null,
+  })
+  const now = new Date(2026, 9, 25, 20)
+
+  it("counts 1 January in its own year to date, and keeps 31 December out of the earlier window", () => {
+    const rows = [rec("2026-01-01", 1), rec("2025-12-31", 10), rec("2025-01-01", 100)]
+    expect(sum(yearToDate(rows, now))).toBe(1)
+    expect(sum(yearToDate(rows, now, 2025))).toBe(100)
+  })
+
+  it("counts a record dated today on today's bar", () => {
+    const out = dailyTotals([rec("2026-10-25", 5), rec("2026-10-24", 3)], now, 3)
+    expect(out.map((d) => d.total)).toEqual([0, 3, 5])
+  })
+
+  it("buckets the first and last day of a month into that month", () => {
+    const range = { start: monthsBack(now, 2), end: localDay(now) }
+    const out = bucketed([rec("2026-09-01", 1), rec("2026-09-30", 10), rec("2026-10-01", 100)], "month", range)
+    expect(out.map((p) => p.total)).toEqual([11, 100])
+  })
+
+  it("keeps the current month's bucket when the evening has already passed midnight UTC", () => {
+    const lastEvening = new Date(2026, 9, 31, 22)
+    const range = { start: monthsBack(lastEvening, 2), end: localDay(lastEvening) }
+    expect(bucketed([], "month", range)).toHaveLength(2)
   })
 })

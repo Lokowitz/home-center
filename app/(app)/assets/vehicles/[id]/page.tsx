@@ -64,7 +64,7 @@ export default async function VehicleDetailPage({
           {vehicle.currentMileage != null && <Stat icon={Gauge} label={fmt.meterNoun(vehicle.meterUnit)} value={`${vehicle.currentMileage.toLocaleString()} ${fmt.meterShort(vehicle.meterUnit)}`} />}
           {vehicle.color && <Stat icon={Palette} label="Color" value={vehicle.color} />}
           {vehicle.vin && <Stat icon={Fingerprint} label="VIN" value={vehicle.vin} mono />}
-          {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(vehicle.purchaseDate)} />}
+          {vehicle.purchaseDate && <Stat icon={Calendar} label="Purchased" value={fmt.date(vehicle.purchaseDate, { utc: true })} />}
         </div>
 
         <AssetInsurance policies={policies} />
@@ -84,9 +84,9 @@ export default async function VehicleDetailPage({
       </aside>
 
       <div className="min-w-0 flex-1 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <h1 className="font-heading text-2xl font-semibold">{vehicle.name}</h1>
-          <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between xl:gap-4">
+          <h1 className="min-w-0 break-words font-heading text-2xl font-semibold">{vehicle.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 xl:shrink-0">
             <VehicleEditButton vehicle={vehicle} policyChoices={policyChoices} policyIds={policies.map((p) => p.id)} propertyChoices={propertyChoices ?? undefined} />
             <Link
               href={`/reports/vehicles/${id}`}
@@ -105,7 +105,7 @@ export default async function VehicleDetailPage({
         </div>
 
         <Tabs defaultValue={tab ?? "service"}>
-          <TabsList variant="line" className="w-full justify-start border-b">
+          <TabsList variant="line" className="w-full justify-start border-b overflow-x-auto">
             <TabsTrigger value="service">Service ({serviceRecords.length})</TabsTrigger>
             <TabsTrigger value="warranties">Warranties ({warranties.length})</TabsTrigger>
             <TabsTrigger value="maintenance">Maintenance Reminders ({maintenanceSchedules.length})</TabsTrigger>
@@ -135,7 +135,7 @@ function Stat({ icon: Icon, label, value, mono }: { icon: React.ElementType; lab
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
-      <div className={mono ? "font-mono text-xs break-all text-right" : "font-semibold text-sm text-right"}>{value}</div>
+      <div className={mono ? "min-w-0 font-mono text-xs break-all text-right" : "min-w-0 break-words font-semibold text-sm text-right"}>{value}</div>
     </div>
   )
 }

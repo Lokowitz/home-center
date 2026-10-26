@@ -7,7 +7,9 @@ import { redirect } from "next/navigation"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
 import { randomBytes } from "crypto"
-import { emailAddress } from "@/lib/email-address"
+import { emailAddress, sameEmail } from "@/lib/email-address"
+import { nameText } from "@/lib/input-limits"
+import { emailTaken } from "@/lib/user-email-server"
 import { checkPasswordChange, PASSWORD_ERROR_FIELD, PASSWORD_ERROR_TEXT } from "@/lib/password-change"
 
 async function requireAdmin() {
@@ -30,7 +32,7 @@ export async function updateSelf(data: { name: string; email: string; currentPas
   if (!session) redirect("/login")
 
   const parsed = z.object({
-    name: z.string().min(1),
+    name: nameText("Name is required"),
     email: emailAddress,
     currentPassword: z.string().optional(),
   }).safeParse(data)
@@ -41,17 +43,14 @@ export async function updateSelf(data: { name: string; email: string; currentPas
     select: { email: true, passwordHash: true },
   })
   if (!account) redirect("/login")
-  if (parsed.data.email !== account.email) {
+  if (!sameEmail(parsed.data.email, account.email)) {
     const current = parsed.data.currentPassword ?? ""
     if (!current || !(await bcrypt.compare(current, account.passwordHash))) {
       return { error: { currentPassword: ["Your current password is not correct."] } }
     }
   }
 
-  const conflict = await prisma.user.findFirst({
-    where: { email: parsed.data.email, NOT: { id: session.user.id } },
-  })
-  if (conflict) return { error: { email: ["That email is already in use."] } }
+  if (await emailTaken(parsed.data.email, session.user.id)) return { error: { email: ["That email is already in use."] } }
 
   await prisma.user.update({
     where: { id: session.user.id },
@@ -113,14 +112,13 @@ export async function createUser(data: { name: string; email: string; role: stri
   await requireAdmin()
 
   const parsed = z.object({
-    name: z.string().min(1),
+    name: nameText("Name is required"),
     email: emailAddress,
     role: z.enum(["ADMIN", "USER"]),
   }).safeParse(data)
   if (!parsed.success) return { error: parsed.error.flatten().fieldErrors }
 
-  const exists = await prisma.user.findUnique({ where: { email: parsed.data.email } })
-  if (exists) return { error: { email: ["A user with this email already exists."] } }
+  if (await emailTaken(parsed.data.email)) return { error: { email: ["A user with this email already exists."] } }
 
   const tempPassword = generateTempPassword()
   const passwordHash = await bcrypt.hash(tempPassword, 12)

@@ -137,7 +137,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
 
   async function handleResume(s: MaintenanceScheduleWithAttachments) {
     const result = await setMaintenanceScheduleActive(s.id, true)
-    if (!result || result.error) { toast.error("Something went wrong."); return }
+    if (!result || result.error) { toast.error(result?.error ?? "Something went wrong."); return }
     toast.success(`"${s.title}" resumed.`)
     router.refresh()
   }
@@ -228,7 +228,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {s.nextDueDate && <div>{fmt.date(s.nextDueDate)}</div>}
+                      {s.nextDueDate && <div>{fmt.date(s.nextDueDate, { utc: true })}</div>}
                       {s.nextDueMileage != null && <div>{s.nextDueMileage.toLocaleString()} {fmt.meterShort(meterUnit)}</div>}
                       {!s.nextDueDate && s.nextDueMileage == null && (isDoneOnce(s) ? "Done" : "—")}
                     </TableCell>
@@ -236,7 +236,7 @@ export function MaintenanceList({ schedules: initialSchedules, assetId, assetTyp
                       {repeatsLabel(s, fmt.meterShort(meterUnit))}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {s.lastCompletedDate ? fmt.date(s.lastCompletedDate) : "—"}
+                      {s.lastCompletedDate ? fmt.date(s.lastCompletedDate, { utc: true }) : "—"}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <AttachmentCount attachments={s.attachments} onClick={() => setExpandedId(expanded ? null : s.id)} />

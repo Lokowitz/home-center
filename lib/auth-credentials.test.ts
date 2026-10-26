@@ -19,6 +19,13 @@ describe("verifyLogin", () => {
     expect(r).toEqual({ status: "ok", user: { id: "u1", name: "Sam", email: "a@x.com", role: "ADMIN", mustResetPassword: false, sessionVersion: 4 } })
   })
 
+  it("looks the address up trimmed and lower-cased", async () => {
+    const d = deps()
+    const r = await verifyLogin({ email: "  A@X.com ", password: "right" }, "1.1.1.1", d)
+    expect(r.status).toBe("ok")
+    expect(d.findUser).toHaveBeenCalledWith("a@x.com")
+  })
+
   it("rejects a wrong password", async () => {
     const r = await verifyLogin({ email: "a@x.com", password: "wrong" }, "1.1.1.1", deps())
     expect(r.status).toBe("invalid")

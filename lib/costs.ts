@@ -1,4 +1,5 @@
 import type { AssetType, ServiceCategory } from "@/app/generated/prisma/client"
+import { localDay } from "@/lib/equipment-life"
 
 // Pure, client-safe cost aggregation. Anything needing the database lives in
 // lib/costs-server.ts instead, matching the assets.ts / assets-server.ts split.
@@ -146,8 +147,18 @@ export function parseAssetKey(key: string): { assetType: AssetType; assetId: str
   return { assetType: key.slice(0, i) as AssetType, assetId: key.slice(i + 1) }
 }
 
+/// Record dates are stored as UTC midnight, so period math below reads them with
+/// UTC getters. `now` is a real instant: pass it through localDay first, so today
+/// and a record dated today fall on the same day in any server time zone.
+
+/// The first day of the month `count - 1` months before now's month, for a range
+/// of the last `count` months ending now.
+export function monthsBack(now: Date, count: number): Date {
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth() - (count - 1), 1))
+}
+
 export function byYear(rows: CostRow[]): Map<string, Bucket> {
-  return rollup(rows, (r) => String(r.date.getFullYear()))
+  return rollup(rows, (r) => String(r.date.getUTCFullYear()))
 }
 
 export function byAsset(rows: CostRow[]): Map<string, Bucket> {
@@ -233,15 +244,16 @@ export function sum(rows: CostRow[]): number {
 }
 
 export function inYear(rows: CostRow[], year: number): CostRow[] {
-  return rows.filter((r) => r.date.getFullYear() === year)
+  return rows.filter((r) => r.date.getUTCFullYear() === year)
 }
 
 /// Rows from 1 January of `year` through the same month and day as `now`.
 /// Passing `now.getFullYear() - 1` gives the same window a year earlier, which is
 /// what makes a year-on-year comparison fair in, say, March.
 export function yearToDate(rows: CostRow[], now: Date, year: number = now.getFullYear()): CostRow[] {
-  const start = new Date(year, 0, 1)
-  const end = new Date(year, now.getMonth(), now.getDate(), 23, 59, 59, 999)
+  const today = localDay(now)
+  const start = new Date(Date.UTC(year, 0, 1))
+  const end = new Date(Date.UTC(year, today.getUTCMonth(), today.getUTCDate(), 23, 59, 59, 999))
   return rows.filter((r) => r.date >= start && r.date <= end)
 }
 
@@ -256,10 +268,11 @@ export function lastYearMonthly(rows: CostRow[], now: Date): { label: string; to
 /// One total per day for the last `days` days, oldest first, ending today. Days
 /// with nothing stay in as zero, so quiet stretches show as gaps.
 export function dailyTotals(rows: CostRow[], now: Date, days: number): { date: Date; total: number }[] {
-  const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+  const dayKey = (d: Date) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`
   const totals = rollup<string>(rows, (r) => dayKey(r.date))
+  const today = localDay(now)
   return Array.from({ length: days }, (_, i) => {
-    const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1 - i))
+    const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - (days - 1 - i)))
     return { date, total: totals.get(dayKey(date))?.total ?? 0 }
   })
 }
@@ -284,7 +297,7 @@ export function averagePerMonth(rows: CostRow[], now: Date): number {
   const earliest = rows.reduce((min, r) => (r.date < min ? r.date : min), rows[0].date)
   const months = Math.max(
     1,
-    (now.getFullYear() - earliest.getFullYear()) * 12 + (now.getMonth() - earliest.getMonth()) + 1
+    (now.getFullYear() - earliest.getUTCFullYear()) * 12 + (now.getMonth() - earliest.getUTCMonth()) + 1
   )
   return cents(sum(rows) / months)
 }
@@ -323,20 +336,20 @@ export function isGranularity(value: unknown): value is Granularity {
 
 /// The first instant of the bucket `d` falls in.
 function bucketStart(d: Date, g: Granularity): Date {
-  if (g === "year") return new Date(d.getFullYear(), 0, 1)
-  if (g === "quarter") return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1)
-  return new Date(d.getFullYear(), d.getMonth(), 1)
+  if (g === "year") return new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  if (g === "quarter") return new Date(Date.UTC(d.getUTCFullYear(), Math.floor(d.getUTCMonth() / 3) * 3, 1))
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1))
 }
 
 function nextBucket(d: Date, g: Granularity): Date {
   const step = g === "year" ? 12 : g === "quarter" ? 3 : 1
-  return new Date(d.getFullYear(), d.getMonth() + step, 1)
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + step, 1))
 }
 
 function bucketKeyOf(d: Date, g: Granularity): string {
-  if (g === "year") return String(d.getFullYear())
-  if (g === "quarter") return `${d.getFullYear()}-Q${Math.floor(d.getMonth() / 3) + 1}`
-  return `${d.getFullYear()}-${d.getMonth()}`
+  if (g === "year") return String(d.getUTCFullYear())
+  if (g === "quarter") return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`
+  return `${d.getUTCFullYear()}-${d.getUTCMonth()}`
 }
 
 /// Two labels per bucket on purpose. `label` is the axis tick, kept short enough
@@ -344,15 +357,15 @@ function bucketKeyOf(d: Date, g: Granularity): string {
 /// is what the tooltip and the table view use, where there is room for it and no
 /// neighbouring tick to supply the year.
 function bucketLabels(d: Date, g: Granularity): { label: string; fullLabel: string } {
-  const year = d.getFullYear()
+  const year = d.getUTCFullYear()
   if (g === "year") return { label: String(year), fullLabel: String(year) }
   if (g === "quarter") {
-    const q = `Q${Math.floor(d.getMonth() / 3) + 1}`
+    const q = `Q${Math.floor(d.getUTCMonth() / 3) + 1}`
     return { label: q, fullLabel: `${q} ${year}` }
   }
   return {
-    label: d.toLocaleString(undefined, { month: "short" }),
-    fullLabel: d.toLocaleString(undefined, { month: "long", year: "numeric" }),
+    label: d.toLocaleString(undefined, { month: "short", timeZone: "UTC" }),
+    fullLabel: d.toLocaleString(undefined, { month: "long", year: "numeric", timeZone: "UTC" }),
   }
 }
 
@@ -361,10 +374,11 @@ function bucketLabels(d: Date, g: Granularity): { label: string; fullLabel: stri
 /// falls in, so the range is derived from the data rather than being a third
 /// control the reader has to set.
 export function costRange(rows: CostRow[], now: Date, year?: number): DateRange {
-  if (year != null) return { start: new Date(year, 0, 1), end: new Date(year, 11, 31) }
-  if (rows.length === 0) return { start: bucketStart(now, "month"), end: now }
+  if (year != null) return { start: new Date(Date.UTC(year, 0, 1)), end: new Date(Date.UTC(year, 11, 31)) }
+  const today = localDay(now)
+  if (rows.length === 0) return { start: bucketStart(today, "month"), end: today }
   const earliest = rows.reduce((min, r) => (r.date < min ? r.date : min), rows[0].date)
-  return { start: earliest, end: now }
+  return { start: earliest, end: today }
 }
 
 export type BucketPoint = {

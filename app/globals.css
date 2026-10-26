@@ -488,11 +488,11 @@
   @keyframes property-cue-trace {
     from { stroke-dashoffset: 100; opacity: 0; }
     10% { opacity: 1; }
-    90% { opacity: 1; }
+    80% { opacity: 1; }
     to { stroke-dashoffset: 0; opacity: 0; }
   }
   .property-cue {
-    animation: property-cue-trace 1.8s ease-in-out 1 both;
+    animation: property-cue-trace 2s ease-in-out 1 both;
   }
 
   .chart-grow {

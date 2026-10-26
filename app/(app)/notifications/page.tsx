@@ -6,6 +6,7 @@ import Link from "next/link"
 import { dismissNotification, markAllNotificationsRead, restoreNotification } from "@/lib/actions/notifications"
 import { resolveNotificationHrefs } from "@/lib/notification-links"
 import { loadNotificationReminders } from "@/lib/notification-reminders"
+import { NotificationRowLink } from "@/components/notification-row-link"
 import { ReminderActions } from "@/components/maintenance/reminder-actions"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 import { loadHiddenEntityIds, loadPropertyScope } from "@/lib/property-filter-server"
@@ -54,7 +55,7 @@ export default async function NotificationsPage({
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Notifications</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -101,7 +102,7 @@ export default async function NotificationsPage({
               >
                 <Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
                 <div className="flex-1 min-w-0">
-                  <Link href={hrefs.get(n.id) ?? "#"} className="block hover:underline">
+                  <NotificationRowLink id={n.id} href={hrefs.get(n.id) ?? "#"} isRead={n.isRead}>
                     <div className="flex items-center gap-2">
                       <p className={cn("text-sm font-medium", !n.isRead && "text-foreground")}>{n.title}</p>
                       {!n.isRead && <Badge variant="secondary" className="h-4 px-1.5 text-xs">New</Badge>}
@@ -109,7 +110,7 @@ export default async function NotificationsPage({
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
                     <p className="text-xs text-muted-foreground mt-1">{fmt.dateTime(n.createdAt)}</p>
-                  </Link>
+                  </NotificationRowLink>
                 </div>
                 {/* A due reminder is dealt with by completing or snoozing it, which
                     also clears the notification. Dismissing would only hide it. */}

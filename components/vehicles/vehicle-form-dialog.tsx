@@ -17,17 +17,19 @@ import { createVehicle, updateVehicle } from "@/lib/actions/vehicles"
 import { AddRemindersSubmit, remindersHref } from "@/components/maintenance/add-reminders-submit"
 import type { Vehicle } from "@/app/generated/prisma/client"
 import { useFormat } from "@/components/regional-provider"
+import { boundedNumber, meterReading, moneyAmount, nameText, numberText, optionalDateText, optionalNameText } from "@/lib/input-limits"
+import { showServerError } from "@/components/forms/server-errors"
 
 const schema = z.object({
-  name: z.string().min(1, "Name is required"),
-  make: z.string().min(1, "Make is required"),
-  model: z.string().min(1, "Model is required"),
-  year: z.string().min(1, "Year is required"),
-  vin: z.string().optional(),
-  color: z.string().optional(),
-  purchaseDate: z.string().optional(),
-  purchasePrice: z.string().optional(),
-  currentMileage: z.string().optional(),
+  name: nameText("Name is required"),
+  make: nameText("Make is required"),
+  model: nameText("Model is required"),
+  year: numberText(boundedNumber(1900, 2100, { whole: true, message: "Enter a year from 1900 to 2100." }), "Year is required"),
+  vin: optionalNameText,
+  color: optionalNameText,
+  purchaseDate: optionalDateText,
+  purchasePrice: numberText(moneyAmount()),
+  currentMileage: numberText(meterReading()),
   meterUnit: z.enum(["MILES", "HOURS"]),
   notes: z.string().optional(),
   policyIds: z.array(z.string()),
@@ -109,7 +111,7 @@ export function VehicleFormDialog({ open, onClose, vehicle, policyChoices = NO_C
       : await createVehicle(fields as unknown as Parameters<typeof createVehicle>[0])
 
     if (result?.error) {
-      toast.error("Please fix the errors and try again.")
+      showServerError(form, result.error)
       return
     }
     toast.success(vehicle ? "Vehicle updated." : "Vehicle added.")

@@ -14,16 +14,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CheckList } from "@/components/forms/check-list"
+import { showServerError } from "@/components/forms/server-errors"
 import { useFormat } from "@/components/regional-provider"
 import { createInsurancePolicy, updateInsurancePolicy } from "@/lib/actions/insurance"
 import { allowedLinks, coverageSuggestions, insuranceKindLabel, isHealthInsuranceKind, kindOptions } from "@/lib/insurance"
 import { toDateInput } from "@/lib/health"
 import type { PolicyInput } from "@/lib/health-schemas"
 import type { PolicyRow } from "@/lib/insurance-server"
+import { MAX_NAME_LENGTH, NAME_MESSAGE, fieldIssue, moneyAmount, optionalDateText } from "@/lib/input-limits"
 
 const schema = z.object({
-  carrier: z.string().trim().min(1, "Carrier is required"),
-  planName: z.string(),
+  carrier: z.string().trim().min(1, "Carrier is required").max(MAX_NAME_LENGTH, NAME_MESSAGE),
+  planName: z.string().trim().max(MAX_NAME_LENGTH, NAME_MESSAGE),
   kind: z.string(),
   policyNumber: z.string(),
   phone: z.string(),
@@ -38,12 +40,28 @@ const schema = z.object({
   propertyIds: z.array(z.string()),
   vehicleIds: z.array(z.string()),
   coverages: z.array(z.object({ label: z.string(), limit: z.string(), deductible: z.string() })),
+}).superRefine((v, ctx) => {
+  // Same limits as the server. Out-of-pocket max only shows, and is only sent, for health kinds.
+  const check = (path: (string | number)[], schema: z.ZodTypeAny, text: string) => {
+    const message = fieldIssue(schema, text)
+    if (message) ctx.addIssue({ code: z.ZodIssueCode.custom, path, message })
+  }
+  check(["startDate"], optionalDateText, v.startDate)
+  check(["endDate"], optionalDateText, v.endDate)
+  check(["deductible"], moneyAmount(), v.deductible)
+  if (isHealthInsuranceKind(v.kind)) check(["outOfPocketMax"], moneyAmount(), v.outOfPocketMax)
+  // A coverage line's error shows under the list, where the server's does.
+  for (const c of v.coverages) {
+    check(["coverages"], moneyAmount(), c.limit)
+    check(["coverages"], moneyAmount(), c.deductible)
+  }
 })
 
 type FormValues = z.infer<typeof schema>
 type Named = { id: string; name: string }
 
-const FIELDS = ["carrier", "planName", "kind", "policyNumber", "phone", "startDate", "endDate", "deductible", "groupNumber", "memberId", "outOfPocketMax", "notes"] as const
+// The fields that show their own message; an error on the kind or the linked people is toasted.
+const SHOWN_FIELDS = ["carrier", "planName", "policyNumber", "phone", "startDate", "endDate", "deductible", "groupNumber", "memberId", "outOfPocketMax", "notes", "coverages"]
 
 function toValues(policy: PolicyRow | null): FormValues {
   return {
@@ -112,15 +130,7 @@ export function InsuranceFormDialog({ open, onClose, policy, health, people, pro
     const result = policy ? await updateInsurancePolicy(policy.id, payload) : await createInsurancePolicy(payload)
 
     if (result.error) {
-      if (typeof result.error === "string") { toast.error(result.error); return }
-      for (const field of FIELDS) {
-        const message = result.error[field]?.[0]
-        if (message) form.setError(field, { message })
-      }
-      const coverageMessage = result.error.coverages?.[0]
-      if (coverageMessage) form.setError("coverages", { message: coverageMessage })
-      const other = result.error.memberIds?.[0] ?? result.error.kind?.[0]
-      toast.error(other ?? "Please fix the errors and try again.")
+      showServerError(form, result.error, SHOWN_FIELDS)
       return
     }
 

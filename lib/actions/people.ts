@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { orGone } from "@/lib/gone"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireHealth } from "@/lib/features-server"
@@ -50,14 +51,15 @@ export async function updatePerson(id: string, values: FormValues): Promise<Acti
     ? await assetPolicyLinks("members", id, values.insurancePolicyIds.split(",").filter(Boolean), true, scope)
     : null
   const { propertyId, ...fields } = parsed.data
-  await prisma.person.update({
+  const saved = await orGone(() => prisma.person.update({
     where: { id },
     data: {
       ...fields,
       ...propertyLinkWrite(propertyId),
       ...(links ? { insurancePolicies: { connect: links.connect.map((p) => ({ id: p })), disconnect: links.disconnect.map((p) => ({ id: p })) } } : {}),
     },
-  })
+  }))
+  if (saved) return { error: saved.error }
   revalidatePath("/assets/people")
   revalidatePath(`/assets/people/${id}`)
   if (links) revalidatePath("/insurance")

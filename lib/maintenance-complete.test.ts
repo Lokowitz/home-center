@@ -5,10 +5,10 @@ const base = { intervalDays: null, intervalMiles: null, nextDueDate: null, nextD
 
 describe("completeSchedule", () => {
   it("counts the next due date and mileage from the completion", () => {
-    const r = completeSchedule({ ...base, intervalDays: 90, intervalMiles: 5000 }, new Date(2026, 9, 1), 41000)
-    expect(r.lastCompletedDate).toEqual(new Date(2026, 9, 1))
+    const r = completeSchedule({ ...base, intervalDays: 90, intervalMiles: 5000 }, new Date(Date.UTC(2026, 9, 1)), 41000)
+    expect(r.lastCompletedDate).toEqual(new Date(Date.UTC(2026, 9, 1)))
     expect(r.lastCompletedMileage).toBe(41000)
-    expect(r.nextDueDate).toEqual(new Date(2026, 11, 30))
+    expect(r.nextDueDate).toEqual(new Date(Date.UTC(2026, 11, 30)))
     expect(r.nextDueMileage).toBe(46000)
   })
 
@@ -40,8 +40,15 @@ describe("completeSchedule", () => {
   })
 
   it("moves an overdue reminder forward from a slightly old completion", () => {
-    const r = completeSchedule({ ...base, intervalDays: 90, nextDueDate: new Date(2026, 5, 1) }, new Date(2026, 8, 1), null)
-    expect(r.nextDueDate).toEqual(new Date(2026, 10, 30))
+    const r = completeSchedule({ ...base, intervalDays: 90, nextDueDate: new Date(Date.UTC(2026, 5, 1)) }, new Date(Date.UTC(2026, 8, 1)), null)
+    expect(r.nextDueDate).toEqual(new Date(Date.UTC(2026, 10, 30)))
+  })
+
+  // Dates are stored as UTC midnight, so counting days must not follow the
+  // server's clock change: 30 days from Oct 25 is Nov 24, not Nov 23 at 23:00.
+  it("counts whole days across a daylight saving change", () => {
+    const r = completeSchedule({ ...base, intervalDays: 30 }, new Date(Date.UTC(2026, 9, 25)), null)
+    expect(r.nextDueDate).toEqual(new Date(Date.UTC(2026, 10, 24)))
   })
 
   it("uses the computed due date when there was none", () => {
@@ -109,8 +116,8 @@ describe("skipSchedule", () => {
   const now = new Date(2026, 9, 9, 12)
 
   it("moves a date one interval on from where it was due", () => {
-    const r = skipSchedule({ ...base, intervalDays: 30, nextDueDate: new Date(2026, 9, 20) }, now, null)
-    expect(r.nextDueDate).toEqual(new Date(2026, 10, 19))
+    const r = skipSchedule({ ...base, intervalDays: 30, nextDueDate: new Date(Date.UTC(2026, 9, 20)) }, now, null)
+    expect(r.nextDueDate).toEqual(new Date(Date.UTC(2026, 10, 19)))
   })
 
   it("keeps stepping until the next one is ahead, so a long-overdue reminder isn't still overdue", () => {

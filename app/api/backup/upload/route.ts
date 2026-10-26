@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto"
 import { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { NextRequest, NextResponse } from "next/server"
-import { adminSession } from "@/lib/auth-guard"
+import { adminRoute } from "@/lib/auth-guard"
 import { isJobRunning } from "@/lib/backup/jobs-server"
 import { restoreDir } from "@/lib/backup/paths"
 import { hasPending } from "@/lib/backup/restore"
@@ -13,8 +13,8 @@ import { hasPending } from "@/lib/backup/restore"
 // Excluded from proxy.ts so a multi-GB body isn't buffered or truncated; auth is checked here.
 // The body streams straight to disk. The client never names the file: the id is made here.
 export async function POST(request: NextRequest) {
-  const session = await adminSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { session, denied } = await adminRoute()
+  if (denied) return denied
   // The proxy's forced password change doesn't run for this route, so it is repeated here.
   if (session.user.mustResetPassword) return NextResponse.json({ error: "Change your password first." }, { status: 403 })
   if (!request.body) return NextResponse.json({ error: "No file" }, { status: 400 })

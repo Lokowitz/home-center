@@ -1,7 +1,7 @@
 import { createReadStream } from "node:fs"
 import { Readable } from "node:stream"
 import { NextRequest, NextResponse } from "next/server"
-import { adminSession } from "@/lib/auth-guard"
+import { adminRoute } from "@/lib/auth-guard"
 import { backupFolder, loadBackupSettings } from "@/lib/backup/settings-server"
 import { listBackups } from "@/lib/backup/store"
 
@@ -9,7 +9,8 @@ import { listBackups } from "@/lib/backup/store"
 const asciiName = (n: string) => n.replace(/[^\x20-\x7e]|["\\%]/g, "_")
 
 export async function GET(request: NextRequest) {
-  if (!(await adminSession())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const { denied } = await adminRoute()
+  if (denied) return denied
   const file = request.nextUrl.searchParams.get("file") ?? ""
   // Only names the folder listing knows; never a path from the client.
   const b = (await listBackups(backupFolder(await loadBackupSettings()))).find((x) => x.file === file)

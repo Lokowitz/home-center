@@ -16,7 +16,7 @@ export function usePrefersReducedMotion(): boolean {
   return useSyncExternalStore(subscribeMotion, () => window.matchMedia(QUERY).matches, () => false)
 }
 
-/** A thin accent line that runs once around the trigger every two minutes while `active`. Nothing moves. */
+/** A thin accent line that runs once around the trigger every 20 seconds while `active`. Nothing moves. */
 export function PropertyFilterCue({ active }: { active: boolean }) {
   const reducedMotion = usePrefersReducedMotion()
   const [tracing, setTracing] = useState(false)

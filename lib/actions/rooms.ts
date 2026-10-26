@@ -4,6 +4,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
+import { orGone } from "@/lib/gone"
 import { removeUploadDir } from "@/lib/upload-fs"
 import { requireRooms } from "@/lib/features-server"
 import { roomSchema, roomData, paintRows, type RoomInput } from "@/lib/rooms"
@@ -42,11 +43,12 @@ export async function updateRoom(id: string, data: RoomInput) {
   if (!existing) return { error: "Not found" }
   if (parsed.data.propertyId !== existing.propertyId) return { error: "A room can't move to another property" }
 
-  await prisma.$transaction([
+  const saved = await orGone(() => prisma.$transaction([
     prisma.roomPaint.deleteMany({ where: { roomId: id } }),
     prisma.room.update({ where: { id }, data: roomData(parsed.data) }),
     prisma.roomPaint.createMany({ data: paintRows(parsed.data.paints).map((p) => ({ ...p, roomId: id })) }),
-  ])
+  ]))
+  if (saved) return { error: saved.error }
   // A rename can make a room match locations typed before.
   await linkEquipmentToRooms(existing.propertyId)
   revalidatePath(`/assets/properties/${existing.propertyId}`)

@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { ignoreGone } from "@/lib/gone"
 import { loadFeatures, visibleNotificationsWhere } from "@/lib/features-server"
 import { loadHiddenEntityIds, loadPropertyScope } from "@/lib/property-filter-server"
 import { notificationScopeWhere } from "@/lib/property-filter"
@@ -15,7 +16,8 @@ async function userId() {
 }
 
 export async function markNotificationRead(id: string) {
-  await prisma.notification.update({ where: { id, userId: await userId() }, data: { isRead: true } })
+  const uid = await userId()
+  await ignoreGone(() => prisma.notification.update({ where: { id, userId: uid }, data: { isRead: true } }))
   revalidatePath("/notifications")
 }
 
@@ -37,15 +39,17 @@ export async function markAllNotificationsRead() {
 
 /** Hides it from the list and the bell. Dismissing also counts as reading it. */
 export async function dismissNotification(id: string) {
-  await prisma.notification.update({
-    where: { id, userId: await userId() },
+  const uid = await userId()
+  await ignoreGone(() => prisma.notification.update({
+    where: { id, userId: uid },
     data: { isRead: true, dismissedAt: new Date() },
-  })
+  }))
   revalidatePath("/", "layout")
 }
 
 /** Brings a dismissed notification back into the list. */
 export async function restoreNotification(id: string) {
-  await prisma.notification.update({ where: { id, userId: await userId() }, data: { dismissedAt: null } })
+  const uid = await userId()
+  await ignoreGone(() => prisma.notification.update({ where: { id, userId: uid }, data: { dismissedAt: null } }))
   revalidatePath("/", "layout")
 }

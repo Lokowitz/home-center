@@ -39,6 +39,8 @@ function currencyFormat(currency: string, opts: Intl.NumberFormatOptions = {}): 
 export function createFormatter(r: Regional) {
   const full = currencyFormat(r.currency)
   const whole = currencyFormat(r.currency, { maximumFractionDigits: 0, minimumFractionDigits: 0 })
+  // Always two decimals, so a rate like 0.15 per mile does not round to zero in yen.
+  const rate = currencyFormat(r.currency, { maximumFractionDigits: 2, minimumFractionDigits: 2 })
   const currencySymbol = full?.formatToParts(0).find((p) => p.type === "currency")?.value ?? r.currency
   const km = r.distanceUnit === "KM"
   const sqm = r.areaUnit === "SQM"
@@ -93,6 +95,8 @@ export function createFormatter(r: Regional) {
     currency: r.currency,
     currencySymbol,
     money,
+    /** A per-mile or per-hour rate: two decimals in every currency. */
+    moneyRate: (n: number) => (rate ? rate.format(n) : money(n)),
     moneyWhole: (n: number) => (whole ? whole.format(n) : `${r.currency} ${Math.round(n).toLocaleString()}`),
     /** Axis ticks and captions: "$12.5k", "€980". */
     moneyCompact: (n: number) =>

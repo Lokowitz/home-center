@@ -194,7 +194,7 @@ export function MobileSidebarTrigger(props: NavProps) {
   const [open, setOpen] = useState(false)
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted transition-colors md:hidden">
+      <SheetTrigger className="relative inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted transition-colors before:absolute before:top-1/2 before:left-1/2 before:size-10 before:-translate-1/2 md:hidden">
         <Menu className="h-4 w-4" />
         <span className="sr-only">Menu</span>
       </SheetTrigger>

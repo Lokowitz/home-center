@@ -43,7 +43,7 @@ export function FieldHelp({ id, className }: { id: string; className?: string })
         onPointerEnter={warm}
         onFocus={warm}
         className={cn(
-          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors",
+          "relative inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors max-sm:before:absolute max-sm:before:top-1/2 max-sm:before:left-1/2 max-sm:before:size-10 max-sm:before:-translate-1/2",
           "hover:text-primary focus-visible:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 data-popup-open:text-primary",
           className,
         )}

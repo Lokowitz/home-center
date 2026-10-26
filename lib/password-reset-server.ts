@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "crypto"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { createLoginThrottle } from "@/lib/login-throttle"
+import { storedEmail } from "@/lib/user-email-server"
 import { loadMailConfig } from "@/lib/notifications/mail-config"
 import { isMailConfigured, sendMail } from "@/lib/notifications/mailer"
 import {
@@ -32,7 +33,7 @@ const hashToken = (token: string) => createHash("sha256").update(token).digest("
 
 export const requestDeps: RequestDeps = {
   mailReady: passwordResetAvailable,
-  findUser: (email) => prisma.user.findFirst({ where: { email }, select: { id: true, email: true, name: true } }),
+  findUser: async (email) => prisma.user.findFirst({ where: { email: await storedEmail(email) }, select: { id: true, email: true, name: true } }),
   storeToken: async (userId, tokenHash, expiresAt) => {
     await prisma.$transaction([
       prisma.passwordResetToken.deleteMany({ where: { userId } }),

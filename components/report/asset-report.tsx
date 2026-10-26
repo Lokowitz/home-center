@@ -10,6 +10,7 @@ import { getFormat } from "@/lib/regional-server"
 import type { Formatter } from "@/lib/regional"
 import { DEFAULT_REPORT_OPTIONS, type ReportOptions } from "@/lib/report-options"
 import { paintLabel } from "@/lib/rooms"
+import { warrantyToday } from "@/lib/llm/warranty-status"
 
 // The printable asset report. A document, not a screen: one column, real
 // headings, tables where things line up, and no interactive affordance anywhere
@@ -24,8 +25,9 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
   const lifetime = sum(costRows)
   const perMeter = asset.meterUnit ? costPerMeter(costRows) : null
   const now = generatedAt
+  const today = warrantyToday(now)
   const activeWarranties = warranties.filter(
-    (w) => w.expirationDate != null && new Date(w.expirationDate) >= now
+    (w) => w.expirationDate != null && new Date(w.expirationDate) >= today
   ).length
 
   // Mileage index for the due calculations, built from the asset itself rather
@@ -39,7 +41,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
   const last = services[services.length - 1]?.date ?? null
 
   return (
-    <article className="report-doc report-sheet mx-auto w-full max-w-[8.5in] px-10 py-9 shadow-sm print:shadow-none">
+    <article className="report-doc report-sheet mx-auto w-full max-w-[8.5in] px-4 max-sm:break-words py-9 shadow-sm sm:px-10 print:shadow-none">
       <Masthead
         title={asset.name}
         subtitle={asset.subtitle}
@@ -84,7 +86,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
       <section className="report-section mt-7">
         <SectionTitle>Summary</SectionTitle>
         <div
-          className="mt-3 grid grid-cols-4 gap-px overflow-hidden rounded-md border"
+          className="mt-3 grid grid-cols-2 gap-px sm:grid-cols-4 overflow-hidden rounded-md border"
           style={{ borderColor: "var(--rule-strong)", background: "var(--rule)" }}
           data-print-color=""
         >
@@ -94,7 +96,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
             value={String(services.length)}
             note={
               first && last
-                ? `${new Date(first).getFullYear()}–${new Date(last).getFullYear()}`
+                ? `${new Date(first).getUTCFullYear()}–${new Date(last).getUTCFullYear()}`
                 : undefined
             }
           />
@@ -113,7 +115,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
           {perMeter != null ? (
             <Stat
               label={`Cost per ${fmt.meterWord(asset.meterUnit!)}`}
-              value={fmt.money(perMeter)}
+              value={fmt.moneyRate(perMeter)}
             />
           ) : asset.purchasePrice != null ? (
             <Stat
@@ -155,7 +157,7 @@ export async function AssetReport({ data, options = DEFAULT_REPORT_OPTIONS }: { 
         data-print-color=""
       >
         <div className="flex justify-between gap-6">
-          <span>
+          <span className="min-w-0 break-words">
             {asset.name} · {isPerson ? "medical summary" : `${assetLabel[asset.type]} report`} · generated{" "}
             {`${fmt.date(generatedAt, { long: true })} ${fmt.time(generatedAt)}`}
           </span>
@@ -194,7 +196,7 @@ function Masthead({
   return (
     <header>
       <div
-        className="flex items-baseline justify-between border-b pb-2 text-[8.5pt] font-semibold uppercase tracking-[0.14em]"
+        className="flex flex-wrap items-baseline justify-between gap-x-4 border-b pb-2 text-[8.5pt] font-semibold uppercase tracking-[0.14em]"
         style={{ borderColor: "var(--rule-strong)", color: "var(--ink-faint)" }}
         data-print-color=""
       >
@@ -203,9 +205,9 @@ function Masthead({
       </div>
       {/* The photo sits beside the title, not below it, so it uses the room the
           masthead leaves free; the details run on underneath the title. */}
-      <div className="report-section mt-5 grid grid-cols-[1.6fr_1fr] gap-7">
-        <div>
-          <h1 className="font-heading text-[26pt] font-semibold leading-none">{title}</h1>
+      <div className="report-section mt-5 grid grid-cols-1 gap-7 sm:grid-cols-[1.6fr_1fr]">
+        <div className="min-w-0">
+          <h1 className="break-words font-heading text-[26pt] font-semibold leading-none">{title}</h1>
           {subtitle ? (
             <p className="mt-2 text-[12pt]" style={{ color: "var(--ink-soft)" }}>
               {subtitle}
@@ -337,6 +339,7 @@ function ServiceHistory({
       {services.length === 0 ? (
         <Empty>{asset.type === "PERSON" ? "No visits have been recorded." : "No service has been recorded for this asset."}</Empty>
       ) : (
+        <div className="max-sm:overflow-x-auto">
         <table className="mt-1 w-full border-collapse text-[10pt]">
           {/* Repeated at the top of every printed page by the browser, which is
               the one thing a table gives a long document that a list cannot. */}
@@ -401,12 +404,14 @@ function ServiceHistory({
             </tfoot>
           ) : null}
         </table>
+        </div>
       )}
     </section>
   )
 }
 
 function Warranties({ warranties, now, fmt }: { warranties: ReportWarranty[]; now: Date; fmt: Formatter }) {
+  const today = warrantyToday(now)
   return (
     <section className="report-section mt-7">
       <SectionTitle>Warranties</SectionTitle>
@@ -416,8 +421,8 @@ function Warranties({ warranties, now, fmt }: { warranties: ReportWarranty[]; no
         <ul className="mt-1">
           {warranties.map((w) => {
             const expires = w.expirationDate ? new Date(w.expirationDate) : null
-            const active = expires != null && expires >= now
-            const remaining = expires ? remainingLife(expires, now) : null
+            const active = expires != null && expires >= today
+            const remaining = expires ? remainingLife(expires, today) : null
             const contact = [w.vendor, w.vendorPhone, w.vendorEmail].filter(Boolean).join(" · ")
 
             return (

@@ -11,6 +11,7 @@ import type { AssetType, MeterUnit } from "@/app/generated/prisma/client"
 import { getFormat } from "@/lib/regional-server"
 import { forecastSchedules } from "@/lib/forecast"
 import { localDay } from "@/lib/equipment-life"
+import { warrantyToday } from "@/lib/llm/warranty-status"
 
 /// Below this many years of history, yearly columns would be one or two marks —
 /// not a chart, just a number drawn tall. Short histories get quarters instead.
@@ -69,7 +70,7 @@ export async function AssetCostPanel({
       select: { title: true, nextDueDate: true, lastCompletedDate: true, createdAt: true, reminderDaysBefore: true },
     }),
     prisma.warranty.findMany({
-      where: { assetId, assetType, expirationDate: { gt: now } },
+      where: { assetId, assetType, expirationDate: { gte: warrantyToday(now) } },
       select: { productName: true, purchaseDate: true, expirationDate: true },
     }),
   ])
@@ -80,7 +81,7 @@ export async function AssetCostPanel({
   const perMeter = meterUnit ? costPerMeter(rows) : null
 
   const range = costRange(rows, now)
-  const spanYears = range.end.getFullYear() - range.start.getFullYear() + 1
+  const spanYears = range.end.getUTCFullYear() - range.start.getUTCFullYear() + 1
   const granularity: Granularity = spanYears >= YEARS_FOR_YEARLY ? "year" : "quarter"
   const buckets = stackedBuckets(rows, granularity, range)
   const populated = buckets.filter((b) => b.total > 0).length
@@ -115,7 +116,7 @@ export async function AssetCostPanel({
       <dl className="space-y-1.5 text-sm">
         <Row label={`${now.getFullYear()} to date`} value={fmt.money(sum(yearToDate(rows, now)))} />
         {perMeter != null && (
-          <Row label={`Per ${fmt.meterWord(meterUnit!)}`} value={fmt.money(perMeter)} />
+          <Row label={`Per ${fmt.meterWord(meterUnit!)}`} value={fmt.moneyRate(perMeter)} />
         )}
         {purchasePrice != null && (
           <>

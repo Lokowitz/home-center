@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { deleteAttachment } from "@/lib/actions/attachments"
+import { GENERIC_ERROR, firstMessages } from "./server-errors"
 import { Paperclip, TriangleAlert, Upload, X, Trash2, FileText, Image } from "lucide-react"
 import type { ActionResult, FieldConfig, FormValues } from "@/lib/form-types"
 import type { Attachment, AttachmentRecordType } from "@/app/generated/prisma/client"
@@ -140,8 +141,12 @@ export function EntityFormDialog({ open, onClose, title, submitLabel, successMes
         if (typeof result.error === "string") {
           toast.error(result.error)
         } else {
-          setErrors(Object.fromEntries(Object.entries(result.error).map(([k, v]) => [k, v?.[0] ?? "Invalid value"])))
-          toast.error("Please fix the errors and try again.")
+          const messages = firstMessages(result.error)
+          setErrors(messages)
+          // The message shows under its field; only one for a field this form doesn't show is toasted.
+          const hidden = Object.entries(messages).find(([name]) => !visibleFields.some((f) => f.name === name))
+          if (hidden) toast.error(hidden[1])
+          else if (Object.keys(messages).length === 0) toast.error(GENERIC_ERROR)
         }
         return
       }
@@ -319,10 +324,10 @@ function FieldInput({ field, value, onChange }: { field: FieldConfig; value: str
     return (
       <div id={id} className="flex flex-wrap gap-x-4 gap-y-2 pt-1">
         {options.map((o) => (
-          <label key={o.value} className="flex items-center gap-2 text-sm">
+          <label key={o.value} className="flex min-w-0 max-w-full items-center gap-2 text-sm [overflow-wrap:anywhere] max-sm:min-h-10">
             <input
               type="checkbox"
-              className="h-4 w-4"
+              className="h-4 w-4 shrink-0"
               checked={selected.has(o.value)}
               onChange={(e) => {
                 const next = new Set(selected)

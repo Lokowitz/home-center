@@ -89,3 +89,47 @@ describe("property input", () => {
     expect(bad({ sqFt: "abc" })).toBe(false)
   })
 })
+
+describe("equipment and property limits", () => {
+  const equipment = { name: "Furnace", category: "HVAC" as const }
+  const property = { name: "Home", type: "HOUSE" as const, address: "1 Main St" }
+  const okEquipment = (extra: Record<string, unknown>) => equipmentSchema.safeParse({ ...equipment, ...extra }).success
+  const okProperty = (extra: Record<string, unknown>) => propertySchema.safeParse({ ...property, ...extra }).success
+
+  it("takes 10,000,000 as a price or replacement cost and refuses a cent more", () => {
+    for (const field of ["purchasePrice", "replacementCost"]) {
+      expect(okEquipment({ [field]: "10000000" }), field).toBe(true)
+      expect(okEquipment({ [field]: "10000000.01" }), field).toBe(false)
+      expect(okEquipment({ [field]: "-1" }), field).toBe(false)
+      expect(okEquipment({ [field]: "1e21" }), field).toBe(false)
+    }
+    expect(okProperty({ purchasePrice: "10000000" })).toBe(true)
+    expect(okProperty({ purchasePrice: "10000001" })).toBe(false)
+    expect(okProperty({ purchasePrice: "-100" })).toBe(false)
+    expect(okProperty({ purchasePrice: "1e30" })).toBe(false)
+  })
+
+  it("keeps dates between 1900 and 2200", () => {
+    for (const field of ["purchaseDate", "installDate"]) {
+      expect(okEquipment({ [field]: "1900-01-01" }), field).toBe(true)
+      expect(okEquipment({ [field]: "2200-12-31" }), field).toBe(true)
+      expect(okEquipment({ [field]: "1899-12-31" }), field).toBe(false)
+      expect(okEquipment({ [field]: "2201-01-01" }), field).toBe(false)
+      expect(okEquipment({ [field]: "275760-01-01" }), field).toBe(false)
+    }
+    expect(okProperty({ purchaseDate: "0001-01-01" })).toBe(false)
+    expect(okProperty({ purchaseDate: "2024-05-31" })).toBe(true)
+  })
+
+  it("saves a date as UTC midnight whatever the time zone", () => {
+    const r = propertySchema.parse({ ...property, purchaseDate: "2024-05-31" })
+    expect(propertyData(r).purchaseDate?.toISOString()).toBe("2024-05-31T00:00:00.000Z")
+  })
+
+  it("limits names to 200 characters", () => {
+    expect(okEquipment({ name: "a".repeat(200) })).toBe(true)
+    expect(okEquipment({ name: "a".repeat(201) })).toBe(false)
+    expect(okProperty({ name: "a".repeat(200) })).toBe(true)
+    expect(okProperty({ name: "a".repeat(201) })).toBe(false)
+  })
+})
