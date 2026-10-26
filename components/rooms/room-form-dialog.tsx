@@ -101,7 +101,7 @@ export function RoomFormDialog({ open, onClose, propertyId, room, serviceRecords
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()} disablePointerDismissal={filePickerOpen}>
       {/* An existing room has tabs of different lengths: a fixed height keeps the dialog from resizing as you switch. */}
-      <DialogContent className={room ? "h-[85vh] grid-rows-[auto_minmax(0,1fr)] sm:max-w-5xl" : "sm:max-w-5xl max-h-[90vh] overflow-y-auto"}>
+      <DialogContent className={room ? "h-[85vh] grid-rows-[auto_minmax(0,1fr)] max-sm:grid-cols-[minmax(0,1fr)] sm:max-w-5xl" : "sm:max-w-5xl max-h-[90vh] max-sm:grid-cols-[minmax(0,1fr)] overflow-y-auto"}>
         {/* Keyed so the form, tab and staged files start fresh for each room. */}
         <RoomDialogBody
           key={room?.id ?? "new"}
@@ -341,7 +341,7 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
       </DialogHeader>
       {room ? (
         <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="min-h-0 flex-col">
-          <TabsList variant="line" className="w-full justify-start border-b">
+          <TabsList variant="line" className="w-full justify-start border-b max-sm:h-10! max-sm:overflow-x-auto max-sm:pb-2 max-sm:[scrollbar-width:none]">
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="service">Service records</TabsTrigger>
             {showEquipment && <TabsTrigger value="equipment">Equipment ({room.equipment.length})</TabsTrigger>}
@@ -349,7 +349,7 @@ function RoomDialogBody({ open, onClose, propertyId, room, serviceRecords, sched
             <TabsTrigger value="files">Files ({room.attachments.length})</TabsTrigger>
           </TabsList>
           {/* keepMounted so unsaved Details edits survive a look at another tab. */}
-          <TabsContent value="details" keepMounted className="mt-4 min-h-0 overflow-y-auto">{details}</TabsContent>
+          <TabsContent value="details" keepMounted className="mt-4 min-h-0 overflow-y-auto max-sm:-mx-4 max-sm:px-4">{details}</TabsContent>
           <TabsContent value="service" className="mt-4 min-h-0 overflow-y-auto">
             <RoomServiceRecords
               room={room}
