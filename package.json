@@ -27,7 +27,7 @@
     "@auth/prisma-adapter": "^2.11.3",
     "@base-ui/react": "^1.6.0",
     "@e965/xlsx": "^0.20.3",
-    "@hookform/resolvers": "^5.5.7",
+    "@hookform/resolvers": "^6.0.0",
     "@huggingface/transformers": "^4.3.0",
     "@kenjiuno/msgreader": "^1.28.0",
     "@libsql/client": "^0.17.0",
