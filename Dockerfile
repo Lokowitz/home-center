@@ -1,6 +1,6 @@
 # ── deps: install production + dev deps ──────────────────────────────────────
 # Debian (glibc), not Alpine: onnxruntime-node's Linux binary needs glibc ≥ 2.28.
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 # Prisma picks its engine by the OpenSSL it finds at install/generate time and
 # needs it at runtime; the slim image ships none.
 RUN apt-get update \
@@ -37,7 +37,7 @@ RUN npm run models:fetch-builtin
 RUN npm prune --omit=dev
 
 # ── runner: minimal production image ─────────────────────────────────────────
-FROM node:22-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 ARG TARGETARCH
 WORKDIR /app
 ENV NODE_ENV=production
